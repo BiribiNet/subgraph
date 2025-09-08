@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x485295dedd3d416f2324f4ae07d51f70e516ac57"  # Replace with actual BRB token address
-      startBlock: 192104534
+      address: "0xd5a0a09f7b7084ac6cefc030ba5c16bacbbefd07"  # Replace with actual BRB token address
+      startBlock: 192200860
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -31,8 +31,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x5a4d9d411132d4247b0e0e7c5175dac4104d7c85"  # Replace with actual RouletteClean address
-      startBlock: 192104551
+      address: "0x8e0bd23da3ad2d4645f78cc6b8b73484868a3a2b"  # Replace with actual RouletteClean address
+      startBlock: 192200883
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -61,8 +61,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: StakedBRB
-      address: "0x049e244a074234e4596f17f76ca8ff9cd78e3ab2"  # Replace with actual StakedBRB address
-      startBlock: 192104557
+      address: "0x15dc1be843c63317e87865e1df14afa782fae171"  # Replace with actual StakedBRB address
+      startBlock: 192200890
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
