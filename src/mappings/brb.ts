@@ -33,8 +33,7 @@ function getOrCreateGlobalState(): GlobalState {
 
 export function handleTransfer(event: Transfer): void {
   // Create transfer entity
-  const transferId = event.transaction.hash.toHexString() + "-" + event.logIndex.toString()
-  const transfer = new BRBTransfer(Bytes.fromHexString(transferId))
+  const transfer = new BRBTransfer(event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString())))
   transfer.from = event.params.from
   transfer.to = event.params.to
   transfer.value = event.params.value
@@ -58,17 +57,16 @@ export function handleTransfer(event: Transfer): void {
   // We need to check if the from address is the StakedBRB contract
   // For now, we'll check if it's during a payout phase
   const globalState = getOrCreateGlobalState()
-  const currentRound = RouletteRound.load(Bytes.fromHexString((globalState.currentRound.minus(BigInt.fromI32(1))).toString()))
+  const currentRound = RouletteRound.load(Bytes.fromHexString(globalState.currentRound.minus(BigInt.fromI32(1)).toHexString()))
   
   if (currentRound && currentRound.status == ROUND_STATUS_PAYOUT) {
     // Get the corresponding RouletteBet entity first
-    const betId = event.params.to.toHexString() + "-" + (globalState.currentRound.minus(BigInt.fromI32(1))).toString()
-    const bet = RouletteBet.load(Bytes.fromHexString(betId))
+    const bet = RouletteBet.load(event.params.to.concat(Bytes.fromHexString(globalState.currentRound.minus(BigInt.fromI32(1)).toHexString())))
     
     if (bet) {
       // This looks like a payout transfer
-      const payoutId = event.transaction.hash.toHexString() + "-" + event.logIndex.toString()
-      const payoutTx = new PayoutTransaction(Bytes.fromHexString(payoutId))
+      const payoutId = event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString()))
+      const payoutTx = new PayoutTransaction(payoutId)
       payoutTx.user = event.params.to
       payoutTx.round = currentRound.id
       payoutTx.bet = bet.id

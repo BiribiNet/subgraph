@@ -50,7 +50,7 @@ export function handleRoundStarted(event: RoundStarted): void {
 
   // Update previous round status to VRF
   const previousRoundId = event.params.roundId.minus(BigInt.fromI32(1))
-  const previousRound = RouletteRound.load(Bytes.fromHexString(previousRoundId.toString()))
+  const previousRound = RouletteRound.load(Bytes.fromHexString(previousRoundId.toHexString()))
   if (previousRound) {
     previousRound.status = ROUND_STATUS_VRF
     previousRound.requestId = event.params.requestId
@@ -61,7 +61,7 @@ export function handleRoundStarted(event: RoundStarted): void {
 }
 
 export function handleVRFResult(event: VRFResult): void {
-  const roundId = event.params.roundId.toString()
+  const roundId = event.params.roundId.toHexString()
   const round = RouletteRound.load(Bytes.fromHexString(roundId))
   if (!round) {
     log.error("Round not found for VRF result: {}", [roundId])
@@ -79,7 +79,7 @@ export function handleVRFResult(event: VRFResult): void {
 }
 
 export function handleRoundResolved(event: RoundResolved): void {
-  const roundId = event.params.roundId.toString()
+  const roundId = event.params.roundId.toHexString()
   const round = RouletteRound.load(Bytes.fromHexString(roundId))
   if (!round) {
     log.error("Round not found for resolution: {}", [roundId])
@@ -92,7 +92,7 @@ export function handleRoundResolved(event: RoundResolved): void {
 }
 
 export function handleBatchProcessed(event: BatchProcessed): void {
-  const roundId = event.params.roundId.toString()
+  const roundId = event.params.roundId.toHexString()
   const round = RouletteRound.load(Bytes.fromHexString(roundId))
   if (!round) {
     log.error("Round not found for batch processing: {}", [roundId])

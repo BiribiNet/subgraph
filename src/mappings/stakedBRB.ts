@@ -16,16 +16,14 @@ import {
   GlobalState,
   RouletteRound,
   RouletteBet,
-  PayoutTransaction,
   StakedBRBDeposit,
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   ProtocolFee
 } from "../../generated/schema"
-import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING, ROUND_STATUS_PAYOUT } from "../helpers/constant"
+import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
-import { STAKED_BRB_CONTRACT_ADDRESS } from "../helpers/constant"
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
 
@@ -83,8 +81,8 @@ export function handleWithdraw(event: Withdraw): void {
   const globalState = getOrCreateGlobalState()
 
   // Create withdrawal entity
-  const withdrawalId = event.transaction.hash.toHexString() + "-" + event.logIndex.toString()
-  const withdrawal = new StakedBRBWithdrawal(Bytes.fromHexString(withdrawalId))
+  const withdrawalId = event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString()))
+  const withdrawal = new StakedBRBWithdrawal(withdrawalId)
   withdrawal.user = event.params.owner
   withdrawal.assets = event.params.assets
   withdrawal.shares = event.params.shares
@@ -107,8 +105,8 @@ export function handleLargeWithdrawalRequested(event: LargeWithdrawalRequested):
   const globalState = getOrCreateGlobalState()
 
   // Create large withdrawal request entity
-  const requestId = event.params.user.toHexString() + "-" + event.block.timestamp.toString()
-  const request = new LargeWithdrawalRequest(Bytes.fromHexString(requestId))
+  const requestId = event.params.user.concat(Bytes.fromHexString(event.block.timestamp.toHexString()))
+  const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.user
   request.amount = event.params.amount
   request.queuePosition = BigInt.fromI32(0) // Will be updated when processed
@@ -128,8 +126,8 @@ export function handleLargeWithdrawalProcessed(event: LargeWithdrawalProcessed):
   const globalState = getOrCreateGlobalState()
 
   // Find and update the large withdrawal request
-  const requestId = event.params.user.toHexString() + "-" + event.block.timestamp.toString()
-  const request = LargeWithdrawalRequest.load(Bytes.fromHexString(requestId))
+  const requestId = event.params.user.concat(Bytes.fromHexString(event.block.timestamp.toHexString()))
+  const request = LargeWithdrawalRequest.load(requestId)
   if (request) {
     request.processedAt = event.block.timestamp
     request.save()
@@ -148,8 +146,8 @@ export function handleProtocolFeeCollected(event: ProtocolFeeCollected): void {
   const globalState = getOrCreateGlobalState()
 
   // Create protocol fee entity
-  const feeId = event.transaction.hash.toHexString() + "-" + event.logIndex.toString()
-  const fee = new ProtocolFee(Bytes.fromHexString(feeId))
+  const feeId = event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString()))
+  const fee = new ProtocolFee(feeId)
   fee.round = globalState.currentRound
   fee.amount = event.params.amount
   fee.recipient = globalState.feeRecipient
@@ -241,9 +239,9 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
 
 function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, roundId: BigInt, event: BetPlaced): void {
   // Get or create round
-  let round = RouletteRound.load(Bytes.fromHexString(roundId.toString()));
+  let round = RouletteRound.load(Bytes.fromHexString(roundId.toHexString()));
   if (!round) {
-    round = new RouletteRound(Bytes.fromHexString(roundId.toString()));
+    round = new RouletteRound(Bytes.fromHexString(roundId.toHexString()));
     round.roundNumber = roundId;
     round.status = ROUND_STATUS_BETTING;
     round.totalBets = BigInt.fromI32(0)
@@ -253,12 +251,12 @@ function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number
   }
 
   // Create or update bet entity (user + round ID)
-  const betId = user.toHexString() + "-" + roundId.toString()
-  let bet = RouletteBet.load(Bytes.fromHexString(betId))
+  const betId = user.concat(Bytes.fromHexString(roundId.toHexString()))
+  let bet = RouletteBet.load(betId)
   
   if (!bet) {
     // Create new bet entity
-    bet = new RouletteBet(Bytes.fromHexString(betId));
+    bet = new RouletteBet(betId);
     bet.user = user;
     bet.round = round.id;
     bet.amounts = [amount];
