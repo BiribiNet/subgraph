@@ -127,7 +127,7 @@ export function handleLargeWithdrawalProcessed(event: LargeWithdrawalProcessed):
   const globalState = getOrCreateGlobalState()
 
   // Find and update the large withdrawal request
-  const requestId = event.params.user.concat(Bytes.fromHexString(event.block.timestamp.toHexString()))
+  const requestId = event.params.user.concat(bigintToBytes(event.block.timestamp))
   const request = LargeWithdrawalRequest.load(requestId)
   if (request) {
     request.processedAt = event.block.timestamp
@@ -147,7 +147,7 @@ export function handleProtocolFeeCollected(event: ProtocolFeeCollected): void {
   const globalState = getOrCreateGlobalState()
 
   // Create protocol fee entity
-  const feeId = event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString()))
+  const feeId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const fee = new ProtocolFee(feeId)
   fee.round = globalState.currentRound
   fee.amount = event.params.amount

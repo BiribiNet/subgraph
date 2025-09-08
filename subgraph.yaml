@@ -74,6 +74,8 @@ dataSources:
         - LargeWithdrawalRequest
         - ProtocolFee
         - User
+        - RouletteRound
+        - RouletteBet
       abis:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
