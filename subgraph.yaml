@@ -1,0 +1,103 @@
+specVersion: 1.3.0
+description: Talus
+schema:
+  file: ./schema.graphql
+indexerHints:
+  prune: auto
+dataSources:
+  - name: BRBToken
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRB
+      address: "0x485295dedd3d416f2324f4ae07d51f70e516ac57"  # Replace with actual BRB token address
+      startBlock: 192104534
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - BRBTransfer
+        - User
+      abis:
+        - name: BRB
+          file: ./abis/BRB.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+      file: ./src/mappings/brb.ts
+  - name: RouletteClean
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: Game
+      address: "0x5a4d9d411132d4247b0e0e7c5175dac4104d7c85"  # Replace with actual RouletteClean address
+      startBlock: 192104551
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - GlobalState
+        - RouletteRound
+        - RouletteBet
+        - PayoutTransaction
+        - User
+      abis:
+        - name: Game
+          file: ./abis/Game.json
+      eventHandlers:
+        - event: RoundStarted(uint256,uint256,uint256)
+          handler: handleRoundStarted
+        - event: RoundResolved(uint256)
+          handler: handleRoundResolved
+        - event: VRFResult(uint256,uint256)
+          handler: handleVRFResult
+        - event: BatchProcessed(uint256,uint256,uint256)
+          handler: handleBatchProcessed
+      file: ./src/mappings/roulette.ts
+  - name: StakedBRB
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: StakedBRB
+      address: "0x049e244a074234e4596f17f76ca8ff9cd78e3ab2"  # Replace with actual StakedBRB address
+      startBlock: 192104557
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - GlobalState
+        - StakedBRBDeposit
+        - StakedBRBWithdrawal
+        - LargeWithdrawalRequest
+        - ProtocolFee
+        - User
+      abis:
+        - name: StakedBRB
+          file: ./abis/StakedBRB.json
+      eventHandlers:
+        - event: Deposit(indexed address,indexed address,uint256,uint256)
+          handler: handleDeposit
+        - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleWithdraw
+        - event: LargeWithdrawalRequested(address,uint256)
+          handler: handleLargeWithdrawalRequested
+        - event: LargeWithdrawalProcessed(address,uint256)
+          handler: handleLargeWithdrawalProcessed
+        - event: ProtocolFeeCollected(uint256)
+          handler: handleProtocolFeeCollected
+        - event: ProtocolFeeRateUpdated(uint256)
+          handler: handleProtocolFeeRateUpdated
+        - event: RoundTransition(uint256,uint256)
+          handler: handleRoundTransition
+        - event: BetPlaced(address,uint256,bytes)
+          handler: handleBetPlaced
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: WithdrawalSettingsUpdated(uint256)
+          handler: handleWithdrawalSettingsUpdated
+        - event: AntiSpamSettingsUpdated(uint256)
+          handler: handleAntiSpamSettingsUpdated
+      file: ./src/mappings/stakedBRB.ts

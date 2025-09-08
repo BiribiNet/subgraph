@@ -1,0 +1,23 @@
+{
+  "name": "subgraph",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "test": "graph test",
+    "deploy:pipeline": "goldsky pipeline apply pipeline.yaml",
+    "deploy:subgraph": "goldsky subgraph deploy biribi/\"$@\"",
+    "prod:subgraph": "goldsky subgraph tag create biribi/\"$@\" --tag prod"
+  },
+  "devDependencies": {
+    "@goldskycom/cli": "^13.0.0",
+    "@graphprotocol/graph-cli": "^0.97.1",
+    "@graphprotocol/graph-ts": "^0.38.1"
+  },
+  "packageManager": "yarn@4.9.2+sha512.1fc009bc09d13cfd0e19efa44cbfc2b9cf6ca61482725eb35bbc5e257e093ebf4130db6dfe15d604ff4b79efd8e1e8e99b25fa7d0a6197c9f9826358d4d65c3c",
+  "dependencies": {
+    "matchstick-as": "^0.6.0"
+  }
+}

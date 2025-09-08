@@ -1,0 +1,268 @@
+enum RoundStatus {
+  BETTING
+  VRF
+  PAYOUT
+  CLEAN
+}
+
+enum BetType {
+  STRAIGHT
+  SPLIT
+  STREET
+  CORNER
+  LINE
+  COLUMN
+  DOZEN
+  RED
+  BLACK
+  ODD
+  EVEN
+  LOW
+  HIGH
+  TRIO_012
+  TRIO_023
+}
+
+type User @entity(immutable: false) {
+  "User address"
+  id: Bytes!
+  "BRB Token Balance"
+  brbBalance: BigInt!
+  "sBRB (StakedBRB) Token Balance"
+  sbrbBalance: BigInt!
+  "Total BRB staked"
+  totalStaked: BigInt!
+  "Total BRB unstaked"
+  totalUnstaked: BigInt!
+  "Total BRB bet in roulette"
+  totalRouletteBets: BigInt!
+  "Total BRB won in roulette"
+  totalRouletteWins: BigInt!
+  "Array of Roulette bets"
+  rouletteBets: [RouletteBet]! @derivedFrom(field: "user")
+  "Array of StakedBRB deposits"
+  stakedBRBDeposits: [StakedBRBDeposit]! @derivedFrom(field: "user")
+  "Array of StakedBRB withdrawals"
+  stakedBRBWithdrawals: [StakedBRBWithdrawal]! @derivedFrom(field: "user")
+  "Array of large withdrawal requests"
+  largeWithdrawalRequests: [LargeWithdrawalRequest]! @derivedFrom(field: "user")
+  "Array of payout transactions"
+  payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "user")
+}
+
+# BRB Token Transfer
+type BRBTransfer @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "From address"
+  from: Bytes!
+  "To address"
+  to: Bytes!
+  "Amount transferred"
+  value: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type RouletteRound @entity(immutable: false) {
+  "Round ID"
+  id: Bytes!
+  "Round number"
+  roundNumber: BigInt!
+  "Round status"
+  status: RoundStatus!
+  "Winning number (0-36)"
+  winningNumber: BigInt
+  "VRF request ID"
+  requestId: BigInt
+  "VRF transaction hash"
+  vrfTxHash: Bytes
+  "Total bets in round"
+  totalBets: BigInt!
+  "Total winning bets"
+  totalWinningBets: BigInt!
+  "Total payouts"
+  totalPayouts: BigInt!
+  "Round start timestamp"
+  startedAt: BigInt!
+  "Round end timestamp"
+  endedAt: BigInt
+  "VRF result timestamp"
+  vrfResultAt: BigInt
+  "Payout completion timestamp"
+  payoutCompletedAt: BigInt
+  "Cleaning completion timestamp"
+  cleaningCompletedAt: BigInt
+  "Array of bets in this round"
+  bets: [RouletteBet]! @derivedFrom(field: "round")
+  "Array of payout transactions in this round"
+  payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "round")
+}
+
+type RouletteBet @entity(immutable: false) {
+  "User address + round ID"
+  id: Bytes!
+  "User who placed the bet"
+  user: User!
+  "Round this bet belongs to"
+  round: RouletteRound!
+  "Array of bet amounts"
+  amounts: [BigInt!]!
+  "Array of bet types"
+  betTypes: [BetType!]!
+  "Array of bet numbers/identifiers"
+  numbers: [BigInt!]!
+  "Total bet amount for this user in this round"
+  totalAmount: BigInt!
+  "Number of bets placed by this user in this round"
+  betCount: BigInt!
+  "Actual payout received"
+  actualPayout: BigInt
+  "First bet block number"
+  firstBetBlockNumber: BigInt!
+  "Latest bet block number"
+  latestBetBlockNumber: BigInt!
+  "First bet timestamp"
+  firstBetTimestamp: BigInt!
+  "Latest bet timestamp"
+  latestBetTimestamp: BigInt!
+  "Latest transaction hash"
+  latestTransactionHash: Bytes!
+  "Array of payout transactions for this bet"
+  payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "bet")
+}
+
+type PayoutTransaction @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "User who received the payout"
+  user: User!
+  "Round this payout belongs to"
+  round: RouletteRound!
+  "Bet this payout belongs to"
+  bet: RouletteBet!
+  "Payout amount"
+  amount: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+# Global state for the BRB ecosystem
+type GlobalState @entity(immutable: false) {
+  "Singleton ID"
+  id: Bytes!
+  "Current round ID"
+  currentRound: BigInt!
+  "Last round start time"
+  lastRoundStartTime: BigInt!
+  "Last round paid"
+  lastRoundPaid: BigInt!
+  "Game period in seconds"
+  gamePeriod: BigInt!
+  "Total bets placed across all rounds"
+  totalBets: BigInt!
+  "Total payouts made across all rounds"
+  totalPayouts: BigInt!
+  "Protocol fee basis points"
+  protocolFeeBasisPoints: BigInt!
+  "Fee recipient address"
+  feeRecipient: Bytes!
+  "Total assets under management in StakedBRB"
+  totalAssets: BigInt!
+  "Total shares issued by StakedBRB"
+  totalShares: BigInt!
+  "Pending bets amount"
+  pendingBets: BigInt!
+  "Last round resolved"
+  lastRoundResolved: BigInt!
+  "Round transition in progress"
+  roundTransitionInProgress: Boolean!
+  "Large withdrawal batch size"
+  largeWithdrawalBatchSize: BigInt!
+  "Max queue length"
+  maxQueueLength: BigInt!
+  "Total pending large withdrawals"
+  totalPendingLargeWithdrawals: BigInt!
+  "Total protocol fees collected"
+  totalFees: BigInt!
+}
+
+type StakedBRBDeposit @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "User who deposited"
+  user: User!
+  "Assets deposited"
+  assets: BigInt!
+  "Shares minted"
+  shares: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type StakedBRBWithdrawal @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "User who withdrew"
+  user: User!
+  "Assets withdrawn"
+  assets: BigInt!
+  "Shares burned"
+  shares: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type LargeWithdrawalRequest @entity(immutable: false) {
+  "User address + request timestamp"
+  id: Bytes!
+  "User who requested withdrawal"
+  user: User!
+  "Requested amount"
+  amount: BigInt!
+  "Queue position"
+  queuePosition: BigInt!
+  "Request timestamp"
+  requestedAt: BigInt!
+  "Processed timestamp"
+  processedAt: BigInt
+  "Whether request was cancelled"
+  isCancelled: Boolean!
+  "Block number"
+  blockNumber: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type ProtocolFee @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "Round this fee was collected from"
+  round: BigInt!
+  "Fee amount collected"
+  amount: BigInt!
+  "Fee recipient"
+  recipient: Bytes!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
