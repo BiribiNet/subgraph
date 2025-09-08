@@ -10,6 +10,7 @@ import {
   RouletteRound
 } from "../../generated/schema"
 import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN } from "../helpers/constant"
+import { bigintToBytes } from "../helpers/bigintToBytes"
 
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
@@ -50,7 +51,7 @@ export function handleRoundStarted(event: RoundStarted): void {
 
   // Update previous round status to VRF
   const previousRoundId = event.params.roundId.minus(BigInt.fromI32(1))
-  const previousRound = RouletteRound.load(Bytes.fromHexString(previousRoundId.toHexString()))
+  const previousRound = RouletteRound.load(bigintToBytes(previousRoundId))
   if (previousRound) {
     previousRound.status = ROUND_STATUS_VRF
     previousRound.requestId = event.params.requestId
@@ -61,10 +62,10 @@ export function handleRoundStarted(event: RoundStarted): void {
 }
 
 export function handleVRFResult(event: VRFResult): void {
-  const roundId = event.params.roundId.toHexString()
-  const round = RouletteRound.load(Bytes.fromHexString(roundId))
+  const roundId = event.params.roundId
+  const round = RouletteRound.load(bigintToBytes(roundId))
   if (!round) {
-    log.error("Round not found for VRF result: {}", [roundId])
+    log.error("Round not found for VRF result: {}", [roundId.toString()])
     return
   }
 
@@ -79,10 +80,10 @@ export function handleVRFResult(event: VRFResult): void {
 }
 
 export function handleRoundResolved(event: RoundResolved): void {
-  const roundId = event.params.roundId.toHexString()
-  const round = RouletteRound.load(Bytes.fromHexString(roundId))
+  const roundId = event.params.roundId
+  const round = RouletteRound.load(bigintToBytes(roundId))
   if (!round) {
-    log.error("Round not found for resolution: {}", [roundId])
+    log.error("Round not found for resolution: {}", [roundId.toString()])
     return
   }
 
@@ -92,10 +93,10 @@ export function handleRoundResolved(event: RoundResolved): void {
 }
 
 export function handleBatchProcessed(event: BatchProcessed): void {
-  const roundId = event.params.roundId.toHexString()
-  const round = RouletteRound.load(Bytes.fromHexString(roundId))
+  const roundId = event.params.roundId
+  const round = RouletteRound.load(bigintToBytes(roundId))
   if (!round) {
-    log.error("Round not found for batch processing: {}", [roundId])
+    log.error("Round not found for batch processing: {}", [roundId.toString()])
     return
   }
 

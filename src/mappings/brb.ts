@@ -3,6 +3,7 @@ import { Transfer } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, GlobalState, RouletteRound, RouletteBet, PayoutTransaction } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
 import { ROUND_STATUS_PAYOUT } from "../helpers/constant"
+import { bigintToBytes } from "../helpers/bigintToBytes"
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
 
@@ -33,7 +34,7 @@ function getOrCreateGlobalState(): GlobalState {
 
 export function handleTransfer(event: Transfer): void {
   // Create transfer entity
-  const transfer = new BRBTransfer(event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString())))
+  const transfer = new BRBTransfer(event.transaction.hash.concat(bigintToBytes(event.logIndex)))
   transfer.from = event.params.from
   transfer.to = event.params.to
   transfer.value = event.params.value
@@ -57,15 +58,15 @@ export function handleTransfer(event: Transfer): void {
   // We need to check if the from address is the StakedBRB contract
   // For now, we'll check if it's during a payout phase
   const globalState = getOrCreateGlobalState()
-  const currentRound = RouletteRound.load(Bytes.fromHexString(globalState.currentRound.minus(BigInt.fromI32(1)).toHexString()))
+  const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRound.minus(BigInt.fromI32(1))))
   
   if (currentRound && currentRound.status == ROUND_STATUS_PAYOUT) {
     // Get the corresponding RouletteBet entity first
-    const bet = RouletteBet.load(event.params.to.concat(Bytes.fromHexString(globalState.currentRound.minus(BigInt.fromI32(1)).toHexString())))
+    const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRound.minus(BigInt.fromI32(1)))))
     
     if (bet) {
       // This looks like a payout transfer
-      const payoutId = event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString()))
+      const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
       const payoutTx = new PayoutTransaction(payoutId)
       payoutTx.user = event.params.to
       payoutTx.round = currentRound.id

@@ -24,6 +24,7 @@ import {
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
+import { bigintToBytes } from "../helpers/bigintToBytes"
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
 
@@ -57,8 +58,8 @@ export function handleDeposit(event: Deposit): void {
   const globalState = getOrCreateGlobalState()
 
   // Create deposit entity
-  const depositId = event.transaction.hash.toHexString() + "-" + event.logIndex.toString()
-  const deposit = new StakedBRBDeposit(Bytes.fromHexString(depositId))
+  const depositId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const deposit = new StakedBRBDeposit(depositId)
   deposit.user = event.params.owner
   deposit.assets = event.params.assets
   deposit.shares = event.params.shares
@@ -81,7 +82,7 @@ export function handleWithdraw(event: Withdraw): void {
   const globalState = getOrCreateGlobalState()
 
   // Create withdrawal entity
-  const withdrawalId = event.transaction.hash.concat(Bytes.fromHexString(event.logIndex.toHexString()))
+  const withdrawalId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const withdrawal = new StakedBRBWithdrawal(withdrawalId)
   withdrawal.user = event.params.owner
   withdrawal.assets = event.params.assets
@@ -105,7 +106,7 @@ export function handleLargeWithdrawalRequested(event: LargeWithdrawalRequested):
   const globalState = getOrCreateGlobalState()
 
   // Create large withdrawal request entity
-  const requestId = event.params.user.concat(Bytes.fromHexString(event.block.timestamp.toHexString()))
+  const requestId = event.params.user.concat(bigintToBytes(event.block.timestamp))
   const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.user
   request.amount = event.params.amount
@@ -239,9 +240,9 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
 
 function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, roundId: BigInt, event: BetPlaced): void {
   // Get or create round
-  let round = RouletteRound.load(Bytes.fromHexString(roundId.toHexString()));
+  let round = RouletteRound.load(bigintToBytes(roundId));
   if (!round) {
-    round = new RouletteRound(Bytes.fromHexString(roundId.toHexString()));
+    round = new RouletteRound(bigintToBytes(roundId));
     round.roundNumber = roundId;
     round.status = ROUND_STATUS_BETTING;
     round.totalBets = BigInt.fromI32(0)
@@ -251,7 +252,7 @@ function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number
   }
 
   // Create or update bet entity (user + round ID)
-  const betId = user.concat(Bytes.fromHexString(roundId.toHexString()))
+  const betId = user.concat(bigintToBytes(roundId))
   let bet = RouletteBet.load(betId)
   
   if (!bet) {
