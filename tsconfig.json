@@ -1,5 +1,5 @@
 {
-  "extends": ["@talus/config/typescript/base", "assemblyscript/tsconfig-base"],
+  "extends": ["assemblyscript/tsconfig-base"],
   "compilerOptions": {
     "rootDir": "."
   },
