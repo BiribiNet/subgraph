@@ -47,11 +47,13 @@ dataSources:
         - name: Game
           file: ./abis/Game.json
       eventHandlers:
+        - event: JackpotResultEvent(uint256,uint256,uint256)
+          handler: handleJackpotResultEvent
         - event: RoundStarted(uint256,uint256,uint256)
           handler: handleRoundStarted
         - event: RoundResolved(uint256)
           handler: handleRoundResolved
-        - event: VRFResult(uint256,uint256)
+        - event: VRFResult(uint256,uint256,uint256)
           handler: handleVRFResult
         - event: BatchProcessed(uint256,uint256,uint256)
           handler: handleBatchProcessed
@@ -103,3 +105,24 @@ dataSources:
         - event: AntiSpamSettingsUpdated(uint256)
           handler: handleAntiSpamSettingsUpdated
       file: ./src/mappings/stakedBRB.ts
+  - name: BRBReferal
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRBReferal
+      address: "0x0000000000000000000000000000000000000000"  # Replace with actual BRBReferal address
+      startBlock: 192200860  # Update with appropriate start block
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - User
+        - BRBReferalTransfer
+      abis:
+        - name: BRBReferal
+          file: ./abis/BRBReferal.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+      file: ./src/mappings/brbReferal.ts

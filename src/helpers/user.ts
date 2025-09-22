@@ -7,6 +7,7 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user = new User(userAddress)
     user.brbBalance = BigInt.fromI32(0)
     user.sbrbBalance = BigInt.fromI32(0)
+    user.brbReferalBalance = BigInt.fromI32(0)
     user.totalStaked = BigInt.fromI32(0)
     user.totalUnstaked = BigInt.fromI32(0)
     user.totalRouletteBets = BigInt.fromI32(0)
@@ -35,6 +36,18 @@ export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncr
     user.sbrbBalance = user.sbrbBalance.plus(amount)
   } else {
     user.sbrbBalance = user.sbrbBalance.minus(amount)
+  }
+  
+  user.save()
+}
+
+export function updateUserBRBReferalBalance(userAddress: Bytes, amount: BigInt, isIncrease: boolean): void {
+  const user = getOrCreateUser(userAddress)
+  
+  if (isIncrease) {
+    user.brbReferalBalance = user.brbReferalBalance.plus(amount)
+  } else {
+    user.brbReferalBalance = user.brbReferalBalance.minus(amount)
   }
   
   user.save()

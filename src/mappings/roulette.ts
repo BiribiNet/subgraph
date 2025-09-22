@@ -1,46 +1,29 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
+import { BigInt, log } from "@graphprotocol/graph-ts"
 import {
   RoundStarted,
   RoundResolved,
   VRFResult,
-  BatchProcessed
+  BatchProcessed,
+  JackpotResultEvent
 } from "../../generated/RouletteClean/Game"
 import {
-  GlobalState,
   RouletteRound
 } from "../../generated/schema"
 import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
+import { getOrCreateGlobalState } from "../helpers/globalState"
 
-
-const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
-
-function getOrCreateGlobalState(): GlobalState {
-  let globalState = GlobalState.load(GLOBAL_STATE_ID)
-  if (!globalState) {
-    globalState = new GlobalState(GLOBAL_STATE_ID)
-    globalState.currentRound = BigInt.fromI32(1)
-    globalState.lastRoundStartTime = BigInt.fromI32(0)
-    globalState.lastRoundPaid = BigInt.fromI32(0)
-    globalState.gamePeriod = BigInt.fromI32(60) // Default 60 seconds
-    globalState.totalBets = BigInt.fromI32(0)
-    globalState.totalPayouts = BigInt.fromI32(0)
-    globalState.protocolFeeBasisPoints = BigInt.fromI32(250) // Default 2.5%
-    globalState.feeRecipient = Bytes.fromHexString("0x0000000000000000000000000000000000000000")
-    globalState.totalAssets = BigInt.fromI32(0)
-    globalState.totalShares = BigInt.fromI32(0)
-    globalState.pendingBets = BigInt.fromI32(0)
-    globalState.lastRoundResolved = BigInt.fromI32(0)
-    globalState.roundTransitionInProgress = false
-    globalState.largeWithdrawalBatchSize = BigInt.fromI32(5)
-    globalState.maxQueueLength = BigInt.fromI32(100)
-    globalState.totalPendingLargeWithdrawals = BigInt.fromI32(0)
+export function handleJackpotResultEvent(event: JackpotResultEvent): void {
+  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
+  if (!round) {
+    log.error("Round not found for jackpot result event: {}", [event.params.roundId.toString()])
+    return
   }
-  return globalState
+
+  round.jackpotWinnerShare = event.params.jackpotWinnerShare
+  round.jackpotWinnerCount = event.params.jackpotWinnerCount
+  round.save()
 }
-
-
-
 export function handleRoundStarted(event: RoundStarted): void {
   const globalState = getOrCreateGlobalState()
 
@@ -70,6 +53,7 @@ export function handleVRFResult(event: VRFResult): void {
   }
 
   // Update round with VRF result
+  round.jackpotNumber = event.params.jackpotNumber;
   round.winningNumber = event.params.winningNumber
   round.vrfResultAt = event.block.timestamp
   round.status = ROUND_STATUS_PAYOUT

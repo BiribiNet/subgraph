@@ -30,6 +30,8 @@ type User @entity(immutable: false) {
   brbBalance: BigInt!
   "sBRB (StakedBRB) Token Balance"
   sbrbBalance: BigInt!
+  "BRBReferal Token Balance"
+  brbReferalBalance: BigInt!
   "Total BRB staked"
   totalStaked: BigInt!
   "Total BRB unstaked"
@@ -48,6 +50,8 @@ type User @entity(immutable: false) {
   largeWithdrawalRequests: [LargeWithdrawalRequest]! @derivedFrom(field: "user")
   "Array of payout transactions"
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "user")
+  "Array of BRBReferal transfers"
+  brbReferalTransfers: [BRBReferalTransfer]! @derivedFrom(field: "user")
 }
 
 # BRB Token Transfer
@@ -68,6 +72,47 @@ type BRBTransfer @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+# BRBReferal Token Transfer
+type BRBReferalTransfer @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "User involved in transfer (either from or to)"
+  user: User!
+  "From address"
+  from: Bytes!
+  "To address"
+  to: Bytes!
+  "Amount transferred"
+  value: BigInt!
+  "Whether this was a credit (true) or debit (false) for the user"
+  isCredit: Boolean!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type JackpotPayout @entity(immutable: true) {
+  "Round ID"
+  id: Bytes!
+  "Round this jackpot win belongs to"
+  round: RouletteRound!
+  "Bet this payout belongs to"
+  bet: RouletteBet!
+  "Payout amount"
+  amount: BigInt!
+  "User who received the payout"
+  user: User!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
 type RouletteRound @entity(immutable: false) {
   "Round ID"
   id: Bytes!
@@ -77,6 +122,12 @@ type RouletteRound @entity(immutable: false) {
   status: RoundStatus!
   "Winning number (0-36)"
   winningNumber: BigInt
+  "Jackpot number"
+  jackpotNumber: BigInt
+  "Jackpot winner share"
+  jackpotWinnerShare: BigInt
+  "Jackpot winner count"
+  jackpotWinnerCount: BigInt
   "VRF request ID"
   requestId: BigInt
   "VRF transaction hash"
@@ -101,6 +152,8 @@ type RouletteRound @entity(immutable: false) {
   bets: [RouletteBet]! @derivedFrom(field: "round")
   "Array of payout transactions in this round"
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "round")
+  "Array of jackpot payouts in this round"
+  jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "round")
 }
 
 type RouletteBet @entity(immutable: false) {
@@ -134,6 +187,8 @@ type RouletteBet @entity(immutable: false) {
   latestTransactionHash: Bytes!
   "Array of payout transactions for this bet"
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "bet")
+  "Array of jackpot payouts for this bet"
+  jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "bet")
 }
 
 type PayoutTransaction @entity(immutable: true) {
@@ -173,6 +228,10 @@ type GlobalState @entity(immutable: false) {
   totalPayouts: BigInt!
   "Protocol fee basis points"
   protocolFeeBasisPoints: BigInt!
+  "Jackpot fee basis points"
+  jackpotFeeBasisPoints: BigInt!
+  "Burn fee basis points"
+  burnFeeBasisPoints: BigInt!
   "Fee recipient address"
   feeRecipient: Bytes!
   "Total assets under management in StakedBRB"
