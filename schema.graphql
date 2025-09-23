@@ -312,20 +312,3 @@ type LargeWithdrawalRequest @entity(immutable: false) {
   "Transaction hash"
   transactionHash: Bytes!
 }
-
-type ProtocolFee @entity(immutable: true) {
-  "Transaction hash + log index"
-  id: Bytes!
-  "Round this fee was collected from"
-  round: BigInt!
-  "Fee amount collected"
-  amount: BigInt!
-  "Fee recipient"
-  recipient: Bytes!
-  "Block number"
-  blockNumber: BigInt!
-  "Block timestamp"
-  timestamp: BigInt!
-  "Transaction hash"
-  transactionHash: Bytes!
-}

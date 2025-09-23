@@ -5,7 +5,6 @@ import {
   Transfer as StakedBRBTransfer,
   LargeWithdrawalRequested,
   LargeWithdrawalProcessed,
-  ProtocolFeeCollected,
   ProtocolFeeRateUpdated,
   RoundTransition,
   BetPlaced,
@@ -20,40 +19,13 @@ import {
   RouletteBet,
   StakedBRBDeposit,
   StakedBRBWithdrawal,
-  LargeWithdrawalRequest,
-  ProtocolFee
+  LargeWithdrawalRequest
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-
-const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
-
-function getOrCreateGlobalState(): GlobalState {
-  let globalState = GlobalState.load(GLOBAL_STATE_ID)
-  if (!globalState) {
-    globalState = new GlobalState(GLOBAL_STATE_ID)
-    globalState.currentRound = BigInt.fromI32(1)
-    globalState.lastRoundStartTime = BigInt.fromI32(0)
-    globalState.lastRoundPaid = BigInt.fromI32(0)
-    globalState.gamePeriod = BigInt.fromI32(60) // Default 60 seconds
-    globalState.totalBets = BigInt.fromI32(0)
-    globalState.totalPayouts = BigInt.fromI32(0)
-    globalState.protocolFeeBasisPoints = BigInt.fromI32(250) // Default 2.5%
-    globalState.feeRecipient = Bytes.fromHexString("0x0000000000000000000000000000000000000000")
-    globalState.totalAssets = BigInt.fromI32(0)
-    globalState.totalShares = BigInt.fromI32(0)
-    globalState.pendingBets = BigInt.fromI32(0)
-    globalState.lastRoundResolved = BigInt.fromI32(0)
-    globalState.roundTransitionInProgress = false
-    globalState.largeWithdrawalBatchSize = BigInt.fromI32(5)
-    globalState.maxQueueLength = BigInt.fromI32(100)
-    globalState.totalPendingLargeWithdrawals = BigInt.fromI32(0)
-    globalState.totalFees = BigInt.fromI32(0)
-  }
-  return globalState
-}
+import { getOrCreateGlobalState } from "../helpers/globalState"
 
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
@@ -159,25 +131,6 @@ export function handleJackpotFeeRateUpdated(event: JackpotFeeRateUpdated): void 
 
   // Update jackpot fee basis points
   globalState.jackpotFeeBasisPoints = event.params.newFee
-  globalState.save()
-}
-export function handleProtocolFeeCollected(event: ProtocolFeeCollected): void {
-  // Get or create GlobalState entity
-  const globalState = getOrCreateGlobalState()
-
-  // Create protocol fee entity
-  const feeId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const fee = new ProtocolFee(feeId)
-  fee.round = globalState.currentRound
-  fee.amount = event.params.amount
-  fee.recipient = globalState.feeRecipient
-  fee.blockNumber = event.block.number
-  fee.timestamp = event.block.timestamp
-  fee.transactionHash = event.transaction.hash
-  fee.save()
-
-  // Update total fees collected
-  globalState.totalFees = globalState.totalFees.plus(event.params.amount)
   globalState.save()
 }
 

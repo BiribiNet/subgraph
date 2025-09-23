@@ -74,7 +74,6 @@ dataSources:
         - StakedBRBDeposit
         - StakedBRBWithdrawal
         - LargeWithdrawalRequest
-        - ProtocolFee
         - User
         - RouletteRound
         - RouletteBet
