@@ -89,6 +89,8 @@ dataSources:
           handler: handleLargeWithdrawalRequested
         - event: LargeWithdrawalProcessed(address,uint256)
           handler: handleLargeWithdrawalProcessed
+        - event: ProtocolFeeRecipientUpdated(address)
+          handler: handleProtocolFeeRecipientUpdated
         - event: ProtocolFeeRateUpdated(uint256)
           handler: handleProtocolFeeRateUpdated
         - event: BurnFeeRateUpdated(uint256)

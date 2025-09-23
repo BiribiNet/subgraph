@@ -11,7 +11,8 @@ import {
   WithdrawalSettingsUpdated,
   AntiSpamSettingsUpdated,
   BurnFeeRateUpdated,
-  JackpotFeeRateUpdated
+  JackpotFeeRateUpdated,
+  ProtocolFeeRecipientUpdated
 } from "../../generated/StakedBRB/StakedBRB"
 import {
   GlobalState,
@@ -159,6 +160,15 @@ export function handleAntiSpamSettingsUpdated(event: AntiSpamSettingsUpdated): v
 
   // Update maximum queue length
   globalState.maxQueueLength = event.params.maxQueueLength
+  globalState.save()
+}
+
+export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpdated): void {
+  // Get or create GlobalState entity
+  const globalState = getOrCreateGlobalState()
+
+  // Update protocol fee recipient
+  globalState.feeRecipient = event.params.newRecipient
   globalState.save()
 }
 
