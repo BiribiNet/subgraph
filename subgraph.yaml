@@ -90,10 +90,12 @@ dataSources:
           handler: handleLargeWithdrawalRequested
         - event: LargeWithdrawalProcessed(address,uint256)
           handler: handleLargeWithdrawalProcessed
-        - event: ProtocolFeeCollected(uint256)
-          handler: handleProtocolFeeCollected
         - event: ProtocolFeeRateUpdated(uint256)
           handler: handleProtocolFeeRateUpdated
+        - event: BurnFeeRateUpdated(uint256)
+          handler: handleBurnFeeRateUpdated
+        - event: JackpotFeeRateUpdated(uint256)
+          handler: handleJackpotFeeRateUpdated
         - event: RoundTransition(uint256,uint256)
           handler: handleRoundTransition
         - event: BetPlaced(address,uint256,bytes)

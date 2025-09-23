@@ -7,8 +7,8 @@
     "codegen": "graph codegen",
     "build": "graph build",
     "test": "graph test",
-    "deploy:subgraph": "goldsky subgraph deploy biribi/\"$@\"",
-    "prod:subgraph": "goldsky subgraph tag create biribi/\"$@\" --tag prod"
+    "deploy:subgraph": "yarn goldsky subgraph deploy biribi/\"$@\"",
+    "prod:subgraph": "yarn goldsky subgraph tag create biribi/\"$@\" --tag prod"
   },
   "devDependencies": {
     "@goldskycom/cli": "^13.0.0",

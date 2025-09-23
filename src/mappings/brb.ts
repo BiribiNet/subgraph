@@ -1,8 +1,8 @@
-import { BigInt } from "@graphprotocol/graph-ts"
+import { Address, BigInt } from "@graphprotocol/graph-ts"
 import { Transfer } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
-import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_PAYOUT } from "../helpers/constant"
+import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 
@@ -33,6 +33,19 @@ export function handleTransfer(event: Transfer): void {
   // We need to check if the from address is the StakedBRB contract
   // For now, we'll check if it's during a payout phase
   const globalState = getOrCreateGlobalState()
+
+  if (event.params.from.equals(Address.fromString(STAKED_BRB_CONTRACT_ADDRESS))) { 
+    if (event.params.to.equals(Address.fromString(JACKPOT_CONTRACT_ADDRESS))) {
+      // Jackpot increased
+      globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
+    } else if (event.params.to.equals(Address.fromBytes(globalState.feeRecipient))) {
+      // Protocol fee increased
+      globalState.totalFees = globalState.totalFees.plus(event.params.value)
+    } else if (event.params.to.equals(Address.fromString(ZERO_ADDRESS))) {
+      // Burned
+      globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
+    }
+  }
   const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRound.minus(BigInt.fromI32(1))))
   
   if (currentRound && currentRound.status == ROUND_STATUS_PAYOUT) {

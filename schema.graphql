@@ -232,6 +232,10 @@ type GlobalState @entity(immutable: false) {
   jackpotFeeBasisPoints: BigInt!
   "Burn fee basis points"
   burnFeeBasisPoints: BigInt!
+  "total burned"
+  totalBurned: BigInt!
+  "current jackpot"
+  currentJackpot: BigInt!
   "Fee recipient address"
   feeRecipient: Bytes!
   "Total assets under management in StakedBRB"

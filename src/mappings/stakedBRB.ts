@@ -10,7 +10,9 @@ import {
   RoundTransition,
   BetPlaced,
   WithdrawalSettingsUpdated,
-  AntiSpamSettingsUpdated
+  AntiSpamSettingsUpdated,
+  BurnFeeRateUpdated,
+  JackpotFeeRateUpdated
 } from "../../generated/StakedBRB/StakedBRB"
 import {
   GlobalState,
@@ -142,6 +144,23 @@ export function handleLargeWithdrawalProcessed(event: LargeWithdrawalProcessed):
   globalState.save()
 }
 
+export function handleBurnFeeRateUpdated(event: BurnFeeRateUpdated): void {
+  // Get or create GlobalState entity
+  const globalState = getOrCreateGlobalState()
+
+  // Update burn fee basis points
+  globalState.burnFeeBasisPoints = event.params.newFee
+  globalState.save()
+}
+
+export function handleJackpotFeeRateUpdated(event: JackpotFeeRateUpdated): void {
+  // Get or create GlobalState entity
+  const globalState = getOrCreateGlobalState()
+
+  // Update jackpot fee basis points
+  globalState.jackpotFeeBasisPoints = event.params.newFee
+  globalState.save()
+}
 export function handleProtocolFeeCollected(event: ProtocolFeeCollected): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()

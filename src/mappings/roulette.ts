@@ -19,10 +19,13 @@ export function handleJackpotResultEvent(event: JackpotResultEvent): void {
     log.error("Round not found for jackpot result event: {}", [event.params.roundId.toString()])
     return
   }
-
+  const globalState = getOrCreateGlobalState()
+  globalState.currentJackpot = globalState.currentJackpot.minus(event.params.jackpotWinnerShare.times(event.params.jackpotWinnerCount))
   round.jackpotWinnerShare = event.params.jackpotWinnerShare
   round.jackpotWinnerCount = event.params.jackpotWinnerCount
+
   round.save()
+  globalState.save()
 }
 export function handleRoundStarted(event: RoundStarted): void {
   const globalState = getOrCreateGlobalState()
