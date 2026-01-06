@@ -6,7 +6,6 @@ import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDR
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 
-
 export function handleTransfer(event: Transfer): void {
   // Create transfer entity
   const transfer = new BRBTransfer(event.transaction.hash.concat(bigintToBytes(event.logIndex)))
@@ -24,8 +23,8 @@ export function handleTransfer(event: Transfer): void {
 
   // Check if this is a payout transfer (from StakedBRB contract to a user)
   // Skip if this is a mint (from zero address) or burn (to zero address)
-  if (event.params.from.toHexString() == "0x0000000000000000000000000000000000000000" || 
-      event.params.to.toHexString() == "0x0000000000000000000000000000000000000000") {
+  if (event.params.from.toHexString() == ZERO_ADDRESS || 
+      event.params.to.toHexString() == ZERO_ADDRESS) {
     return
   }
 

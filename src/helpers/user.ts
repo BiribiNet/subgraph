@@ -1,5 +1,6 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts"
 import { User } from "../../generated/schema"
+import { ZERO_ADDRESS } from "./constant"
 
 export function getOrCreateUser(userAddress: Bytes): User {
   let user = User.load(userAddress)
@@ -18,6 +19,9 @@ export function getOrCreateUser(userAddress: Bytes): User {
 }
 
 export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncrease: boolean): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const user = getOrCreateUser(userAddress)
   
   if (isIncrease) {
@@ -30,6 +34,9 @@ export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncre
 }
 
 export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncrease: boolean): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const user = getOrCreateUser(userAddress)
   
   if (isIncrease) {
@@ -42,6 +49,9 @@ export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncr
 }
 
 export function updateUserBRBReferalBalance(userAddress: Bytes, amount: BigInt, isIncrease: boolean): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const user = getOrCreateUser(userAddress)
   
   if (isIncrease) {
@@ -54,6 +64,9 @@ export function updateUserBRBReferalBalance(userAddress: Bytes, amount: BigInt, 
 }
 
 export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDeposit: boolean): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const user = getOrCreateUser(userAddress)
   
   if (isDeposit) {
@@ -66,6 +79,9 @@ export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDep
 }
 
 export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWin: boolean, isPayout: boolean): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const user = getOrCreateUser(userAddress)
   
   if (isPayout) {
@@ -80,6 +96,9 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
 }
 
 export function updateUserGeneralStats(userAddress: Bytes, betAmount: BigInt, winAmount: BigInt): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const user = getOrCreateUser(userAddress)
   
   user.totalRouletteBets = user.totalRouletteBets.plus(betAmount)
