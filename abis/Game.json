@@ -333,12 +333,6 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "jackpotWinnerShare",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
         "name": "jackpotWinnerCount",
         "type": "uint256"
       }

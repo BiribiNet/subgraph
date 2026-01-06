@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0xe77ad346242865244ae6bc5255d309c77951cd7c"  # Replace with actual BRB token address
-      startBlock: 196997464
+      address: "0x4818f9ee10028716d54ad9c434eda1cfb1d4dd97"  # Replace with actual BRB token address
+      startBlock: 231079987
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -19,6 +19,11 @@ dataSources:
       entities:
         - BRBTransfer
         - User
+        - WithdrawTransaction
+        - JackpotPayout
+        - PayoutTransaction
+        - RouletteRound
+        - RouletteBet
       abis:
         - name: BRB
           file: ./abis/BRB.json
@@ -31,8 +36,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x03d008786f3da109e0e259eb0df2079469d84968"  # Replace with actual RouletteClean address
-      startBlock: 196997479
+      address: "0x55e4fb964f815c970a78cb4222e3f75e7cafc845"  # Replace with actual RouletteClean address
+      startBlock: 231080026
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -47,7 +52,7 @@ dataSources:
         - name: Game
           file: ./abis/Game.json
       eventHandlers:
-        - event: JackpotResultEvent(uint256,uint256,uint256)
+        - event: JackpotResultEvent(uint256,uint256)
           handler: handleJackpotResultEvent
         - event: RoundStarted(uint256,uint256,uint256)
           handler: handleRoundStarted
@@ -63,8 +68,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: StakedBRB
-      address: "0xdefa1c46ff54736d5cc322d6ac17cfd5f7510b2c"  # Replace with actual StakedBRB address
-      startBlock: 196997482
+      address: "0xc8a17a100c27c8d696dcfd9c259f168f7d0c1b3b"  # Replace with actual StakedBRB address
+      startBlock: 231080028
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -77,6 +82,7 @@ dataSources:
         - User
         - RouletteRound
         - RouletteBet
+        - WithdrawTransaction
       abis:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
@@ -113,8 +119,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferal
-      address: "0x17e33d9da0e3df161efb9531c891ac1e43261491"  # Replace with actual BRBReferal address
-      startBlock: 196997460  # Update with appropriate start block
+      address: "0xa3e8b245a2e51fbb9fd5bc658fa82bb1e62fea2a"  # Replace with actual BRBReferal address
+      startBlock: 231079984  # Update with appropriate start block
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

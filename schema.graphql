@@ -275,6 +275,11 @@ type StakedBRBDeposit @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+type WithdrawTransaction @entity(immutable: true) {
+  "Transaction hash"
+  id: Bytes!
+}
+
 type StakedBRBWithdrawal @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!

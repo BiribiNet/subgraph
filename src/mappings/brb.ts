@@ -1,6 +1,6 @@
 import { Address, BigInt } from "@graphprotocol/graph-ts"
 import { Transfer } from "../../generated/BRBToken/BRB"
-import { BRBTransfer, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout } from "../../generated/schema"
+import { BRBTransfer, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
 import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -52,9 +52,9 @@ export function handleTransfer(event: Transfer): void {
     // Get the corresponding RouletteBet entity first
     const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRound.minus(BigInt.fromI32(1)))))
     
-    if (bet) {
+    if (bet !== null) {
       const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-      if (event.params.from.toHexString() == JACKPOT_CONTRACT_ADDRESS) {
+      if (event.params.from.equals(Address.fromString(JACKPOT_CONTRACT_ADDRESS))) {
         // This looks like a jackpot payout transfer
         const jackpotPayoutTx = new JackpotPayout(payoutId)
         jackpotPayoutTx.user = event.params.to;
@@ -65,38 +65,44 @@ export function handleTransfer(event: Transfer): void {
         jackpotPayoutTx.timestamp = event.block.timestamp
         jackpotPayoutTx.transactionHash = event.transaction.hash
         jackpotPayoutTx.save()
-      } else {
-        // This looks like a payout transfer
-        const payoutTx = new PayoutTransaction(payoutId)
-        payoutTx.user = event.params.to
-        payoutTx.round = currentRound.id
-        payoutTx.bet = bet.id
-        payoutTx.amount = event.params.value
-        payoutTx.blockNumber = event.block.number
-        payoutTx.timestamp = event.block.timestamp
-        payoutTx.transactionHash = event.transaction.hash
-        payoutTx.save()
-
-        // Update the corresponding RouletteBet entity
-        const currentPayout = bet.actualPayout
-        if (currentPayout) {
-          bet.actualPayout = currentPayout.plus(event.params.value)
-        } else {
-          bet.actualPayout = event.params.value
+        globalState.currentJackpot = globalState.currentJackpot.minus(event.params.value)
+        updateUserRouletteStats(event.params.to, event.params.value, true, true)
+      } else if (event.params.from.equals(Address.fromString(STAKED_BRB_CONTRACT_ADDRESS))) {
+        const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
+        if (withdrawTx === null) { // if we are in a withdraw scenario exit
+          // This looks like a payout transfer
+          const payoutTx = new PayoutTransaction(payoutId)
+          payoutTx.user = event.params.to
+          payoutTx.round = currentRound.id
+          payoutTx.bet = bet.id
+          payoutTx.amount = event.params.value
+          payoutTx.blockNumber = event.block.number
+          payoutTx.timestamp = event.block.timestamp
+          payoutTx.transactionHash = event.transaction.hash
+          payoutTx.save()
+  
+          // Update the corresponding RouletteBet entity
+          const currentPayout = bet.actualPayout
+          if (currentPayout !== null) {
+            bet.actualPayout = currentPayout.plus(event.params.value)
+          } else {
+            bet.actualPayout = event.params.value
+          }
+  
+          // Update round totals
+          currentRound.totalPayouts = currentRound.totalPayouts.plus(event.params.value)
+          // Update global totals
+          globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
+          updateUserRouletteStats(event.params.to, event.params.value, true, true)
         }
       }
       bet.save()
 
-      // Update round totals
-      currentRound.totalPayouts = currentRound.totalPayouts.plus(event.params.value)
       currentRound.save()
 
-      // Update global totals
-      globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
       globalState.save()
 
       // Update user roulette stats (win)
-      updateUserRouletteStats(event.params.to, event.params.value, true, false)
     }
   }
 }

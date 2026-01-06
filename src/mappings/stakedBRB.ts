@@ -20,7 +20,8 @@ import {
   RouletteBet,
   StakedBRBDeposit,
   StakedBRBWithdrawal,
-  LargeWithdrawalRequest
+  LargeWithdrawalRequest,
+  WithdrawTransaction
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance } from "../helpers/user"
@@ -69,6 +70,11 @@ export function handleWithdraw(event: Withdraw): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, false)
+
+  const withdrawTransaction = WithdrawTransaction.load(event.transaction.hash)
+  if (withdrawTransaction == null) {
+    new WithdrawTransaction(event.transaction.hash).save()
+  }
 
   // Update global totals
   globalState.totalAssets = globalState.totalAssets.minus(event.params.assets)
@@ -310,10 +316,10 @@ export function handleTransfer(event: StakedBRBTransfer): void {
   // Update sBRB balances for users
   
   // Skip if this is a mint (from zero address) or burn (to zero address)
-  if (event.params.from.toHexString() == "0x0000000000000000000000000000000000000000" || 
-      event.params.to.toHexString() == "0x0000000000000000000000000000000000000000") {
-    return
-  }
+  // if (event.params.from.toHexString() == "0x0000000000000000000000000000000000000000" || 
+  //     event.params.to.toHexString() == "0x0000000000000000000000000000000000000000") {
+  //   return
+  // }
 
   // Update sBRB balances
   updateUserSBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
