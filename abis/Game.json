@@ -177,6 +177,11 @@
   },
   {
     "inputs": [],
+    "name": "MaxUpkeepLimitReached",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotInitializing",
     "type": "error"
   },
@@ -736,14 +741,26 @@
     "name": "getRoundResult",
     "outputs": [
       {
-        "internalType": "uint256",
-        "name": "winningNumber",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isSet",
-        "type": "bool"
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "winningNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "jackpotNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "set",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct RouletteClean.RandomResult",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
@@ -942,13 +959,7 @@
       }
     ],
     "name": "registerPayoutUpkeeps",
-    "outputs": [
-      {
-        "internalType": "uint256[]",
-        "name": "",
-        "type": "uint256[]"
-      }
-    ],
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1037,6 +1048,24 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "rouletteNumber",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "jackpotNumber",
+        "type": "uint256"
+      }
+    ],
+    "name": "testForceNumber",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
