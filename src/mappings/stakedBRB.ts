@@ -1,4 +1,4 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import {
   Deposit,
   Withdraw,
@@ -178,16 +178,6 @@ export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpd
   globalState.save()
 }
 
-export function handleRoundTransition(event: RoundTransition): void {
-  // Get or create GlobalState entity
-  const globalState = getOrCreateGlobalState()
-
-  // Update round information
-  globalState.currentRound = event.params.newRound
-  globalState.roundTransitionInProgress = true
-  globalState.save()
-}
-
 function getBetTypeFromNumber(betTypeNumber: BigInt): string {
   const betTypeInt = betTypeNumber.toI32()
   switch (betTypeInt) {
@@ -226,28 +216,20 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
   }
 }
 
-function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, roundId: BigInt, event: BetPlaced): void {
+function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, roundId: Bytes, event: BetPlaced): void {
   // Get or create round
-  let round = RouletteRound.load(bigintToBytes(roundId));
-  if (!round) {
-    round = new RouletteRound(bigintToBytes(roundId));
-    round.roundNumber = roundId;
-    round.status = ROUND_STATUS_BETTING;
-    round.totalBets = BigInt.fromI32(0)
-    round.totalWinningBets = BigInt.fromI32(0);
-    round.totalPayouts = BigInt.fromI32(0);
-    round.startedAt = event.block.timestamp;
-  }
+  let round = RouletteRound.load(roundId);
 
+  if (round == null) return log.critical("Round not found for bet placement: {}", [roundId.toString()])
   // Create or update bet entity (user + round ID)
-  const betId = user.concat(bigintToBytes(roundId))
+  const betId = user.concat(roundId)
   let bet = RouletteBet.load(betId)
   
   if (!bet) {
     // Create new bet entity
     bet = new RouletteBet(betId);
     bet.user = user;
-    bet.round = round.id;
+    bet.round = roundId;
     bet.amounts = [amount];
     bet.betTypes = [getBetTypeFromNumber(betType)];
     bet.numbers = [number];

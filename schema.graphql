@@ -215,7 +215,9 @@ type GlobalState @entity(immutable: false) {
   "Singleton ID"
   id: Bytes!
   "Current round ID"
-  currentRound: BigInt!
+  currentRound: RouletteRound!
+  "Current round number"
+  currentRoundNumber: BigInt!
   "Last round start time"
   lastRoundStartTime: BigInt!
   "Last round paid"
@@ -256,6 +258,12 @@ type GlobalState @entity(immutable: false) {
   totalPendingLargeWithdrawals: BigInt!
   "Total protocol fees collected"
   totalFees: BigInt!
+  "Chainlink keeper registry address"
+  chainlinkKeeperRegistry: Bytes!
+  "Chainlink keeper registrat address"
+  chainlinkKeeperRegistrar: Bytes!
+  "Chainlink vrf subscription id"
+  subscriptionId: BigInt!
 }
 
 type StakedBRBDeposit @entity(immutable: true) {

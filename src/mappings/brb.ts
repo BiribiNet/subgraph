@@ -45,11 +45,11 @@ export function handleTransfer(event: Transfer): void {
       globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
     }
   }
-  const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRound.minus(BigInt.fromI32(1))))
+  const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
   
   if (currentRound && currentRound.status == ROUND_STATUS_PAYOUT) {
     // Get the corresponding RouletteBet entity first
-    const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRound.minus(BigInt.fromI32(1)))))
+    const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1)))))
     
     if (bet !== null) {
       const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))

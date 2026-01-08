@@ -4,12 +4,13 @@ import {
   RoundResolved,
   VRFResult,
   BatchProcessed,
-  JackpotResultEvent
+  JackpotResultEvent,
+  ChainlinkSetupCompleted
 } from "../../generated/RouletteClean/Game"
 import {
   RouletteRound
 } from "../../generated/schema"
-import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN } from "../helpers/constant"
+import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_BETTING } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 
@@ -27,9 +28,22 @@ export function handleJackpotResultEvent(event: JackpotResultEvent): void {
 export function handleRoundStarted(event: RoundStarted): void {
   const globalState = getOrCreateGlobalState()
 
+  const roundId = bigintToBytes(event.params.roundId);
+  const round = new RouletteRound(roundId);
+  round.roundNumber = event.params.roundId;
+  round.status = ROUND_STATUS_BETTING;
+  round.totalBets = BigInt.fromI32(0)
+  round.totalWinningBets = BigInt.fromI32(0);
+  round.totalPayouts = BigInt.fromI32(0);
+  round.startedAt = event.block.timestamp;
+
+  round.save();
+
   // Update current round
-  globalState.currentRound = event.params.roundId
+  globalState.currentRound = roundId;
+  globalState.currentRoundNumber = event.params.roundId
   globalState.lastRoundStartTime = event.params.timestamp
+  globalState.roundTransitionInProgress = true
   globalState.save()
 
   // Update previous round status to VRF
@@ -42,6 +56,24 @@ export function handleRoundStarted(event: RoundStarted): void {
     previousRound.endedAt = event.block.timestamp
     previousRound.save()
   }
+}
+
+export function handleChainlinkSetupCompleted(event: ChainlinkSetupCompleted): void {
+  const round = new RouletteRound(bigintToBytes(BigInt.fromI32(1)));
+  round.roundNumber = BigInt.fromI32(1);
+  round.status = ROUND_STATUS_BETTING;
+  round.totalBets = BigInt.fromI32(0)
+  round.totalWinningBets = BigInt.fromI32(0);
+  round.totalPayouts = BigInt.fromI32(0);
+  round.startedAt = event.block.timestamp;
+
+  round.save();
+
+  const globalState = getOrCreateGlobalState()
+  globalState.chainlinkKeeperRegistry = event.params.keeperRegistry
+  globalState.chainlinkKeeperRegistrar = event.params.keeperRegistrar
+  globalState.subscriptionId = event.params.subscriptionId
+  globalState.save()
 }
 
 export function handleVRFResult(event: VRFResult): void {

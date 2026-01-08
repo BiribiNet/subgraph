@@ -1,6 +1,7 @@
 import { Bytes, BigInt } from "@graphprotocol/graph-ts"
 import { GlobalState } from "../../generated/schema"
 import { ZERO } from "./number"
+import { bigintToBytes } from "./bigintToBytes"
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
 
@@ -8,7 +9,8 @@ export function getOrCreateGlobalState(): GlobalState {
   let globalState = GlobalState.load(GLOBAL_STATE_ID)
   if (!globalState) {
     globalState = new GlobalState(GLOBAL_STATE_ID)
-    globalState.currentRound = BigInt.fromI32(1)
+    globalState.currentRound = bigintToBytes(BigInt.fromI32(1))
+    globalState.currentRoundNumber = BigInt.fromI32(1)
     globalState.lastRoundStartTime = ZERO
     globalState.lastRoundPaid = ZERO
     globalState.gamePeriod = BigInt.fromI32(120) // Default 60 seconds
