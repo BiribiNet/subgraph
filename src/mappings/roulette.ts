@@ -35,7 +35,7 @@ export function handleRoundStarted(event: RoundStarted): void {
   round.totalBets = BigInt.fromI32(0)
   round.totalWinningBets = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
-  round.startedAt = event.block.timestamp;
+  round.startedAt = event.params.timestamp;
 
   round.save();
 
