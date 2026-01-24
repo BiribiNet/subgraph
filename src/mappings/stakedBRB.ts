@@ -6,7 +6,6 @@ import {
   LargeWithdrawalRequested,
   LargeWithdrawalProcessed,
   ProtocolFeeRateUpdated,
-  RoundTransition,
   BetPlaced,
   WithdrawalSettingsUpdated,
   AntiSpamSettingsUpdated,
@@ -15,7 +14,6 @@ import {
   ProtocolFeeRecipientUpdated
 } from "../../generated/StakedBRB/StakedBRB"
 import {
-  GlobalState,
   RouletteRound,
   RouletteBet,
   StakedBRBDeposit,

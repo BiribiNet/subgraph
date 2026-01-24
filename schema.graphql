@@ -1,6 +1,7 @@
 enum RoundStatus {
   BETTING
   VRF
+  COMPUTING_PAYOUT
   PAYOUT
   CLEAN
 }
@@ -134,9 +135,11 @@ type RouletteRound @entity(immutable: false) {
   vrfTxHash: Bytes
   "Total bets in round"
   totalBets: BigInt!
-  "Total winning bets"
-  totalWinningBets: BigInt!
-  "Total payouts"
+  "Computed payouts count"
+  computedPayoutsCount: BigInt
+  "Current payouts count"
+  currentPayoutsCount: BigInt!
+  "Total payouts Amount"
   totalPayouts: BigInt!
   "Round start timestamp"
   startedAt: BigInt!

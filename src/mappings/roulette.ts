@@ -5,12 +5,13 @@ import {
   VRFResult,
   BatchProcessed,
   JackpotResultEvent,
-  ChainlinkSetupCompleted
+  ChainlinkSetupCompleted,
+  ComputedPayouts
 } from "../../generated/RouletteClean/Game"
 import {
   RouletteRound
 } from "../../generated/schema"
-import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_BETTING } from "../helpers/constant"
+import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_BETTING, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 
@@ -25,6 +26,17 @@ export function handleJackpotResultEvent(event: JackpotResultEvent): void {
   round.save()
 }
 
+export function handleComputedPayouts(event: ComputedPayouts): void {
+  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
+  if (!round) {
+    log.error("Round not found for computed payouts: {}", [event.params.roundId.toString()])
+    return
+  }
+  round.status = ROUND_STATUS_COMPUTING_PAYOUT;
+  round.computedPayoutsCount = event.params.totalWinningBets;
+  round.save()
+}
+
 export function handleRoundStarted(event: RoundStarted): void {
   const globalState = getOrCreateGlobalState()
 
@@ -33,7 +45,7 @@ export function handleRoundStarted(event: RoundStarted): void {
   round.roundNumber = event.params.roundId;
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
-  round.totalWinningBets = BigInt.fromI32(0);
+  round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.startedAt = event.params.timestamp;
 
@@ -63,7 +75,7 @@ export function handleChainlinkSetupCompleted(event: ChainlinkSetupCompleted): v
   round.roundNumber = BigInt.fromI32(1);
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
-  round.totalWinningBets = BigInt.fromI32(0);
+  round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.startedAt = event.block.timestamp;
 
@@ -117,13 +129,8 @@ export function handleBatchProcessed(event: BatchProcessed): void {
   }
 
   // Update round payout totals
-  round.totalPayouts = round.totalPayouts.plus(event.params.payoutsCount)
+  round.currentPayoutsCount = round.currentPayoutsCount.plus(event.params.payoutsCount)
   round.save()
-
-  // Update global totals
-  const globalState = getOrCreateGlobalState()
-  globalState.totalPayouts = globalState.totalPayouts.plus(event.params.payoutsCount)
-  globalState.save()
 }
 
 

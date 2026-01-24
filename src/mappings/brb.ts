@@ -65,6 +65,7 @@ export function handleTransfer(event: Transfer): void {
         jackpotPayoutTx.transactionHash = event.transaction.hash
         jackpotPayoutTx.save()
         globalState.currentJackpot = globalState.currentJackpot.minus(event.params.value)
+        globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
         updateUserRouletteStats(event.params.to, event.params.value, true, true)
       } else if (event.params.from.equals(Address.fromString(STAKED_BRB_CONTRACT_ADDRESS))) {
         const withdrawTx = WithdrawTransaction.load(event.transaction.hash);

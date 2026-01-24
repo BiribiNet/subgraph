@@ -778,25 +778,6 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "previousRound",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "newRound",
-        "type": "uint256"
-      }
-    ],
-    "name": "RoundTransition",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": true,
         "internalType": "address",
         "name": "from",
@@ -1600,11 +1581,6 @@
         "internalType": "uint256",
         "name": "newRoundId",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "previousRoundId",
-        "type": "uint256"
       }
     ],
     "name": "onRoundTransition",
@@ -1783,11 +1759,6 @@
             "internalType": "address",
             "name": "player",
             "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "betAmount",
-            "type": "uint256"
           },
           {
             "internalType": "uint256",

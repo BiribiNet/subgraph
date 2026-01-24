@@ -21,6 +21,7 @@ export const BET_TRIO_023 = 15
 // Constants for round status
 export const ROUND_STATUS_BETTING = "BETTING"
 export const ROUND_STATUS_VRF = "VRF"
+export const ROUND_STATUS_COMPUTING_PAYOUT = "COMPUTING_PAYOUT"
 export const ROUND_STATUS_PAYOUT = "PAYOUT"
 export const ROUND_STATUS_CLEAN = "CLEAN"
 
