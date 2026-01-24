@@ -1,5 +1,5 @@
-export const STAKED_BRB_CONTRACT_ADDRESS = "0xc8a17a100c27c8d696dcfd9c259f168f7d0c1b3b"
-export const JACKPOT_CONTRACT_ADDRESS = "0x121972811bd5c1ff2ed471e4d933ecbbf7d64d8e"
+export const STAKED_BRB_CONTRACT_ADDRESS = "0x9ce38e21fda6fbe57f3a804996b9ddf860258116"
+export const JACKPOT_CONTRACT_ADDRESS = "0x3c4ab5d98d1f61928fd280b6cc51a8f5a18edecb"
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 // Constants for bet types (same as in roulette.ts)
 export const BET_STRAIGHT = 1
