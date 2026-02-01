@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0xa09ebae00945d57419b2f6ed2db8ae52a65cfa4b"  # Replace with actual BRB token address
-      startBlock: 236329255
+      address: "0x519b0023fef5a46519e13c5a4a6c12a1f566c642"  # Replace with actual BRB token address
+      startBlock: 238652361
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -36,8 +36,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x624f40a570139f51854f1f5fcc0bc847612df791"  # Replace with actual RouletteClean address
-      startBlock: 236329267
+      address: "0xc19d7520d0e90a74338469d8717efc6afc350a72"  # Replace with actual RouletteClean address
+      startBlock: 238652405
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -72,8 +72,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: StakedBRB
-      address: "0x9ce38e21fda6fbe57f3a804996b9ddf860258116"  # Replace with actual StakedBRB address
-      startBlock: 236329269
+      address: "0x6b04400f2e5e94581ce9dff18347a19c258c1371"  # Replace with actual StakedBRB address
+      startBlock: 238652410
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -107,7 +107,7 @@ dataSources:
           handler: handleBurnFeeRateUpdated
         - event: JackpotFeeRateUpdated(uint256)
           handler: handleJackpotFeeRateUpdated
-        - event: BetPlaced(address,uint256,bytes)
+        - event: BetPlaced(address,uint256,bytes,uint256)
           handler: handleBetPlaced
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
@@ -121,8 +121,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferal
-      address: "0xef2c4ed9f373d375bb0c306d27f1f5aaaea5b6cc"  # Replace with actual BRBReferal address
-      startBlock: 236329253  # Update with appropriate start block
+      address: "0x22b6307475cf56dc0951c6a9f44388391d7227f1"  # Replace with actual BRBReferal address
+      startBlock: 238652352  # Update with appropriate start block
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

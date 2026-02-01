@@ -45,6 +45,7 @@ export function handleRoundStarted(event: RoundStarted): void {
   round.roundNumber = event.params.roundId;
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
+  round.maxBetAmount = BigInt.fromI32(0)
   round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.startedAt = event.params.timestamp;
@@ -75,6 +76,7 @@ export function handleChainlinkSetupCompleted(event: ChainlinkSetupCompleted): v
   round.roundNumber = BigInt.fromI32(1);
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
+  round.maxBetAmount = BigInt.fromI32(0)
   round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.startedAt = event.block.timestamp;

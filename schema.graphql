@@ -135,6 +135,8 @@ type RouletteRound @entity(immutable: false) {
   vrfTxHash: Bytes
   "Total bets in round"
   totalBets: BigInt!
+  "Max bet amount in round"
+  maxBetAmount: BigInt!
   "Computed payouts count"
   computedPayoutsCount: BigInt
   "Current payouts count"
@@ -241,8 +243,30 @@ type GlobalState @entity(immutable: false) {
   totalBurned: BigInt!
   "current jackpot"
   currentJackpot: BigInt!
+  "APY - 7 day rolling window"
+  apy7Day: BigDecimal!
+  "APY - 30 day rolling window"
+  apy30Day: BigDecimal!
+  "APY - 365 day rolling window"
+  apy365Day: BigDecimal!
+  "APY - Lifetime since inception"
+  apyLifetime: BigDecimal!
+  "APY lifetime baseline timestamp (first deposit)"
+  apyLifetimeBaselineTimestamp: BigInt!
+  "APY lifetime baseline total assets"
+  apyLifetimeBaselineTotalAssets: BigInt!
+  "APY lifetime baseline total shares"
+  apyLifetimeBaselineTotalShares: BigInt!
+  "Last APY snapshot timestamp"
+  lastApySnapshotTimestamp: BigInt!
   "Fee recipient address"
   feeRecipient: Bytes!
+  "Total play all time"
+  totalPlayAllTime: BigInt!
+  "Stakers count"
+  stakersCount: BigInt!
+  "Total players count"
+  uniquePlayersCount: BigInt!
   "Total assets under management in StakedBRB"
   totalAssets: BigInt!
   "Total shares issued by StakedBRB"
@@ -267,6 +291,20 @@ type GlobalState @entity(immutable: false) {
   chainlinkKeeperRegistrar: Bytes!
   "Chainlink vrf subscription id"
   subscriptionId: BigInt!
+}
+
+# Daily snapshot for APY calculations
+type APYSnapshot @entity(immutable: true) {
+  "Day timestamp (rounded to midnight UTC)"
+  id: Bytes!
+  "Total assets at snapshot time"
+  totalAssets: BigInt!
+  "Total shares at snapshot time"
+  totalShares: BigInt!
+  "Snapshot timestamp"
+  timestamp: BigInt!
+  "Block number"
+  blockNumber: BigInt!
 }
 
 type StakedBRBDeposit @entity(immutable: true) {

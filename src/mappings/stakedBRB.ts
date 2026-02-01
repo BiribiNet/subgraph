@@ -22,14 +22,18 @@ import {
   WithdrawTransaction
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING } from "../helpers/constant"
-import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance } from "../helpers/user"
+import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState } from "../helpers/globalState"
+import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
 
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
+  
+  // Get or create user and check if this is their first stake
+  const user = getOrCreateUser(event.params.owner)
+  const isFirstStake = user.sbrbBalance.equals(BigInt.fromI32(0))
 
   // Create deposit entity
   const depositId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
@@ -48,12 +52,24 @@ export function handleDeposit(event: Deposit): void {
   // Update global totals
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
   globalState.totalShares = globalState.totalShares.plus(event.params.shares)
+  
+  // Increment stakers count if this is user's first stake
+  if (isFirstStake) {
+    globalState.stakersCount = globalState.stakersCount.plus(BigInt.fromI32(1))
+  }
+  
+  // Recalculate all APYs after deposit (handles baseline setting and snapshots)
+  calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
+  
   globalState.save()
 }
 
 export function handleWithdraw(event: Withdraw): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
+  
+  // Get user to check if they'll have zero balance after withdrawal
+  const user = getOrCreateUser(event.params.owner)
 
   // Create withdrawal entity
   const withdrawalId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
@@ -74,9 +90,22 @@ export function handleWithdraw(event: Withdraw): void {
     new WithdrawTransaction(event.transaction.hash).save()
   }
 
+  // Check if user will have zero sBRB balance after this withdrawal
+  // The balance update happens in handleTransfer, so we check if shares withdrawn equals current balance
+  const willBeZeroBalance = user.sbrbBalance.equals(event.params.shares)
+
   // Update global totals
   globalState.totalAssets = globalState.totalAssets.minus(event.params.assets)
   globalState.totalShares = globalState.totalShares.minus(event.params.shares)
+  
+  // Decrement stakers count if user unstakes everything
+  if (willBeZeroBalance) {
+    globalState.stakersCount = globalState.stakersCount.minus(BigInt.fromI32(1))
+  }
+  
+  // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)
+  calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
+  
   globalState.save()
 }
 
@@ -262,17 +291,36 @@ function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number
 
   // Update round totals
   round.totalBets = round.totalBets.plus(amount);
+  
+  // Track max bet amount in this round
+  if (bet.totalAmount.gt(round.maxBetAmount)) {
+    round.maxBetAmount = bet.totalAmount;
+  }
+  
   round.save();
 }
 
 export function handleBetPlaced(event: BetPlaced): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState();
+  
+  // Get or create user to track unique players
+  const user = getOrCreateUser(event.params.user)
+  const isFirstBet = user.totalRouletteBets.equals(BigInt.fromI32(0))
 
   // Decode the bytes parameter to get multiple bets
   const decoded = decodeWrapper(event.params.data, "(uint256[],uint256[],uint256[])");
   
   globalState.pendingBets = globalState.pendingBets.plus(event.params.amount);
+  
+  // Update total play all time
+  globalState.totalPlayAllTime = globalState.totalPlayAllTime.plus(event.params.amount)
+  
+  // Increment unique players count if this is user's first bet
+  if (isFirstBet) {
+    globalState.uniquePlayersCount = globalState.uniquePlayersCount.plus(BigInt.fromI32(1))
+  }
+  
   updateUserRouletteStats(event.params.user, event.params.amount, false, false);
   if (decoded) {
     const s = decoded.toTuple()
@@ -283,7 +331,7 @@ export function handleBetPlaced(event: BetPlaced): void {
     // Process each bet
     for (let i = 0; i < amountsLength; i++) {
       // Process the individual bet (create/update RouletteBet entity)
-      processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], globalState.currentRound, event)
+      processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], bigintToBytes(event.params.roundId), event)
       // Update user roulette stats
     }
   }
