@@ -99,10 +99,8 @@ export function handleTransfer(event: Transfer): void {
       bet.save()
 
       currentRound.save()
-
-      globalState.save()
-
       // Update user roulette stats (win)
     }
   }
+  globalState.save()
 }
