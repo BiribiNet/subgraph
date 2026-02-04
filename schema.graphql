@@ -229,8 +229,6 @@ type GlobalState @entity(immutable: false) {
   lastRoundPaid: BigInt!
   "Game period in seconds"
   gamePeriod: BigInt!
-  "Total bets placed across all rounds"
-  totalBets: BigInt!
   "Total payouts made across all rounds"
   totalPayouts: BigInt!
   "Protocol fee basis points"
