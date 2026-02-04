@@ -11,7 +11,8 @@ import {
   AntiSpamSettingsUpdated,
   BurnFeeRateUpdated,
   JackpotFeeRateUpdated,
-  ProtocolFeeRecipientUpdated
+  ProtocolFeeRecipientUpdated,
+  RoundCleaned
 } from "../../generated/StakedBRB/StakedBRB"
 import {
   RouletteRound,
@@ -61,6 +62,12 @@ export function handleDeposit(event: Deposit): void {
   // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
   
+  globalState.save()
+}
+
+export function handleRoundCleaned(event: RoundCleaned): void {
+  const globalState = getOrCreateGlobalState()
+  globalState.lastRoundResolved = event.params.roundId
   globalState.save()
 }
 

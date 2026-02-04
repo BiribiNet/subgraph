@@ -2,7 +2,7 @@ import { Address, BigInt } from "@graphprotocol/graph-ts"
 import { Transfer } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
-import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
+import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 
@@ -33,21 +33,23 @@ export function handleTransfer(event: Transfer): void {
   // For now, we'll check if it's during a payout phase
   const globalState = getOrCreateGlobalState()
 
-  if (event.params.from.equals(Address.fromString(STAKED_BRB_CONTRACT_ADDRESS))) { 
-    if (event.params.to.equals(Address.fromString(JACKPOT_CONTRACT_ADDRESS))) {
+  const fromHex = event.params.from.toHexString()
+  const toHex = event.params.to.toHexString()
+  if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) { 
+    if (toHex == JACKPOT_CONTRACT_ADDRESS) {
       // Jackpot increased
       globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
-    } else if (event.params.to.equals(Address.fromBytes(globalState.feeRecipient))) {
+    } else if (toHex == globalState.feeRecipient.toHexString()) {
       // Protocol fee increased
       globalState.totalFees = globalState.totalFees.plus(event.params.value)
-    } else if (event.params.to.equals(Address.fromString(ZERO_ADDRESS))) {
+    } else if (toHex == ZERO_ADDRESS) {
       // Burned
       globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
     }
   }
   const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
   
-  if (currentRound && currentRound.status == ROUND_STATUS_PAYOUT) {
+  if (currentRound && currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT) {
     // Get the corresponding RouletteBet entity first
     const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1)))))
     

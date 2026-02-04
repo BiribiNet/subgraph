@@ -10,13 +10,14 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x519b0023fef5a46519e13c5a4a6c12a1f566c642"  # Replace with actual BRB token address
-      startBlock: 238652361
+      address: "0x12d6dbd3a1390fbd51a20cdcd97e1f4188604b7f"  # Replace with actual BRB token address
+      startBlock: 239721491
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
+        - GlobalState
         - BRBTransfer
         - User
         - WithdrawTransaction
@@ -36,8 +37,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0xc19d7520d0e90a74338469d8717efc6afc350a72"  # Replace with actual RouletteClean address
-      startBlock: 238652405
+      address: "0x1212d5d4885aa3e87a58bb6521b8e08f84376f5b"  # Replace with actual RouletteClean address
+      startBlock: 239721518
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -72,8 +73,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: StakedBRB
-      address: "0x6b04400f2e5e94581ce9dff18347a19c258c1371"  # Replace with actual StakedBRB address
-      startBlock: 238652410
+      address: "0x04d0128b78a6bb30f684cdc89e11e9d2fecd649a"  # Replace with actual StakedBRB address
+      startBlock: 239721520
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -91,6 +92,8 @@ dataSources:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
       eventHandlers:
+        - event: RoundCleaned(uint256)
+          handler: handleRoundCleaned
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit
         - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)

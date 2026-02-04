@@ -117,6 +117,11 @@ export function handleRoundResolved(event: RoundResolved): void {
     return
   }
 
+  const globalState = getOrCreateGlobalState()
+  
+  globalState.lastRoundPaid = event.params.roundId
+  globalState.save();
+
   round.status = ROUND_STATUS_CLEAN
   round.cleaningCompletedAt = event.block.timestamp
   round.save()
