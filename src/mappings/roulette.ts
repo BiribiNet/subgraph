@@ -120,6 +120,7 @@ export function handleRoundResolved(event: RoundResolved): void {
   const globalState = getOrCreateGlobalState()
   
   globalState.lastRoundPaid = event.params.roundId
+  globalState.pendingBets = globalState.pendingBets.minus(round.totalBets)
   globalState.save();
 
   round.status = ROUND_STATUS_CLEAN

@@ -27,14 +27,11 @@ import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance,
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
+import { ONE } from "../helpers/number"
 
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-  
-  // Get or create user and check if this is their first stake
-  const user = getOrCreateUser(event.params.owner)
-  const isFirstStake = user.sbrbBalance.equals(BigInt.fromI32(0))
 
   // Create deposit entity
   const depositId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
@@ -54,11 +51,6 @@ export function handleDeposit(event: Deposit): void {
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
   globalState.totalShares = globalState.totalShares.plus(event.params.shares)
   
-  // Increment stakers count if this is user's first stake
-  if (isFirstStake) {
-    globalState.stakersCount = globalState.stakersCount.plus(BigInt.fromI32(1))
-  }
-  
   // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
   
@@ -67,7 +59,8 @@ export function handleDeposit(event: Deposit): void {
 
 export function handleRoundCleaned(event: RoundCleaned): void {
   const globalState = getOrCreateGlobalState()
-  globalState.lastRoundResolved = event.params.roundId
+  globalState.lastRoundResolved = event.params.roundId;
+  globalState.roundTransitionInProgress = false;
   globalState.save()
 }
 
@@ -107,7 +100,7 @@ export function handleWithdraw(event: Withdraw): void {
   
   // Decrement stakers count if user unstakes everything
   if (willBeZeroBalance) {
-    globalState.stakersCount = globalState.stakersCount.minus(BigInt.fromI32(1))
+    globalState.stakersCount = globalState.stakersCount.minus(ONE)
   }
   
   // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)

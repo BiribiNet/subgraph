@@ -1,10 +1,12 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts"
 import { User } from "../../generated/schema"
 import { ZERO_ADDRESS } from "./constant"
+import { getOrCreateGlobalState } from "./globalState"
+import { ONE, ZERO } from "./number"
 
 export function getOrCreateUser(userAddress: Bytes): User {
   let user = User.load(userAddress)
-  if (!user) {
+  if (user == null) {
     user = new User(userAddress)
     user.brbBalance = BigInt.fromI32(0)
     user.sbrbBalance = BigInt.fromI32(0)
@@ -38,13 +40,21 @@ export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncr
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+  const globalState = getOrCreateGlobalState()
+
   if (isIncrease) {
+    if (user.sbrbBalance.equals(ZERO)) {
+      globalState.stakersCount = globalState.stakersCount.plus(ONE)
+    }
     user.sbrbBalance = user.sbrbBalance.plus(amount)
   } else {
     user.sbrbBalance = user.sbrbBalance.minus(amount)
+    if (user.sbrbBalance.equals(ZERO)) {
+      globalState.stakersCount = globalState.stakersCount.minus(ONE)
+    }
   }
-  
+
+  globalState.save();
   user.save()
 }
 

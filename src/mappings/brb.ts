@@ -1,4 +1,4 @@
-import { Address, BigInt } from "@graphprotocol/graph-ts"
+import { BigInt } from "@graphprotocol/graph-ts"
 import { Transfer } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
@@ -21,20 +21,19 @@ export function handleTransfer(event: Transfer): void {
   updateUserBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
   updateUserBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
 
-  // Check if this is a payout transfer (from StakedBRB contract to a user)
-  // Skip if this is a mint (from zero address) or burn (to zero address)
-  if (event.params.from.toHexString() == ZERO_ADDRESS || 
-      event.params.to.toHexString() == ZERO_ADDRESS) {
-    return
-  }
-
   // Check if this transfer is from the StakedBRB contract to a user (potential payout)
   // We need to check if the from address is the StakedBRB contract
   // For now, we'll check if it's during a payout phase
   const globalState = getOrCreateGlobalState()
 
+
   const fromHex = event.params.from.toHexString()
-  const toHex = event.params.to.toHexString()
+  const toHex = event.params.to.toHexString();
+
+  if (fromHex == ZERO_ADDRESS) {
+    return
+  }
+
   if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) { 
     if (toHex == JACKPOT_CONTRACT_ADDRESS) {
       // Jackpot increased
@@ -42,20 +41,24 @@ export function handleTransfer(event: Transfer): void {
     } else if (toHex == globalState.feeRecipient.toHexString()) {
       // Protocol fee increased
       globalState.totalFees = globalState.totalFees.plus(event.params.value)
-    } else if (toHex == ZERO_ADDRESS) {
-      // Burned
-      globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
     }
   }
+
+  if (toHex == ZERO_ADDRESS) {
+    // Burned
+    globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
+  }
+
+
   const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
   
-  if (currentRound && currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT) {
+  if (currentRound != null && currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT) {
     // Get the corresponding RouletteBet entity first
     const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1)))))
     
-    if (bet !== null) {
+    if (bet != null) {
       const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-      if (event.params.from.equals(Address.fromString(JACKPOT_CONTRACT_ADDRESS))) {
+      if (fromHex == JACKPOT_CONTRACT_ADDRESS) {
         // This looks like a jackpot payout transfer
         const jackpotPayoutTx = new JackpotPayout(payoutId)
         jackpotPayoutTx.user = event.params.to;
@@ -69,9 +72,9 @@ export function handleTransfer(event: Transfer): void {
         globalState.currentJackpot = globalState.currentJackpot.minus(event.params.value)
         globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
         updateUserRouletteStats(event.params.to, event.params.value, true, true)
-      } else if (event.params.from.equals(Address.fromString(STAKED_BRB_CONTRACT_ADDRESS))) {
+      } else if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) {
         const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
-        if (withdrawTx === null) { // if we are in a withdraw scenario exit
+        if (withdrawTx == null) { // if we are in a withdraw scenario exit
           // This looks like a payout transfer
           const payoutTx = new PayoutTransaction(payoutId)
           payoutTx.user = event.params.to
