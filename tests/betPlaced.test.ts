@@ -57,7 +57,9 @@ describe('RouletteBet tests', () => {
     initializeBet();
     vrfResult()
     assert.entityCount('RouletteBet', 1);
-    assert.fieldEquals('RouletteRound', '1', 'status', ROUND_STATUS_PAYOUT)
+    // Round ID is bytes, not string
+    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
+    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_PAYOUT)
     // assert.fieldEquals('RouletteBet', '0xbbbbedc42dc53842141be8f70df9efe4d08538a41', 'user', '0xbbbbedc42dc53842141be8f70df9efe4d08538a4');
   });
 });

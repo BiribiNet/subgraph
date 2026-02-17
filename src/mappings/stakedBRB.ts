@@ -22,8 +22,8 @@ import {
   LargeWithdrawalRequest,
   WithdrawTransaction
 } from "../../generated/schema"
-import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING } from "../helpers/constant"
-import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser } from "../helpers/user"
+import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING, JACKPOT_CONTRACT_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS } from "../helpers/constant"
+import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
@@ -46,6 +46,9 @@ export function handleDeposit(event: Deposit): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, true)
+  
+  // Update cumulative deposit cost basis
+  updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
 
   // Update global totals
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
@@ -59,8 +62,23 @@ export function handleDeposit(event: Deposit): void {
 
 export function handleRoundCleaned(event: RoundCleaned): void {
   const globalState = getOrCreateGlobalState()
-  globalState.lastRoundResolved = event.params.roundId;
+  const roundId = event.params.roundId
+  globalState.lastRoundResolved = roundId;
+  const round = RouletteRound.load(bigintToBytes(roundId))
+  if (!round) {
+    log.error("Round not found for batch processing: {}", [roundId.toString()])
+    return
+  }
   globalState.roundTransitionInProgress = false;
+
+  globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
+
+  if (round.totalBets.gt(round.totalPayouts)) { // pool won money
+    globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts).minus(event.params.fees.protocolFees.plus(event.params.fees.burnAmount).plus(event.params.fees.jackpotAmount)))
+  } else { // pool lost money
+    globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts))
+  }
+
   globalState.save()
 }
 
@@ -84,6 +102,9 @@ export function handleWithdraw(event: Withdraw): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, false)
+  
+  // Update cumulative deposit cost basis (remove cost basis of withdrawn shares)
+  updateUserWithdrawalCostBasis(event.params.owner, event.params.shares)
 
   const withdrawTransaction = WithdrawTransaction.load(event.transaction.hash)
   if (withdrawTransaction == null) {
@@ -312,7 +333,6 @@ export function handleBetPlaced(event: BetPlaced): void {
   const decoded = decodeWrapper(event.params.data, "(uint256[],uint256[],uint256[])");
   
   globalState.pendingBets = globalState.pendingBets.plus(event.params.amount);
-  
   // Update total play all time
   globalState.totalPlayAllTime = globalState.totalPlayAllTime.plus(event.params.amount)
   

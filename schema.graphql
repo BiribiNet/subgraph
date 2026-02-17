@@ -37,6 +37,10 @@ type User @entity(immutable: false) {
   totalStaked: BigInt!
   "Total BRB unstaked"
   totalUnstaked: BigInt!
+  "Cumulative deposit value (sum of all BRB deposited)"
+  cumulativeDepositValue: BigInt!
+  "Cumulative shares received from deposits"
+  cumulativeDepositShares: BigInt!
   "Total BRB bet in roulette"
   totalRouletteBets: BigInt!
   "Total BRB won in roulette"
