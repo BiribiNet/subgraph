@@ -287,6 +287,14 @@ type GlobalState @entity(immutable: false) {
   totalPendingLargeWithdrawals: BigInt!
   "Total protocol fees collected"
   totalFees: BigInt!
+  "Cumulative total BRB transfers TO StakedBRB contract"
+  totalTransfersToPool: BigInt!
+  "Cumulative total deposits"
+  totalDeposits: BigInt!
+  "Total transfers to pool at last round cleanup (for donation calculation)"
+  totalTransfersToPoolAtLastClean: BigInt!
+  "Total deposits at last round cleanup (for donation calculation)"
+  totalDepositsAtLastClean: BigInt!
   "Chainlink keeper registry address"
   chainlinkKeeperRegistry: Bytes!
   "Chainlink keeper registrat address"

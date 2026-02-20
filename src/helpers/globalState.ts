@@ -41,6 +41,10 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.maxQueueLength = BigInt.fromI32(100)
     globalState.totalPendingLargeWithdrawals = ZERO
     globalState.totalFees = ZERO
+    globalState.totalTransfersToPool = ZERO
+    globalState.totalDeposits = ZERO
+    globalState.totalTransfersToPoolAtLastClean = ZERO
+    globalState.totalDepositsAtLastClean = ZERO
   }
   return globalState
 }

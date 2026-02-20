@@ -50,6 +50,9 @@ export function handleDeposit(event: Deposit): void {
   // Update cumulative deposit cost basis
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
 
+  // Track cumulative deposits in GlobalState for donation calculation
+  globalState.totalDeposits = globalState.totalDeposits.plus(event.params.assets)
+
   // Update global totals
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
   globalState.totalShares = globalState.totalShares.plus(event.params.shares)
@@ -72,6 +75,20 @@ export function handleRoundCleaned(event: RoundCleaned): void {
   globalState.roundTransitionInProgress = false;
 
   globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
+
+  // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
+  const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
+  const depositsThisRound = globalState.totalDeposits.minus(globalState.totalDepositsAtLastClean)
+  const donations = transfersThisRound.minus(depositsThisRound).minus(round.totalBets)
+  
+  // Add donations to totalAssets (direct donations that weren't tracked via Deposit events)
+  if (donations.gt(BigInt.fromI32(0))) {
+    globalState.totalAssets = globalState.totalAssets.plus(donations)
+  }
+
+  // Update "at last clean" values for next round's calculation
+  globalState.totalTransfersToPoolAtLastClean = globalState.totalTransfersToPool
+  globalState.totalDepositsAtLastClean = globalState.totalDeposits
 
   if (round.totalBets.gt(round.totalPayouts)) { // pool won money
     globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts).minus(event.params.fees.protocolFees.plus(event.params.fees.burnAmount).plus(event.params.fees.jackpotAmount)))

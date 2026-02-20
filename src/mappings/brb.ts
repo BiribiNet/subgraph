@@ -43,6 +43,11 @@ export function handleTransfer(event: Transfer): void {
     globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
   }
 
+  // Track BRB transfers TO StakedBRB contract (for donation calculation)
+  if (toHex == STAKED_BRB_CONTRACT_ADDRESS) {
+    // Track cumulative transfers to pool in GlobalState
+    globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
+  }
 
   const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
   
