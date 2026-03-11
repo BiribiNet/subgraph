@@ -34,14 +34,8 @@ export function handleTransfer(event: Transfer): void {
     return
   }
 
-  if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) { 
-    if (toHex == JACKPOT_CONTRACT_ADDRESS) {
-      // Jackpot increased
-      globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
-    } else if (toHex == globalState.feeRecipient.toHexString()) {
-      // Protocol fee increased
-      globalState.totalFees = globalState.totalFees.plus(event.params.value)
-    }
+  if (toHex == JACKPOT_CONTRACT_ADDRESS) {
+    globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
   }
 
   if (toHex == ZERO_ADDRESS) {
@@ -49,6 +43,11 @@ export function handleTransfer(event: Transfer): void {
     globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
   }
 
+  // Track BRB transfers TO StakedBRB contract (for donation calculation)
+  if (toHex == STAKED_BRB_CONTRACT_ADDRESS) {
+    // Track cumulative transfers to pool in GlobalState
+    globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
+  }
 
   const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
   
@@ -97,6 +96,7 @@ export function handleTransfer(event: Transfer): void {
           // Update round totals
           currentRound.totalPayouts = currentRound.totalPayouts.plus(event.params.value)
           // Update global totals
+          // update total assets in StakedBRB
           globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
           updateUserRouletteStats(event.params.to, event.params.value, true, true)
         }

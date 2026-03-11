@@ -92,7 +92,7 @@ dataSources:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
       eventHandlers:
-        - event: RoundCleaned(uint256)
+        - event: RoundCleaned(uint256,(uint256,uint256,uint256))
           handler: handleRoundCleaned
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit

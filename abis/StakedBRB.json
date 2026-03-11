@@ -788,6 +788,29 @@
         "internalType": "uint256",
         "name": "roundId",
         "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "protocolFees",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "burnAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "jackpotAmount",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct StakedBRB.Fees",
+        "name": "fees",
+        "type": "tuple"
       }
     ],
     "name": "RoundCleaned",
