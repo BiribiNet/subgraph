@@ -281,61 +281,138 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
   }
 }
 
-function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, roundId: Bytes, event: BetPlaced): void {
-  // Get or create round
-  let round = RouletteRound.load(roundId);
+function max3(a: BigInt, b: BigInt, c: BigInt): BigInt {
+  let m = a
+  if (b.gt(m)) m = b
+  if (c.gt(m)) m = c
+  return m
+}
 
-  if (round == null) return log.critical("Round not found for bet placement: {}", [roundId.toString()])
+function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, betType: BigInt, number: BigInt): void {
+  const betTypeInt = betType.toI32()
+  const numI32 = number.toI32()
+
+  if (betTypeInt == BET_STRAIGHT) {
+    // roundStraightBetsTotal += amount, and potentially update roundMaxStraightBet
+    const totals = round.straightBetsTotals
+    const next = totals[numI32].plus(amount)
+    totals[numI32] = next
+    round.straightBetsTotals = totals
+    if (next.gt(round.maxStraightBet)) {
+      round.maxStraightBet = next
+    }
+  } else if (betTypeInt == BET_STREET) {
+    const totals = round.streetBetsTotals
+    const next = totals[numI32].plus(amount)
+    totals[numI32] = next
+    round.streetBetsTotals = totals
+    if (next.gt(round.maxStreetBet)) {
+      round.maxStreetBet = next
+    }
+  } else if (betTypeInt == BET_RED) {
+    round.redBetsSum = round.redBetsSum.plus(amount)
+  } else if (betTypeInt == BET_BLACK) {
+    round.blackBetsSum = round.blackBetsSum.plus(amount)
+  } else if (betTypeInt == BET_ODD) {
+    round.oddBetsSum = round.oddBetsSum.plus(amount)
+  } else if (betTypeInt == BET_EVEN) {
+    round.evenBetsSum = round.evenBetsSum.plus(amount)
+  } else if (betTypeInt == BET_LOW) {
+    round.lowBetsSum = round.lowBetsSum.plus(amount)
+  } else if (betTypeInt == BET_HIGH) {
+    round.highBetsSum = round.highBetsSum.plus(amount)
+  } else if (betTypeInt == BET_DOZEN) {
+    const sums = round.dozenBetsSum
+    const next = sums[numI32].plus(amount)
+    sums[numI32] = next
+    round.dozenBetsSum = sums
+  } else if (betTypeInt == BET_COLUMN) {
+    const sums = round.columnBetsSum
+    const next = sums[numI32].plus(amount)
+    sums[numI32] = next
+    round.columnBetsSum = sums
+  } else if (betTypeInt == BET_SPLIT) {
+    // payout = amount * 18 (added to otherBetsPayout)
+    round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(18)))
+  } else if (betTypeInt == BET_CORNER) {
+    round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(9)))
+  } else if (betTypeInt == BET_LINE) {
+    round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(6)))
+  } else if (betTypeInt == BET_TRIO_012 || betTypeInt == BET_TRIO_023) {
+    round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(12)))
+  }
+}
+
+function calculateMaxPayoutFromRoundComponents(round: RouletteRound): BigInt {
+  // Mirrors RouletteLib + safety buffer logic
+  const straightComponent = round.maxStraightBet.times(BigInt.fromI32(36)).plus(round.maxStreetBet.times(BigInt.fromI32(12)))
+
+  const redBlackComponent = (round.redBetsSum.gt(round.blackBetsSum) ? round.redBetsSum : round.blackBetsSum).times(BigInt.fromI32(2))
+  const oddEvenComponent = (round.oddBetsSum.gt(round.evenBetsSum) ? round.oddBetsSum : round.evenBetsSum).times(BigInt.fromI32(2))
+  const lowHighComponent = (round.lowBetsSum.gt(round.highBetsSum) ? round.lowBetsSum : round.highBetsSum).times(BigInt.fromI32(2))
+  const pairComponent = redBlackComponent.plus(oddEvenComponent).plus(lowHighComponent)
+
+  const dozenSums = round.dozenBetsSum
+  const dozenMax = max3(dozenSums[1], dozenSums[2], dozenSums[3])
+  const dozenComponent = dozenMax.times(BigInt.fromI32(3))
+
+  const columnSums = round.columnBetsSum
+  const columnMax = max3(columnSums[1], columnSums[2], columnSums[3])
+  const columnComponent = columnMax.times(BigInt.fromI32(3))
+
+  const otherComponent = round.otherBetsPayout
+
+  const raw = straightComponent.plus(pairComponent).plus(dozenComponent).plus(columnComponent).plus(otherComponent)
+
+  // SAFETY_BUFFER_BPS = 11000 (110%) with floor division by 10000
+  return raw.times(BigInt.fromI32(11000)).div(BigInt.fromI32(10000))
+}
+
+function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, round: RouletteRound, event: BetPlaced): void {
   // Create or update bet entity (user + round ID)
-  const betId = user.concat(roundId)
+  const betId = user.concat(round.id)
   let bet = RouletteBet.load(betId)
-  
+
   if (!bet) {
     // Create new bet entity
-    bet = new RouletteBet(betId);
-    bet.user = user;
-    bet.round = roundId;
-    bet.amounts = [amount];
-    bet.betTypes = [getBetTypeFromNumber(betType)];
-    bet.numbers = [number];
-    bet.totalAmount = amount;
-    bet.betCount = BigInt.fromI32(1);
-    bet.firstBetBlockNumber = event.block.number;
-    bet.firstBetTimestamp = event.block.timestamp;
-    bet.latestBetBlockNumber = event.block.number;
-    bet.latestBetTimestamp = event.block.timestamp;
-    bet.latestTransactionHash = event.transaction.hash;
+    bet = new RouletteBet(betId)
+    bet.user = user
+    bet.round = round.id
+    bet.amounts = [amount]
+    bet.betTypes = [getBetTypeFromNumber(betType)]
+    bet.numbers = [number]
+    bet.totalAmount = amount
+    bet.betCount = BigInt.fromI32(1)
+    bet.firstBetBlockNumber = event.block.number
+    bet.firstBetTimestamp = event.block.timestamp
+    bet.latestBetBlockNumber = event.block.number
+    bet.latestBetTimestamp = event.block.timestamp
+    bet.latestTransactionHash = event.transaction.hash
   } else {
     // Update existing bet entity
-    const currentAmounts = bet.amounts;
-    const currentBetTypes = bet.betTypes;
-    const currentNumbers = bet.numbers;
-    
-    currentAmounts.push(amount);
-    currentBetTypes.push(getBetTypeFromNumber(betType));
-    currentNumbers.push(number);
-    
-    bet.amounts = currentAmounts;
-    bet.betTypes = currentBetTypes;
-    bet.numbers = currentNumbers;
-    bet.totalAmount = bet.totalAmount.plus(amount);
-    bet.betCount = bet.betCount.plus(BigInt.fromI32(1));
-    bet.latestBetBlockNumber = event.block.number;
-    bet.latestBetTimestamp = event.block.timestamp;
-    bet.latestTransactionHash = event.transaction.hash;
+    const currentAmounts = bet.amounts
+    const currentBetTypes = bet.betTypes
+    const currentNumbers = bet.numbers
+
+    currentAmounts.push(amount)
+    currentBetTypes.push(getBetTypeFromNumber(betType))
+    currentNumbers.push(number)
+
+    bet.amounts = currentAmounts
+    bet.betTypes = currentBetTypes
+    bet.numbers = currentNumbers
+    bet.totalAmount = bet.totalAmount.plus(amount)
+    bet.betCount = bet.betCount.plus(BigInt.fromI32(1))
+    bet.latestBetBlockNumber = event.block.number
+    bet.latestBetTimestamp = event.block.timestamp
+    bet.latestTransactionHash = event.transaction.hash
   }
-  
-  bet.save();
+
+  bet.save()
 
   // Update round totals
-  round.totalBets = round.totalBets.plus(amount);
-  
-  // Track max bet amount in this round
-  if (bet.totalAmount.gt(round.maxBetAmount)) {
-    round.maxBetAmount = bet.totalAmount;
-  }
-  
-  round.save();
+  round.totalBets = round.totalBets.plus(amount)
+  updateRoundMaxPayoutComponents(round, amount, betType, number)
 }
 
 export function handleBetPlaced(event: BetPlaced): void {
@@ -365,12 +442,23 @@ export function handleBetPlaced(event: BetPlaced): void {
     const betTypes = s[1].toBigIntArray()
     const numbers = s[2].toBigIntArray()
     const amountsLength = amounts.length;
+
+    const roundId = bigintToBytes(event.params.roundId)
+    let round = RouletteRound.load(roundId)
+    if (round == null) {
+      log.critical("Round not found for bet placement: {}", [roundId.toString()])
+      return
+    }
+
     // Process each bet
     for (let i = 0; i < amountsLength; i++) {
-      // Process the individual bet (create/update RouletteBet entity)
-      processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], bigintToBytes(event.params.roundId), event)
-      // Update user roulette stats
+      // Process the individual bet (create/update RouletteBet entity + update maxPayout components)
+      processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
     }
+
+    // Compute and persist maxPayout after processing the full decoded bet batch
+    round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
+    round.save()
   }
   
   globalState.save()

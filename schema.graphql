@@ -139,8 +139,34 @@ type RouletteRound @entity(immutable: false) {
   vrfTxHash: Bytes
   "Total bets in round"
   totalBets: BigInt!
-  "Max bet amount in round"
+  "Max payout buffer for the round (RouletteClean maxPayout * safety buffer)"
   maxBetAmount: BigInt!
+  "Max total straight bet amount on any number for the round"
+  maxStraightBet: BigInt!
+  "Max total street bet amount on any street for the round"
+  maxStreetBet: BigInt!
+  "Total straight bet amount per number index (0..36)"
+  straightBetsTotals: [BigInt!]!
+  "Total street bet amount per street-start index (0..36)"
+  streetBetsTotals: [BigInt!]!
+  "Total red bet amount for the round"
+  redBetsSum: BigInt!
+  "Total black bet amount for the round"
+  blackBetsSum: BigInt!
+  "Total odd bet amount for the round"
+  oddBetsSum: BigInt!
+  "Total even bet amount for the round"
+  evenBetsSum: BigInt!
+  "Total low bet amount for the round"
+  lowBetsSum: BigInt!
+  "Total high bet amount for the round"
+  highBetsSum: BigInt!
+  "Total dozen bet amount sums by dozen id (index 0..3; use 1..3)"
+  dozenBetsSum: [BigInt!]!
+  "Total column bet amount sums by column id (index 0..3; use 1..3)"
+  columnBetsSum: [BigInt!]!
+  "Total payout amount from split/corner/line/trio bets (already in payout units)"
+  otherBetsPayout: BigInt!
   "Computed payouts count"
   computedPayoutsCount: BigInt
   "Current payouts count"

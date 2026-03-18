@@ -15,6 +15,14 @@ import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 
+function zerosArray(length: i32): Array<BigInt> {
+  const arr = new Array<BigInt>(length);
+  for (let i = 0; i < length; i++) {
+    arr[i] = BigInt.fromI32(0);
+  }
+  return arr;
+}
+
 export function handleJackpotResultEvent(event: JackpotResultEvent): void {
   const round = RouletteRound.load(bigintToBytes(event.params.roundId))
   if (!round) {
@@ -46,6 +54,19 @@ export function handleRoundStarted(event: RoundStarted): void {
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
   round.maxBetAmount = BigInt.fromI32(0)
+  round.maxStraightBet = BigInt.fromI32(0)
+  round.maxStreetBet = BigInt.fromI32(0)
+  round.straightBetsTotals = zerosArray(37) // index = roulette number (0..36)
+  round.streetBetsTotals = zerosArray(37) // index = street start number (1..34, step 3)
+  round.redBetsSum = BigInt.fromI32(0)
+  round.blackBetsSum = BigInt.fromI32(0)
+  round.oddBetsSum = BigInt.fromI32(0)
+  round.evenBetsSum = BigInt.fromI32(0)
+  round.lowBetsSum = BigInt.fromI32(0)
+  round.highBetsSum = BigInt.fromI32(0)
+  round.dozenBetsSum = zerosArray(4) // index = dozen id (1..3)
+  round.columnBetsSum = zerosArray(4) // index = column id (1..3)
+  round.otherBetsPayout = BigInt.fromI32(0)
   round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.startedAt = event.params.timestamp;
@@ -77,6 +98,19 @@ export function handleChainlinkSetupCompleted(event: ChainlinkSetupCompleted): v
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
   round.maxBetAmount = BigInt.fromI32(0)
+  round.maxStraightBet = BigInt.fromI32(0)
+  round.maxStreetBet = BigInt.fromI32(0)
+  round.straightBetsTotals = zerosArray(37)
+  round.streetBetsTotals = zerosArray(37)
+  round.redBetsSum = BigInt.fromI32(0)
+  round.blackBetsSum = BigInt.fromI32(0)
+  round.oddBetsSum = BigInt.fromI32(0)
+  round.evenBetsSum = BigInt.fromI32(0)
+  round.lowBetsSum = BigInt.fromI32(0)
+  round.highBetsSum = BigInt.fromI32(0)
+  round.dozenBetsSum = zerosArray(4)
+  round.columnBetsSum = zerosArray(4)
+  round.otherBetsPayout = BigInt.fromI32(0)
   round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.startedAt = event.block.timestamp;
