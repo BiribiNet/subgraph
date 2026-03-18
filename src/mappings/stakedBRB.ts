@@ -29,6 +29,14 @@ import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
 import { ONE } from "../helpers/number"
 
+function zerosArray(length: number): Array<BigInt> {
+  const arr = new Array<BigInt>(length)
+  for (let i = 0; i < length; i++) {
+    arr[i] = BigInt.fromI32(0)
+  }
+  return arr
+}
+
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
@@ -73,6 +81,17 @@ export function handleRoundCleaned(event: RoundCleaned): void {
     return
   }
   globalState.roundTransitionInProgress = false;
+
+  // StakedBRB reduces global $.maxPayout by maxPayoutPerRound[roundId].
+  // The per-round value itself is NOT cleared in the contract, so we keep it as historical data.
+  const roundMaxPayoutPerRound = round.maxBetAmount
+  if (roundMaxPayoutPerRound.gt(BigInt.fromI32(0))) {
+    if (roundMaxPayoutPerRound.ge(globalState.maxBetAmount)) {
+      globalState.maxBetAmount = BigInt.fromI32(0)
+    } else {
+      globalState.maxBetAmount = globalState.maxBetAmount.minus(roundMaxPayoutPerRound)
+    }
+  }
 
   globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
 
@@ -457,7 +476,14 @@ export function handleBetPlaced(event: BetPlaced): void {
     }
 
     // Compute and persist maxPayout after processing the full decoded bet batch
-    round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
+    const maxPayoutThisCall = calculateMaxPayoutFromRoundComponents(round)
+
+    // StakedBRB increases both:
+    // - per-round maxPayoutPerRound[roundId] += maxPayout
+    // - global maxPayout (i.e., $.maxPayout) += maxPayout
+    round.maxBetAmount = round.maxBetAmount.plus(maxPayoutThisCall)
+    globalState.maxBetAmount = globalState.maxBetAmount.plus(maxPayoutThisCall)
+
     round.save()
   }
   

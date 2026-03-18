@@ -17,6 +17,7 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.totalPayouts = ZERO
     globalState.totalBurned = ZERO
     globalState.currentJackpot = ZERO
+    globalState.maxBetAmount = ZERO
     globalState.apy7Day = BigDecimal.fromString("0")
     globalState.apy30Day = BigDecimal.fromString("0")
     globalState.apy365Day = BigDecimal.fromString("0")
@@ -41,10 +42,16 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.maxQueueLength = BigInt.fromI32(100)
     globalState.totalPendingLargeWithdrawals = ZERO
     globalState.totalFees = ZERO
+    globalState.minJackpotCondition = ZERO
     globalState.totalTransfersToPool = ZERO
     globalState.totalDeposits = ZERO
     globalState.totalTransfersToPoolAtLastClean = ZERO
     globalState.totalDepositsAtLastClean = ZERO
+
+    // Chainlink / keeper config (required non-null fields)
+    globalState.chainlinkKeeperRegistry = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
+    globalState.chainlinkKeeperRegistrar = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
+    globalState.subscriptionId = ZERO
   }
   return globalState
 }

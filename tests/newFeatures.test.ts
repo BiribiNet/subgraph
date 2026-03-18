@@ -8,10 +8,12 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit, Withdraw } from '../generated/StakedBRB/StakedBRB';
-import { handleBetPlaced, handleDeposit, handleWithdraw } from '../src/mappings/stakedBRB';
+import { BetPlaced, Deposit, Withdraw, RoundCleaned } from '../generated/StakedBRB/StakedBRB';
+import { handleBetPlaced, handleDeposit, handleWithdraw, handleRoundCleaned } from '../src/mappings/stakedBRB';
 import { ChainlinkSetupCompleted } from '../generated/RouletteClean/Game';
 import { handleChainlinkSetupCompleted } from '../src/mappings/roulette';
+import { MinJackpotConditionUpdated } from '../generated/RouletteClean/Game';
+import { handleMinJackpotConditionUpdated } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
 // Helper functions
@@ -106,6 +108,42 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
   betPlacedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
   betPlacedEvent.block.timestamp = BigInt.fromI32(timestamp);
   handleBetPlaced(betPlacedEvent);
+};
+
+const createRoundCleaned = (roundId: i32, protocolFees: string, burnAmount: string, jackpotAmount: string, timestamp: i32): void => {
+  const roundCleanedEvent = changetype<RoundCleaned>(newMockEvent());
+  roundCleanedEvent.parameters = new Array<ethereum.EventParam>();
+  roundCleanedEvent.parameters.push(
+    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
+  );
+
+  const feesTuple = new ethereum.Tuple();
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
+  roundCleanedEvent.parameters.push(
+    new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple))
+  );
+
+  roundCleanedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  roundCleanedEvent.block.timestamp = BigInt.fromI32(timestamp);
+  roundCleanedEvent.block.number = BigInt.fromI32(timestamp / 100);
+  handleRoundCleaned(roundCleanedEvent);
+};
+
+const createMinJackpotConditionUpdated = (minJackpotCondition: string, timestamp: i32 = 1000000): void => {
+  const event = changetype<MinJackpotConditionUpdated>(newMockEvent());
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam(
+      'newMinJackpotCondition',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromString(minJackpotCondition))
+    )
+  );
+  event.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handleMinJackpotConditionUpdated(event);
 };
 
 // Test Suite 1: Staking Statistics
@@ -234,8 +272,11 @@ describe('Max Bet Amount Tests', () => {
     // Each bet adds 10 ETH (from hardcoded data field), so total = 20 ETH
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
-    // With the fixed ABI payload used in this test, maxPayout evaluates to 198 ETH after 2 bet placements.
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '198000000000000000000');
+    // With the fixed ABI payload used in this test:
+    //  - first bet: maxPayout = 99 ETH
+    //  - second bet: maxPayout = 198 ETH
+    // contract does: maxPayoutPerRound += maxPayout each time => total = 99 + 198 = 297 ETH
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '297000000000000000000');
   });
 
   test('maxBetAmount does not decrease on smaller bet', () => {
@@ -246,8 +287,8 @@ describe('Max Bet Amount Tests', () => {
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     // Each bet adds 10 ETH (from hardcoded data field), so total = 20 ETH
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
-    // maxPayout is non-decreasing for the round; with this fixed payload it evaluates to 198 ETH.
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '198000000000000000000');
+    // maxPayoutPerRound accumulates => 99 + 198 = 297 ETH
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '297000000000000000000');
   });
 
   test('maxBetAmount tracks total amount per user', () => {
@@ -259,8 +300,24 @@ describe('Max Bet Amount Tests', () => {
     
     // maxPayout is driven by the bet-type components, not by a per-user maximum total.
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '198000000000000000000');
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '297000000000000000000');
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
+  });
+
+  test('maxBetAmount resets to 0 on RoundCleaned', () => {
+    // Place a single bet to ensure maxBetAmount is non-zero
+    createBet(USER_ADDRESS, '10000000000000000000', 1000000, 1);
+
+    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '99000000000000000000');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'maxBetAmount', '99000000000000000000');
+
+    // Clean the round, which resets StakedBRB's active maxPayout contribution
+    createRoundCleaned(1, '0', '0', '0', 1000500);
+
+    // Contract keeps the per-round maxPayoutPerRound value, but reduces global maxPayout.
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '99000000000000000000');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'maxBetAmount', '0');
   });
 });
 
@@ -322,6 +379,16 @@ describe('APY Snapshot Tests', () => {
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'apy30Day', '0');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'apy365Day', '0');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'apyLifetime', '0');
+  });
+});
+
+// Test Suite 7: Roulette minJackpotCondition
+describe('Roulette MinJackpotCondition Tests', () => {
+  beforeEach(() => clearStore());
+
+  test('GlobalState.minJackpotCondition updates on MinJackpotConditionUpdated', () => {
+    createMinJackpotConditionUpdated('123456');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'minJackpotCondition', '123456');
   });
 });
 

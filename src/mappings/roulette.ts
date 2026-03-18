@@ -6,7 +6,8 @@ import {
   BatchProcessed,
   JackpotResultEvent,
   ChainlinkSetupCompleted,
-  ComputedPayouts
+  ComputedPayouts,
+  MinJackpotConditionUpdated
 } from "../../generated/RouletteClean/Game"
 import {
   RouletteRound
@@ -43,6 +44,12 @@ export function handleComputedPayouts(event: ComputedPayouts): void {
   round.status = ROUND_STATUS_COMPUTING_PAYOUT;
   round.computedPayoutsCount = event.params.totalWinningBets;
   round.save()
+}
+
+export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdated): void {
+  const globalState = getOrCreateGlobalState()
+  globalState.minJackpotCondition = event.params.newMinJackpotCondition
+  globalState.save()
 }
 
 export function handleRoundStarted(event: RoundStarted): void {
