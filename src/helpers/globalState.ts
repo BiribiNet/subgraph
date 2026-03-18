@@ -13,7 +13,7 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.currentRoundNumber = BigInt.fromI32(1)
     globalState.lastRoundStartTime = ZERO
     globalState.lastRoundPaid = ZERO
-    globalState.gamePeriod = BigInt.fromI32(120) // Default 60 seconds
+    globalState.gamePeriod = BigInt.fromI32(80) // Default 80 seconds
     globalState.totalPayouts = ZERO
     globalState.totalBurned = ZERO
     globalState.currentJackpot = ZERO
@@ -25,8 +25,8 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.apyLifetimeBaselineTotalAssets = ZERO
     globalState.apyLifetimeBaselineTotalShares = ZERO
     globalState.lastApySnapshotTimestamp = ZERO
-    globalState.protocolFeeBasisPoints = BigInt.fromI32(300) // Default 3%
-    globalState.jackpotFeeBasisPoints = BigInt.fromI32(150) // Default 1.5%
+    globalState.protocolFeeBasisPoints = BigInt.fromI32(200) // Default 2%
+    globalState.jackpotFeeBasisPoints = BigInt.fromI32(250) // Default 2.5%
     globalState.burnFeeBasisPoints = BigInt.fromI32(50) // Default 0.5%
     globalState.feeRecipient = Bytes.fromHexString("0x0000000000000000000000000000000000000000")
     globalState.totalPlayAllTime = ZERO
