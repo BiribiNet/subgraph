@@ -38,14 +38,6 @@ import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice } from "../h
 import { ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot, trackHourlyUniquePlayer } from "../helpers/aggregation"
 
-function zerosArray(length: number): Array<BigInt> {
-  const arr = new Array<BigInt>(length)
-  for (let i = 0; i < length; i++) {
-    arr[i] = BigInt.fromI32(0)
-  }
-  return arr
-}
-
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
@@ -123,12 +115,10 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
     round.stakersRevenue = ZERO
   }
 
-  // Update cumulative staker revenue
-  if (round.stakersRevenue !== null) {
-    const sr = round.stakersRevenue as BigInt
-    if (sr.gt(ZERO)) {
-      globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
-    }
+  // Update cumulative staker revenue (stakersRevenue is always set above)
+  const sr = round.stakersRevenue as BigInt
+  if (sr.gt(ZERO)) {
+    globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
   }
 
   // Update DailyStats with round completion data

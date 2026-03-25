@@ -95,6 +95,11 @@ export function handleTransfer(event: Transfer): void {
           globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
           updateUserRouletteStats(event.params.to, event.params.value, true, true)
           bet.won = true
+
+          // Track payout in DailyStats
+          const dailyStatsJackpotPayout = getOrCreateDailyStats(event.block.timestamp)
+          dailyStatsJackpotPayout.totalPayouts = dailyStatsJackpotPayout.totalPayouts.plus(event.params.value)
+          dailyStatsJackpotPayout.save()
         } else if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) {
           const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
           if (withdrawTx == null) { // if we are in a withdraw scenario exit
@@ -123,13 +128,13 @@ export function handleTransfer(event: Transfer): void {
             // Update global totals
             globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
             updateUserRouletteStats(event.params.to, event.params.value, true, true)
+
+            // Track payout in DailyStats
+            const dailyStatsRegularPayout = getOrCreateDailyStats(event.block.timestamp)
+            dailyStatsRegularPayout.totalPayouts = dailyStatsRegularPayout.totalPayouts.plus(event.params.value)
+            dailyStatsRegularPayout.save()
           }
         }
-
-        // Update DailyStats with payout in real-time
-        const dailyStatsPayout = getOrCreateDailyStats(event.block.timestamp)
-        dailyStatsPayout.totalPayouts = dailyStatsPayout.totalPayouts.plus(event.params.value)
-        dailyStatsPayout.save()
 
         bet.save()
         currentRound.save()
