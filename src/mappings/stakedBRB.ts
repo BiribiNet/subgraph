@@ -12,7 +12,8 @@ import {
   BurnFeeRateUpdated,
   JackpotFeeRateUpdated,
   ProtocolFeeRecipientUpdated,
-  RoundCleaned
+  RoundCleaned,
+  FeeWithdrawn
 } from "../../generated/StakedBRB/StakedBRB"
 import {
   RouletteRound,
@@ -20,14 +21,16 @@ import {
   StakedBRBDeposit,
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
-  WithdrawTransaction
+  WithdrawTransaction,
+  FeeWithdrawal
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING, JACKPOT_CONTRACT_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
-import { ONE } from "../helpers/number"
+import { ONE, ZERO } from "../helpers/number"
+import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 
 function zerosArray(length: number): Array<BigInt> {
   const arr = new Array<BigInt>(length)
@@ -94,6 +97,44 @@ export function handleRoundCleaned(event: RoundCleaned): void {
   }
 
   globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
+
+  // Revenue breakdown per round
+  round.infraRevenue = event.params.fees.protocolFees
+  round.roundBurnAmount = event.params.fees.burnAmount
+  round.jackpotRevenue = event.params.fees.jackpotAmount
+
+  if (round.totalBets.gt(round.totalPayouts)) {
+    const totalFeesAmount = event.params.fees.protocolFees
+      .plus(event.params.fees.burnAmount)
+      .plus(event.params.fees.jackpotAmount)
+    round.stakersRevenue = round.totalBets.minus(round.totalPayouts).minus(totalFeesAmount)
+  } else {
+    round.stakersRevenue = ZERO
+  }
+
+  // Update cumulative staker revenue
+  if (round.stakersRevenue !== null) {
+    const sr = round.stakersRevenue as BigInt
+    if (sr.gt(ZERO)) {
+      globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
+    }
+  }
+
+  // Update DailyStats with round completion data
+  const dailyStats = getOrCreateDailyStats(event.block.timestamp)
+  dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
+  dailyStats.totalPayouts = dailyStats.totalPayouts.plus(round.totalPayouts)
+  if (round.totalBets.gt(round.totalPayouts)) {
+    dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
+  }
+  if (globalState.totalShares.gt(ZERO)) {
+    const PRECISION = BigInt.fromI32(10).pow(18)
+    dailyStats.vaultSharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
+      .div(globalState.totalShares.toBigDecimal())
+      .div(PRECISION.toBigDecimal())
+  }
+  dailyStats.jackpotPool = globalState.currentJackpot
+  dailyStats.save()
 
   // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
   const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
@@ -259,6 +300,23 @@ export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpd
 
   // Update protocol fee recipient
   globalState.feeRecipient = event.params.newRecipient
+  globalState.save()
+}
+
+export function handleFeeWithdrawn(event: FeeWithdrawn): void {
+  // Create immutable record
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const withdrawal = new FeeWithdrawal(id)
+  withdrawal.amount = event.params.amount
+  withdrawal.recipient = event.params.recipient
+  withdrawal.timestamp = event.block.timestamp
+  withdrawal.blockNumber = event.block.number
+  withdrawal.transactionHash = event.transaction.hash
+  withdrawal.save()
+
+  // Update global state
+  const globalState = getOrCreateGlobalState()
+  globalState.totalFees = globalState.totalFees.plus(event.params.amount)
   globalState.save()
 }
 
@@ -486,7 +544,23 @@ export function handleBetPlaced(event: BetPlaced): void {
 
     round.save()
   }
-  
+
+  // Update DailyStats aggregation
+  const dailyStats = getOrCreateDailyStats(event.block.timestamp)
+  dailyStats.volume = dailyStats.volume.plus(event.params.amount)
+  dailyStats.betCount = dailyStats.betCount.plus(BigInt.fromI32(1))
+  const isNewDaily = trackDailyUniquePlayer(event.block.timestamp, event.params.user.toHexString())
+  if (isNewDaily) {
+    dailyStats.uniquePlayers = dailyStats.uniquePlayers.plus(BigInt.fromI32(1))
+  }
+  dailyStats.save()
+
+  // Update HourlyVolumeSnapshot
+  const hourly = getOrCreateHourlySnapshot(event.block.timestamp)
+  hourly.volume = hourly.volume.plus(event.params.amount)
+  hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
+  hourly.save()
+
   globalState.save()
 }
 

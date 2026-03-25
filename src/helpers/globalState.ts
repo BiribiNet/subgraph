@@ -48,6 +48,10 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.totalTransfersToPoolAtLastClean = ZERO
     globalState.totalDepositsAtLastClean = ZERO
 
+    globalState.totalStakerRevenue = ZERO
+    globalState.brbPrice = BigDecimal.fromString("0")
+    globalState.brbPriceUpdatedAt = ZERO
+
     // Chainlink / keeper config (required non-null fields)
     globalState.chainlinkKeeperRegistry = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
     globalState.chainlinkKeeperRegistrar = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
@@ -71,22 +75,36 @@ function getDayId(timestamp: BigInt): Bytes {
  * Snapshots are taken once per day (at most) to track historical share values
  */
 function createOrUpdateSnapshot(
-  totalAssets: BigInt,
-  totalShares: BigInt,
+  globalState: GlobalState,
   timestamp: BigInt,
   blockNumber: BigInt
 ): void {
   const dayId = getDayId(timestamp)
   let snapshot = APYSnapshot.load(dayId)
-  
+
   // Only create snapshot if it doesn't exist for this day
   // This ensures we only snapshot once per day
   if (!snapshot) {
     snapshot = new APYSnapshot(dayId)
-    snapshot.totalAssets = totalAssets
-    snapshot.totalShares = totalShares
+    snapshot.totalAssets = globalState.totalAssets
+    snapshot.totalShares = globalState.totalShares
     snapshot.timestamp = timestamp
     snapshot.blockNumber = blockNumber
+
+    // Enriched vault snapshot fields
+    if (globalState.totalShares.gt(ZERO)) {
+      const PRECISION = BigInt.fromI32(10).pow(18)
+      snapshot.sharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
+        .div(globalState.totalShares.toBigDecimal())
+        .div(PRECISION.toBigDecimal())
+    } else {
+      snapshot.sharePrice = BigDecimal.fromString("1")
+    }
+    snapshot.stakerCount = globalState.stakersCount
+    snapshot.apy7Day = globalState.apy7Day
+    snapshot.apy30Day = globalState.apy30Day
+    snapshot.apyLifetime = globalState.apyLifetime
+
     snapshot.save()
   }
 }
@@ -185,7 +203,7 @@ export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: Big
   const timeSinceLastSnapshot = currentTimestamp.minus(globalState.lastApySnapshotTimestamp)
   
   if (timeSinceLastSnapshot.ge(SECONDS_PER_DAY) || globalState.lastApySnapshotTimestamp.equals(ZERO)) {
-    createOrUpdateSnapshot(globalState.totalAssets, globalState.totalShares, currentTimestamp, blockNumber)
+    createOrUpdateSnapshot(globalState, currentTimestamp, blockNumber)
     globalState.lastApySnapshotTimestamp = currentTimestamp
   }
 
