@@ -48,6 +48,7 @@ const createDeposit = (user: string, assets: string, shares: string, timestamp: 
     new ethereum.EventParam('shares', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(shares)))
   );
   depositEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  depositEvent.logIndex = BigInt.fromI32(0);
   depositEvent.block.timestamp = BigInt.fromI32(timestamp);
   depositEvent.block.number = BigInt.fromI32(timestamp / 100);
   handleDeposit(depositEvent);
@@ -100,7 +101,9 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
     new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
   );
   betPlacedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  betPlacedEvent.logIndex = BigInt.fromI32(0);
   betPlacedEvent.block.timestamp = BigInt.fromI32(timestamp);
+  betPlacedEvent.block.number = BigInt.fromI32(timestamp / 100);
   handleBetPlaced(betPlacedEvent);
 };
 
@@ -130,6 +133,7 @@ const createRoundCleaningCompleted = (
   ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
 
   ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   handleRoundCleaningCompleted(ev);
@@ -145,6 +149,7 @@ const createMinJackpotConditionUpdated = (minJackpotCondition: string, timestamp
     )
   );
   event.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  event.logIndex = BigInt.fromI32(0);
   event.block.timestamp = BigInt.fromI32(timestamp);
   event.block.number = BigInt.fromI32(timestamp / 100);
   handleMinJackpotConditionUpdated(event);

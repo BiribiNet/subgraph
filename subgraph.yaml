@@ -96,6 +96,7 @@ dataSources:
         - DailyStats
         - DailyPlayer
         - HourlyVolumeSnapshot
+        - HourlyPlayer
       abis:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
