@@ -139,8 +139,6 @@ type RouletteRound @entity(immutable: false) {
   winningNumber: BigInt
   "Jackpot number"
   jackpotNumber: BigInt
-  "Jackpot winner share"
-  jackpotWinnerShare: BigInt
   "Jackpot winner count"
   jackpotWinnerCount: BigInt
   "VRF request ID"

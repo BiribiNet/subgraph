@@ -1,6 +1,6 @@
 import { Transfer } from "../../generated/BRBReferal/BRBReferal"
 import { BRBReferalTransfer } from "../../generated/schema"
-import { updateUserBRBReferalBalance } from "../helpers/user"
+import { updateUserBRBReferalBalance, updateUserActivity } from "../helpers/user"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 
 export function handleTransfer(event: Transfer): void {
@@ -29,6 +29,7 @@ export function handleTransfer(event: Transfer): void {
 
   if (!toIsZero) {
     updateUserBRBReferalBalance(event.params.to, event.params.value, true)   // Add to receiver
+    updateUserActivity(event.params.to, event.block.timestamp)
     
     // Create transfer entity for receiver (credit)
     const transferIdTo = event.transaction.hash.concat(bigintToBytes(event.logIndex)).concat(event.params.to)

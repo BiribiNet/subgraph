@@ -143,19 +143,6 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
   user.save()
 }
 
-export function updateUserGeneralStats(userAddress: Bytes, betAmount: BigInt, winAmount: BigInt): void {
-  if (userAddress.toHexString() == ZERO_ADDRESS) {
-    return
-  }
-  const user = getOrCreateUser(userAddress)
-
-  user.totalRouletteBets = user.totalRouletteBets.plus(betAmount)
-  user.totalRouletteWins = user.totalRouletteWins.plus(winAmount)
-  user.netProfit = user.netProfit.minus(betAmount).plus(winAmount)
-
-  user.save()
-}
-
 export function updateUserDepositCostBasis(userAddress: Bytes, assets: BigInt, shares: BigInt): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return

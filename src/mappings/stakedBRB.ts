@@ -204,18 +204,11 @@ export function handleWithdraw(event: Withdraw): void {
     new WithdrawTransaction(event.transaction.hash).save()
   }
 
-  // Check if user will have zero sBRB balance after this withdrawal
-  // The balance update happens in handleTransfer, so we check if shares withdrawn equals current balance
-  const willBeZeroBalance = user.sbrbBalance.equals(event.params.shares)
-
   // Update global totals
+  // Note: stakersCount is decremented in updateUserSBRBBalance (via handleTransfer)
+  // when the sBRB Transfer event fires and balance reaches zero
   globalState.totalAssets = globalState.totalAssets.minus(event.params.assets)
   globalState.totalShares = globalState.totalShares.minus(event.params.shares)
-  
-  // Decrement stakers count if user unstakes everything
-  if (willBeZeroBalance) {
-    globalState.stakersCount = globalState.stakersCount.minus(ONE)
-  }
 
   // Update share price
   updateSharePrice(globalState)
