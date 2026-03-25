@@ -311,6 +311,10 @@ type GlobalState @entity(immutable: false) {
   totalAssets: BigInt!
   "Total shares issued by StakedBRB"
   totalShares: BigInt!
+  "Current sBRB share price (BRB per sBRB)"
+  sharePrice: BigDecimal!
+  "Total number of rounds created"
+  totalRounds: BigInt!
   "Pending bets amount"
   pendingBets: BigInt!
   "Last round resolved"
@@ -529,21 +533,6 @@ type QueuedLiquidityRejectedLog @entity(immutable: true) {
   blockNumber: BigInt!
   "Timestamp"
   timestamp: BigInt!
-  "Transaction hash"
-  transactionHash: Bytes!
-}
-
-type FeeWithdrawal @entity(immutable: true) {
-  "Transaction hash + log index"
-  id: Bytes!
-  "Amount withdrawn"
-  amount: BigInt!
-  "Fee recipient"
-  recipient: Bytes!
-  "Block timestamp"
-  timestamp: BigInt!
-  "Block number"
-  blockNumber: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
 }

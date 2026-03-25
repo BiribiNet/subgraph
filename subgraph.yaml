@@ -93,7 +93,6 @@ dataSources:
         - RouletteRound
         - RouletteBet
         - WithdrawTransaction
-        - FeeWithdrawal
         - DailyStats
         - DailyPlayer
         - HourlyVolumeSnapshot

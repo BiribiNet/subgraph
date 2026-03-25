@@ -26,7 +26,6 @@ import {
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   WithdrawTransaction,
-  FeeWithdrawal,
   BettingWindowClosedLog,
   QueuedLiquidityRejectedLog,
   WithdrawalEjectedLog
@@ -35,7 +34,7 @@ import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, 
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
+import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice } from "../helpers/globalState"
 import { ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 
@@ -75,9 +74,12 @@ export function handleDeposit(event: Deposit): void {
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
   globalState.totalShares = globalState.totalShares.plus(event.params.shares)
   
+  // Update share price
+  updateSharePrice(globalState)
+
   // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
-  
+
   globalState.save()
 }
 
@@ -164,6 +166,10 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
     globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts))
   }
 
+  // Update share price and APYs after revenue distribution
+  updateSharePrice(globalState)
+  calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
+
   globalState.save()
 }
 
@@ -208,10 +214,13 @@ export function handleWithdraw(event: Withdraw): void {
   if (willBeZeroBalance) {
     globalState.stakersCount = globalState.stakersCount.minus(ONE)
   }
-  
+
+  // Update share price
+  updateSharePrice(globalState)
+
   // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
-  
+
   globalState.save()
 }
 
@@ -569,20 +578,24 @@ export function handleBetPlaced(event: BetPlaced): void {
       return
     }
 
+    // Capture max payout BEFORE processing bets (for delta calculation)
+    const previousMaxPayout = calculateMaxPayoutFromRoundComponents(round)
+
     // Process each bet
     for (let i = 0; i < amountsLength; i++) {
       // Process the individual bet (create/update RouletteBet entity + update maxPayout components)
       processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
     }
 
-    // Compute and persist maxPayout after processing the full decoded bet batch
-    const maxPayoutThisCall = calculateMaxPayoutFromRoundComponents(round)
+    // Compute max payout AFTER processing bets and use the delta
+    const currentMaxPayout = calculateMaxPayoutFromRoundComponents(round)
+    const delta = currentMaxPayout.minus(previousMaxPayout)
 
     // StakedBRB increases both:
-    // - per-round maxPayoutPerRound[roundId] += maxPayout
-    // - global maxPayout (i.e., $.maxPayout) += maxPayout
-    round.maxBetAmount = round.maxBetAmount.plus(maxPayoutThisCall)
-    globalState.maxBetAmount = globalState.maxBetAmount.plus(maxPayoutThisCall)
+    // - per-round maxPayoutPerRound[roundId] += delta
+    // - global maxPayout (i.e., $.maxPayout) += delta
+    round.maxBetAmount = round.maxBetAmount.plus(delta)
+    globalState.maxBetAmount = globalState.maxBetAmount.plus(delta)
 
     round.save()
   }
@@ -607,16 +620,7 @@ export function handleBetPlaced(event: BetPlaced): void {
 }
 
 export function handleTransfer(event: StakedBRBTransfer): void {
-  // This handles ERC4626 share transfers (sBRB tokens)
-  // Update sBRB balances for users
-  
-  // Skip if this is a mint (from zero address) or burn (to zero address)
-  // if (event.params.from.toHexString() == "0x0000000000000000000000000000000000000000" || 
-  //     event.params.to.toHexString() == "0x0000000000000000000000000000000000000000") {
-  //   return
-  // }
-
-  // Update sBRB balances
+  // Update sBRB balances for users (including mint/burn from zero address)
   updateUserSBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
   updateUserSBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
 }
