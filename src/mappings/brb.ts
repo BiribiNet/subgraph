@@ -2,7 +2,7 @@ import { BigInt } from "@graphprotocol/graph-ts"
 import { Transfer } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
-import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
+import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 import { getOrCreateDailyStats } from "../helpers/aggregation"
@@ -22,11 +22,7 @@ export function handleTransfer(event: Transfer): void {
   updateUserBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
   updateUserBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
 
-  // Check if this transfer is from the StakedBRB contract to a user (potential payout)
-  // We need to check if the from address is the StakedBRB contract
-  // For now, we'll check if it's during a payout phase
   const globalState = getOrCreateGlobalState()
-
 
   const fromHex = event.params.from.toHexString()
   const toHex = event.params.to.toHexString();
@@ -78,14 +74,14 @@ export function handleTransfer(event: Transfer): void {
   if (globalState.currentRoundNumber.gt(BigInt.fromI32(1))) {
     const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
 
-    if (currentRound != null && currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT) {
+    if (currentRound != null && (currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT || currentRound.status == ROUND_STATUS_PAYOUT)) {
       // Get the corresponding RouletteBet entity first
       const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1)))))
 
       if (bet != null) {
         const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
         if (fromHex == JACKPOT_CONTRACT_ADDRESS) {
-          // This looks like a jackpot payout transfer
+          // Jackpot payout transfer
           const jackpotPayoutTx = new JackpotPayout(payoutId)
           jackpotPayoutTx.user = event.params.to;
           jackpotPayoutTx.round = currentRound.id
@@ -98,10 +94,11 @@ export function handleTransfer(event: Transfer): void {
           globalState.currentJackpot = globalState.currentJackpot.minus(event.params.value)
           globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
           updateUserRouletteStats(event.params.to, event.params.value, true, true)
+          bet.won = true
         } else if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) {
           const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
           if (withdrawTx == null) { // if we are in a withdraw scenario exit
-            // This looks like a payout transfer
+            // Regular payout transfer
             const payoutTx = new PayoutTransaction(payoutId)
             payoutTx.user = event.params.to
             payoutTx.round = currentRound.id
@@ -119,6 +116,7 @@ export function handleTransfer(event: Transfer): void {
             } else {
               bet.actualPayout = event.params.value
             }
+            bet.won = true
 
             // Update round totals
             currentRound.totalPayouts = currentRound.totalPayouts.plus(event.params.value)
@@ -127,6 +125,12 @@ export function handleTransfer(event: Transfer): void {
             updateUserRouletteStats(event.params.to, event.params.value, true, true)
           }
         }
+
+        // Update DailyStats with payout in real-time
+        const dailyStatsPayout = getOrCreateDailyStats(event.block.timestamp)
+        dailyStatsPayout.totalPayouts = dailyStatsPayout.totalPayouts.plus(event.params.value)
+        dailyStatsPayout.save()
+
         bet.save()
         currentRound.save()
       }

@@ -1,5 +1,5 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { DailyStats, DailyPlayer, HourlyVolumeSnapshot } from "../../generated/schema"
+import { DailyStats, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer } from "../../generated/schema"
 import { ZERO } from "./number"
 
 const SECONDS_PER_DAY = BigInt.fromI32(86400)
@@ -48,7 +48,20 @@ export function getOrCreateHourlySnapshot(timestamp: BigInt): HourlyVolumeSnapsh
     snapshot.hour = hourNumber.toI32()
     snapshot.volume = ZERO
     snapshot.betCount = ZERO
+    snapshot.uniquePlayers = ZERO
     snapshot.timestamp = timestamp
   }
   return snapshot
+}
+
+export function trackHourlyUniquePlayer(timestamp: BigInt, playerAddress: string): boolean {
+  const hourNumber = timestamp.div(SECONDS_PER_HOUR)
+  const id = hourNumber.toString() + "-" + playerAddress
+  let hp = HourlyPlayer.load(id)
+  if (hp == null) {
+    hp = new HourlyPlayer(id)
+    hp.save()
+    return true // new player this hour
+  }
+  return false
 }

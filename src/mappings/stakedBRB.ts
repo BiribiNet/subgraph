@@ -31,12 +31,12 @@ import {
   WithdrawalEjectedLog
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING, JACKPOT_CONTRACT_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS } from "../helpers/constant"
-import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis } from "../helpers/user"
+import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserActivity } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice } from "../helpers/globalState"
 import { ONE, ZERO } from "../helpers/number"
-import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot } from "../helpers/aggregation"
+import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot, trackHourlyUniquePlayer } from "../helpers/aggregation"
 
 function zerosArray(length: number): Array<BigInt> {
   const arr = new Array<BigInt>(length)
@@ -63,7 +63,8 @@ export function handleDeposit(event: Deposit): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, true)
-  
+  updateUserActivity(event.params.owner, event.block.timestamp)
+
   // Update cumulative deposit cost basis
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
 
@@ -131,9 +132,9 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
 
   // Update DailyStats with round completion data
+  // Note: totalPayouts is tracked in real-time in brb.ts handleTransfer
   const dailyStats = getOrCreateDailyStats(event.block.timestamp)
   dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
-  dailyStats.totalPayouts = dailyStats.totalPayouts.plus(round.totalPayouts)
   if (round.totalBets.gt(round.totalPayouts)) {
     dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
   }
@@ -193,7 +194,8 @@ export function handleWithdraw(event: Withdraw): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, false)
-  
+  updateUserActivity(event.params.owner, event.block.timestamp)
+
   // Update cumulative deposit cost basis (remove cost basis of withdrawn shares)
   updateUserWithdrawalCostBasis(event.params.owner, event.params.shares)
 
@@ -564,6 +566,7 @@ export function handleBetPlaced(event: BetPlaced): void {
   }
   
   updateUserRouletteStats(event.params.user, event.params.amount, false, false);
+  updateUserActivity(event.params.user, event.block.timestamp);
   if (decoded) {
     const s = decoded.toTuple()
     const amounts = s[0].toBigIntArray()
@@ -614,6 +617,10 @@ export function handleBetPlaced(event: BetPlaced): void {
   const hourly = getOrCreateHourlySnapshot(event.block.timestamp)
   hourly.volume = hourly.volume.plus(event.params.amount)
   hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
+  const isNewHourly = trackHourlyUniquePlayer(event.block.timestamp, event.params.user.toHexString())
+  if (isNewHourly) {
+    hourly.uniquePlayers = hourly.uniquePlayers.plus(BigInt.fromI32(1))
+  }
   hourly.save()
 
   globalState.save()
