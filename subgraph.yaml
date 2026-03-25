@@ -27,12 +27,16 @@ dataSources:
         - RouletteRound
         - RouletteBet
         - DailyStats
+        - TokenApproval
+        - ProtocolStats
       abis:
         - name: BRB
           file: ./abis/BRB.json
       eventHandlers:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
       file: ./src/mappings/brb.ts
   - name: RouletteClean
     kind: ethereum/contract
@@ -51,6 +55,9 @@ dataSources:
         - RouletteBet
         - PayoutTransaction
         - User
+        - AdminRoleChange
+        - ContractUpgrade
+        - ProtocolStats
       abis:
         - name: Game
           file: ./abis/Game.json
@@ -69,12 +76,22 @@ dataSources:
           handler: handleVRFResult
         - event: BatchProcessed(uint256,uint256,uint256)
           handler: handleBatchProcessed
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleGameRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleGameRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleGameRoleAdminChanged
+        - event: Initialized(uint64)
+          handler: handleGameInitialized
+        - event: Upgraded(indexed address)
+          handler: handleGameUpgraded
       file: ./src/mappings/roulette.ts
   - name: StakedBRB
     kind: ethereum/contract
     network: arbitrum-sepolia
     source:
-      abi: StakedBRB
+      abi: MergedEvents
       address: "0x306a67e1ca543c0892011174fa02cb1848172965"
       startBlock: 253300275
     mapping:
@@ -97,9 +114,18 @@ dataSources:
         - DailyStats
         - DailyPlayer
         - HourlyVolumeSnapshot
+        - TokenApproval
+        - AdminRoleChange
+        - ContractUpgrade
+        - UpkeepRegistration
+        - MaxBetsUpdate
+        - VaultState
+        - ProtocolStats
       abis:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
+        - name: MergedEvents
+          file: ./abis/MergedEvents.json
       eventHandlers:
         - event: RoundCleaningCompleted(uint256,uint256,uint256,(uint256,uint256,uint256))
           handler: handleRoundCleaningCompleted
@@ -137,7 +163,24 @@ dataSources:
           handler: handleWithdrawalSettingsUpdated
         - event: AntiSpamSettingsUpdated(uint256)
           handler: handleAntiSpamSettingsUpdated
-
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleVaultRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleVaultRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleVaultRoleAdminChanged
+        - event: Initialized(uint64)
+          handler: handleVaultInitialized
+        - event: Upgraded(indexed address)
+          handler: handleVaultUpgraded
+        - event: CleaningUpkeepRegistered(indexed uint256,indexed address,uint32,uint96,string)
+          handler: handleCleaningUpkeepRegistered
+        - event: UpkeepRegistered(indexed uint256,indexed address,uint32,uint96,uint256,string)
+          handler: handleUpkeepRegistered
+        - event: MaxSupportedBetsUpdated(uint256,uint256)
+          handler: handleMaxSupportedBetsUpdated
       file: ./src/mappings/stakedBRB.ts
   - name: BRBReferal
     kind: ethereum/contract
@@ -153,10 +196,13 @@ dataSources:
       entities:
         - User
         - BRBReferalTransfer
+        - TokenApproval
       abis:
         - name: BRBReferal
           file: ./abis/BRBReferal.json
       eventHandlers:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
       file: ./src/mappings/brbReferal.ts

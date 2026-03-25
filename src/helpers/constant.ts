@@ -41,3 +41,6 @@ export const BET_TYPE_LOW = "LOW"
 export const BET_TYPE_HIGH = "HIGH"
 export const BET_TYPE_TRIO_012 = "TRIO_012"
 export const BET_TYPE_TRIO_023 = "TRIO_023"
+
+// Contract addresses for identifying event sources
+export const GAME_CONTRACT_ADDRESS = "0x8761cea90cc7ab474d371b039b3bae7bc22d5e96"

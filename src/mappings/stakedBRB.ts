@@ -1,4 +1,4 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
+import { BigInt, BigDecimal, Bytes, log } from "@graphprotocol/graph-ts"
 import {
   Deposit,
   Withdraw,
@@ -20,6 +20,17 @@ import {
   WithdrawalEjected
 } from "../../generated/StakedBRB/StakedBRB"
 import {
+  Approval,
+  RoleGranted,
+  RoleRevoked,
+  RoleAdminChanged,
+  Initialized,
+  Upgraded,
+  CleaningUpkeepRegistered,
+  UpkeepRegistered,
+  MaxSupportedBetsUpdated
+} from "../../generated/StakedBRB/MergedEvents"
+import {
   RouletteRound,
   RouletteBet,
   StakedBRBDeposit,
@@ -29,13 +40,18 @@ import {
   FeeWithdrawal,
   BettingWindowClosedLog,
   QueuedLiquidityRejectedLog,
-  WithdrawalEjectedLog
+  WithdrawalEjectedLog,
+  TokenApproval,
+  AdminRoleChange,
+  ContractUpgrade,
+  UpkeepRegistration,
+  MaxBetsUpdate
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING, JACKPOT_CONTRACT_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS } from "../helpers/constant"
-import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis } from "../helpers/user"
+import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
+import { getOrCreateGlobalState, calculateAllAPYs, getOrCreateVaultState, getOrCreateProtocolStats } from "../helpers/globalState"
 import { ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 
@@ -77,8 +93,24 @@ export function handleDeposit(event: Deposit): void {
   
   // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
-  
+
   globalState.save()
+
+  // Update VaultState singleton
+  const vault = getOrCreateVaultState()
+  vault.totalAssets = globalState.totalAssets
+  vault.totalShares = globalState.totalShares
+  if (globalState.totalShares.gt(ZERO)) {
+    const PRECISION = BigInt.fromI32(10).pow(18)
+    vault.sharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
+      .div(globalState.totalShares.toBigDecimal())
+      .div(PRECISION.toBigDecimal())
+  }
+  vault.stakerCount = globalState.stakersCount
+  vault.save()
+
+  // Update user activity timestamp
+  updateUserLastActive(event.params.owner, event.block.timestamp)
 }
 
 export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): void {
@@ -165,6 +197,39 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
 
   globalState.save()
+
+  // Update VaultState singleton
+  const vault = getOrCreateVaultState()
+  vault.totalAssets = globalState.totalAssets
+  vault.totalShares = globalState.totalShares
+  if (globalState.totalShares.gt(ZERO)) {
+    const PRECISION = BigInt.fromI32(10).pow(18)
+    vault.sharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
+      .div(globalState.totalShares.toBigDecimal())
+      .div(PRECISION.toBigDecimal())
+  }
+  vault.stakerCount = globalState.stakersCount
+  if (round.stakersRevenue !== null) {
+    const sr = round.stakersRevenue as BigInt
+    if (sr.gt(ZERO)) {
+      vault.allTimeRevenue = vault.allTimeRevenue.plus(sr)
+    }
+  }
+  vault.save()
+
+  // Update ProtocolStats
+  const protocolStats = getOrCreateProtocolStats()
+  protocolStats.totalRounds = protocolStats.totalRounds.plus(ONE)
+  if (round.stakersRevenue !== null) {
+    const sr2 = round.stakersRevenue as BigInt
+    if (sr2.gt(ZERO)) {
+      protocolStats.totalStakerRevenue = protocolStats.totalStakerRevenue.plus(sr2)
+    }
+  }
+  protocolStats.totalBurned = globalState.totalBurned
+  protocolStats.save()
+
+  round.save()
 }
 
 export function handleWithdraw(event: Withdraw): void {
@@ -211,8 +276,26 @@ export function handleWithdraw(event: Withdraw): void {
   
   // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
-  
+
   globalState.save()
+
+  // Update VaultState singleton
+  const vaultW = getOrCreateVaultState()
+  vaultW.totalAssets = globalState.totalAssets
+  vaultW.totalShares = globalState.totalShares
+  if (globalState.totalShares.gt(ZERO)) {
+    const PRECISION_W = BigInt.fromI32(10).pow(18)
+    vaultW.sharePrice = globalState.totalAssets.times(PRECISION_W).toBigDecimal()
+      .div(globalState.totalShares.toBigDecimal())
+      .div(PRECISION_W.toBigDecimal())
+  } else {
+    vaultW.sharePrice = BigDecimal.fromString("1")
+  }
+  vaultW.stakerCount = globalState.stakersCount
+  vaultW.save()
+
+  // Update user activity timestamp
+  updateUserLastActive(event.params.owner, event.block.timestamp)
 }
 
 export function handleWithdrawalRequested(event: WithdrawalRequested): void {
@@ -603,22 +686,135 @@ export function handleBetPlaced(event: BetPlaced): void {
   hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
   hourly.save()
 
+  // Update ProtocolStats
+  const protocolStats = getOrCreateProtocolStats()
+  protocolStats.totalWagered = protocolStats.totalWagered.plus(event.params.amount)
+  protocolStats.totalBets = protocolStats.totalBets.plus(ONE)
+  if (isFirstBet) {
+    protocolStats.totalPlayers = protocolStats.totalPlayers.plus(ONE)
+  }
+  protocolStats.save()
+
+  // Update user activity timestamp
+  updateUserLastActive(event.params.user, event.block.timestamp)
+
   globalState.save()
 }
 
 export function handleTransfer(event: StakedBRBTransfer): void {
-  // This handles ERC4626 share transfers (sBRB tokens)
-  // Update sBRB balances for users
-  
-  // Skip if this is a mint (from zero address) or burn (to zero address)
-  // if (event.params.from.toHexString() == "0x0000000000000000000000000000000000000000" || 
-  //     event.params.to.toHexString() == "0x0000000000000000000000000000000000000000") {
-  //   return
-  // }
-
   // Update sBRB balances
-  updateUserSBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
-  updateUserSBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
+  updateUserSBRBBalance(event.params.from, event.params.value, false)
+  updateUserSBRBBalance(event.params.to, event.params.value, true)
 }
 
+export function handleApproval(event: Approval): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const approval = new TokenApproval(id)
+  approval.token = "sBRB"
+  approval.owner = event.params.owner
+  approval.spender = event.params.spender
+  approval.value = event.params.value
+  approval.blockNumber = event.block.number
+  approval.timestamp = event.block.timestamp
+  approval.transactionHash = event.transaction.hash
+  approval.save()
+}
 
+export function handleVaultRoleGranted(event: RoleGranted): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "StakedBRB"
+  entity.eventType = "GRANTED"
+  entity.role = event.params.role
+  entity.account = event.params.account
+  entity.sender = event.params.sender
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleVaultRoleRevoked(event: RoleRevoked): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "StakedBRB"
+  entity.eventType = "REVOKED"
+  entity.role = event.params.role
+  entity.account = event.params.account
+  entity.sender = event.params.sender
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleVaultRoleAdminChanged(event: RoleAdminChanged): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "StakedBRB"
+  entity.eventType = "ADMIN_CHANGED"
+  entity.role = event.params.role
+  entity.previousAdminRole = event.params.previousAdminRole
+  entity.newAdminRole = event.params.newAdminRole
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleVaultInitialized(event: Initialized): void {
+  log.info("StakedBRB contract initialized with version {}", [event.params.version.toString()])
+}
+
+export function handleVaultUpgraded(event: Upgraded): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new ContractUpgrade(id)
+  entity.contract = "StakedBRB"
+  entity.implementation = event.params.implementation
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleCleaningUpkeepRegistered(event: CleaningUpkeepRegistered): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new UpkeepRegistration(id)
+  entity.registrationType = "CLEANING"
+  entity.upkeepId = event.params.upkeepId
+  entity.forwarder = event.params.forwarder
+  entity.gasLimit = event.params.gasLimit
+  entity.linkAmount = event.params.linkAmount
+  entity.upkeepType = event.params.upkeepType
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleUpkeepRegistered(event: UpkeepRegistered): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new UpkeepRegistration(id)
+  entity.registrationType = "STANDARD"
+  entity.upkeepId = event.params.upkeepId
+  entity.forwarder = event.params.forwarder
+  entity.gasLimit = event.params.gasLimit
+  entity.linkAmount = event.params.linkAmount
+  entity.checkDataLength = event.params.checkDataLength
+  entity.upkeepType = event.params.upkeepType
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleMaxSupportedBetsUpdated(event: MaxSupportedBetsUpdated): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new MaxBetsUpdate(id)
+  entity.maxSupportedBets = event.params.maxSupportedBets
+  entity.totalPayoutUpkeeps = event.params.totalPayoutUpkeeps
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}

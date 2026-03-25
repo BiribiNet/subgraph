@@ -1,4 +1,4 @@
-import { BigInt, log } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import {
   VrfRequested,
   RoundResolved,
@@ -6,10 +6,17 @@ import {
   BatchProcessed,
   JackpotResultEvent,
   ComputedPayouts,
-  MinJackpotConditionUpdated
+  MinJackpotConditionUpdated,
+  RoleGranted,
+  RoleRevoked,
+  RoleAdminChanged,
+  Initialized,
+  Upgraded
 } from "../../generated/RouletteClean/Game"
 import {
-  RouletteRound
+  RouletteRound,
+  AdminRoleChange,
+  ContractUpgrade
 } from "../../generated/schema"
 import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_BETTING, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -151,4 +158,59 @@ export function handleBatchProcessed(event: BatchProcessed): void {
   round.save()
 }
 
+export function handleGameRoleGranted(event: RoleGranted): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "Game"
+  entity.eventType = "GRANTED"
+  entity.role = event.params.role
+  entity.account = event.params.account
+  entity.sender = event.params.sender
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
 
+export function handleGameRoleRevoked(event: RoleRevoked): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "Game"
+  entity.eventType = "REVOKED"
+  entity.role = event.params.role
+  entity.account = event.params.account
+  entity.sender = event.params.sender
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleGameRoleAdminChanged(event: RoleAdminChanged): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "Game"
+  entity.eventType = "ADMIN_CHANGED"
+  entity.role = event.params.role
+  entity.previousAdminRole = event.params.previousAdminRole
+  entity.newAdminRole = event.params.newAdminRole
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleGameInitialized(event: Initialized): void {
+  log.info("Game contract initialized with version {}", [event.params.version.toString()])
+}
+
+export function handleGameUpgraded(event: Upgraded): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new ContractUpgrade(id)
+  entity.contract = "Game"
+  entity.implementation = event.params.implementation
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}

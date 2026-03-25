@@ -17,9 +17,28 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.cumulativeDepositShares = BigInt.fromI32(0)
     user.totalRouletteBets = BigInt.fromI32(0)
     user.totalRouletteWins = BigInt.fromI32(0)
+    user.tier = "BRONZE"
+    user.brbpPoints = BigInt.fromI32(0)
+    user.firstSeenAt = BigInt.fromI32(0)
+    user.lastActiveAt = BigInt.fromI32(0)
+    user.totalWon = BigInt.fromI32(0)
+    user.totalLost = BigInt.fromI32(0)
+    user.winCount = BigInt.fromI32(0)
     user.save()
   }
   return user
+}
+
+export function updateUserLastActive(userAddress: Bytes, timestamp: BigInt): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
+  const user = getOrCreateUser(userAddress)
+  if (user.firstSeenAt.equals(BigInt.fromI32(0))) {
+    user.firstSeenAt = timestamp
+  }
+  user.lastActiveAt = timestamp
+  user.save()
 }
 
 export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncrease: boolean): void {
