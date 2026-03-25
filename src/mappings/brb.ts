@@ -71,6 +71,9 @@ export function handleTransfer(event: Transfer): void {
     globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
   }
 
+  // Payout detection: Transfer events from StakedBRB/Jackpot to users during payout phase.
+  // These are processed before RoundCleaningCompleted (sequential log index ordering),
+  // so round.totalPayouts is finalized by the time revenue is calculated in cleaning.
   if (globalState.currentRoundNumber.gt(BigInt.fromI32(1))) {
     const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
 

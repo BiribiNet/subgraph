@@ -413,6 +413,12 @@ type StakedBRBDeposit @entity(immutable: true) {
 type WithdrawTransaction @entity(immutable: true) {
   "Transaction hash"
   id: Bytes!
+  "User who withdrew"
+  user: Bytes!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
 }
 
 type StakedBRBWithdrawal @entity(immutable: true) {

@@ -161,6 +161,7 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   updateSharePrice(globalState)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
+  round.save()
   globalState.save()
 }
 
@@ -191,7 +192,11 @@ export function handleWithdraw(event: Withdraw): void {
 
   const withdrawTransaction = WithdrawTransaction.load(event.transaction.hash)
   if (withdrawTransaction == null) {
-    new WithdrawTransaction(event.transaction.hash).save()
+    const wt = new WithdrawTransaction(event.transaction.hash)
+    wt.user = event.params.owner
+    wt.blockNumber = event.block.number
+    wt.timestamp = event.block.timestamp
+    wt.save()
   }
 
   // Update global totals
