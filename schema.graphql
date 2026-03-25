@@ -185,6 +185,14 @@ type RouletteRound @entity(immutable: false) {
   payoutCompletedAt: BigInt
   "Cleaning completion timestamp"
   cleaningCompletedAt: BigInt
+  "Stakers revenue share (95% of house edge)"
+  stakersRevenue: BigInt
+  "Jackpot revenue share (2.5%)"
+  jackpotRevenue: BigInt
+  "Burn amount for this round (0.5%)"
+  roundBurnAmount: BigInt
+  "Infrastructure revenue share (2%)"
+  infraRevenue: BigInt
   "Array of bets in this round"
   bets: [RouletteBet]! @derivedFrom(field: "round")
   "Array of payout transactions in this round"
@@ -333,6 +341,12 @@ type GlobalState @entity(immutable: false) {
   chainlinkKeeperRegistrar: Bytes!
   "Chainlink vrf subscription id"
   subscriptionId: BigInt!
+  "Cumulative total revenue distributed to stakers"
+  totalStakerRevenue: BigInt!
+  "Current BRB price from DEX"
+  brbPrice: BigDecimal!
+  "BRB price last updated at"
+  brbPriceUpdatedAt: BigInt!
   "StakedBRB liquidity escrow (BRB held for queued deposit/mint)"
   liquidityEscrow: Bytes!
   "Max deposit/mint queue ops per cleaning upkeep (StakedBRB admin param)"
@@ -355,6 +369,16 @@ type APYSnapshot @entity(immutable: true) {
   timestamp: BigInt!
   "Block number"
   blockNumber: BigInt!
+  "Share price at snapshot time"
+  sharePrice: BigDecimal
+  "Number of stakers at snapshot time"
+  stakerCount: BigInt
+  "7-day APY at snapshot time"
+  apy7Day: BigDecimal
+  "30-day APY at snapshot time"
+  apy30Day: BigDecimal
+  "Lifetime APY at snapshot time"
+  apyLifetime: BigDecimal
 }
 
 type StakedBRBDeposit @entity(immutable: true) {
@@ -417,6 +441,68 @@ type LargeWithdrawalRequest @entity(immutable: false) {
   transactionHash: Bytes!
 }
 
+type DailyStats @entity(immutable: false) {
+  "Day number since epoch (timestamp / 86400)"
+  id: ID!
+  "Unix day number"
+  date: Int!
+  "Total volume (BRB wagered) for the day"
+  volume: BigInt!
+  "Number of bets placed"
+  betCount: BigInt!
+  "Number of unique players"
+  uniquePlayers: BigInt!
+  "Revenue collected (house edge)"
+  revenue: BigInt!
+  "BRB burned this day"
+  burnAmount: BigInt!
+  "BRB sent to jackpot this day"
+  jackpotFunded: BigInt!
+  "Vault share price at last event of the day"
+  vaultSharePrice: BigDecimal!
+  "Jackpot pool size at end of day"
+  jackpotPool: BigInt!
+  "Number of rounds completed"
+  roundsCompleted: BigInt!
+  "Total payouts"
+  totalPayouts: BigInt!
+  "Timestamp of first event on this day"
+  timestamp: BigInt!
+}
+
+type DailyPlayer @entity(immutable: true) {
+  "Day ID + player address"
+  id: ID!
+}
+
+type HourlyVolumeSnapshot @entity(immutable: false) {
+  "Hour number since epoch (timestamp / 3600)"
+  id: ID!
+  "Hour number"
+  hour: Int!
+  "Total volume this hour"
+  volume: BigInt!
+  "Number of bets"
+  betCount: BigInt!
+  "Timestamp"
+  timestamp: BigInt!
+}
+
+type BRBBurn @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "Round this burn belongs to"
+  round: RouletteRound
+  "Amount burned"
+  amount: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
 type BettingWindowClosedLog @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
@@ -443,6 +529,21 @@ type QueuedLiquidityRejectedLog @entity(immutable: true) {
   blockNumber: BigInt!
   "Timestamp"
   timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type FeeWithdrawal @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "Amount withdrawn"
+  amount: BigInt!
+  "Fee recipient"
+  recipient: Bytes!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Block number"
+  blockNumber: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
 }

@@ -26,6 +26,7 @@ import {
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   WithdrawTransaction,
+  FeeWithdrawal,
   BettingWindowClosedLog,
   QueuedLiquidityRejectedLog,
   WithdrawalEjectedLog
@@ -35,7 +36,8 @@ import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance,
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, calculateAllAPYs } from "../helpers/globalState"
-import { ONE } from "../helpers/number"
+import { ONE, ZERO } from "../helpers/number"
+import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 
 function zerosArray(length: number): Array<BigInt> {
   const arr = new Array<BigInt>(length)
@@ -103,6 +105,44 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
 
   globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
+
+  // Revenue breakdown per round
+  round.infraRevenue = event.params.fees.protocolFees
+  round.roundBurnAmount = event.params.fees.burnAmount
+  round.jackpotRevenue = event.params.fees.jackpotAmount
+
+  if (round.totalBets.gt(round.totalPayouts)) {
+    const totalFeesAmount = event.params.fees.protocolFees
+      .plus(event.params.fees.burnAmount)
+      .plus(event.params.fees.jackpotAmount)
+    round.stakersRevenue = round.totalBets.minus(round.totalPayouts).minus(totalFeesAmount)
+  } else {
+    round.stakersRevenue = ZERO
+  }
+
+  // Update cumulative staker revenue
+  if (round.stakersRevenue !== null) {
+    const sr = round.stakersRevenue as BigInt
+    if (sr.gt(ZERO)) {
+      globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
+    }
+  }
+
+  // Update DailyStats with round completion data
+  const dailyStats = getOrCreateDailyStats(event.block.timestamp)
+  dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
+  dailyStats.totalPayouts = dailyStats.totalPayouts.plus(round.totalPayouts)
+  if (round.totalBets.gt(round.totalPayouts)) {
+    dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
+  }
+  if (globalState.totalShares.gt(ZERO)) {
+    const PRECISION = BigInt.fromI32(10).pow(18)
+    dailyStats.vaultSharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
+      .div(globalState.totalShares.toBigDecimal())
+      .div(PRECISION.toBigDecimal())
+  }
+  dailyStats.jackpotPool = globalState.currentJackpot
+  dailyStats.save()
 
   // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
   const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
@@ -320,6 +360,7 @@ export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpd
   globalState.feeRecipient = event.params.newRecipient
   globalState.save()
 }
+
 
 function getBetTypeFromNumber(betTypeNumber: BigInt): string {
   const betTypeInt = betTypeNumber.toI32()
@@ -545,7 +586,23 @@ export function handleBetPlaced(event: BetPlaced): void {
 
     round.save()
   }
-  
+
+  // Update DailyStats aggregation
+  const dailyStats = getOrCreateDailyStats(event.block.timestamp)
+  dailyStats.volume = dailyStats.volume.plus(event.params.amount)
+  dailyStats.betCount = dailyStats.betCount.plus(BigInt.fromI32(1))
+  const isNewDaily = trackDailyUniquePlayer(event.block.timestamp, event.params.user.toHexString())
+  if (isNewDaily) {
+    dailyStats.uniquePlayers = dailyStats.uniquePlayers.plus(BigInt.fromI32(1))
+  }
+  dailyStats.save()
+
+  // Update HourlyVolumeSnapshot
+  const hourly = getOrCreateHourlySnapshot(event.block.timestamp)
+  hourly.volume = hourly.volume.plus(event.params.amount)
+  hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
+  hourly.save()
+
   globalState.save()
 }
 
