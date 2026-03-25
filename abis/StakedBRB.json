@@ -20,6 +20,11 @@
         "internalType": "address",
         "name": "jackpotContract",
         "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "upkeepManager",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -59,12 +64,27 @@
   },
   {
     "inputs": [],
-    "name": "AmountExceedsTotalAssets",
+    "name": "BettingClosed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "CancelWithdrawalBlockedDuringResolution",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "DepositBlockedDuringResolution",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "DepositIntentAlreadyQueued",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "DepositOutsideGamePeriod",
     "type": "error"
   },
   {
@@ -260,22 +280,12 @@
   },
   {
     "inputs": [],
-    "name": "ExceedsSafeBettingLimit",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "FailedCall",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "IndexOutOfBounds",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InsufficientBalance",
     "type": "error"
   },
   {
@@ -295,12 +305,22 @@
   },
   {
     "inputs": [],
+    "name": "InvalidLiquidityEscrow",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidLiquidityOpsPerUpkeep",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidMaxQueueLength",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "InvalidRoundProgression",
+    "name": "InvalidReceiver",
     "type": "error"
   },
   {
@@ -310,12 +330,7 @@
   },
   {
     "inputs": [],
-    "name": "InvalidWithdrawalFee",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "LargeWithdrawalPending",
+    "name": "LiquidityEscrowAlreadySet",
     "type": "error"
   },
   {
@@ -340,6 +355,11 @@
   },
   {
     "inputs": [],
+    "name": "NoWithdrawalPending",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "NotInitializing",
     "type": "error"
   },
@@ -350,7 +370,7 @@
   },
   {
     "inputs": [],
-    "name": "OnlyForwarders",
+    "name": "OnlyCleaningForwarders",
     "type": "error"
   },
   {
@@ -366,38 +386,6 @@
   {
     "inputs": [],
     "name": "QueueIsEmpty",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "token",
-        "type": "address"
-      }
-    ],
-    "name": "SafeERC20FailedOperation",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "value",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "length",
-        "type": "uint256"
-      }
-    ],
-    "name": "StringsInsufficientHexLength",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "TransferFailed",
     "type": "error"
   },
   {
@@ -423,17 +411,17 @@
   },
   {
     "inputs": [],
-    "name": "UpkeepRegistrationFailed",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "UserNotInQueue",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "WithdrawalBlockedDuringResolution",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "WithdrawalPending",
     "type": "error"
   },
   {
@@ -521,11 +509,11 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "newFee",
+        "name": "roundId",
         "type": "uint256"
       }
     ],
-    "name": "BurnFeeRateUpdated",
+    "name": "BettingWindowClosed",
     "type": "event"
   },
   {
@@ -534,35 +522,11 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "upkeepId",
+        "name": "newFee",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "forwarder",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "gasLimit",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint96",
-        "name": "linkAmount",
-        "type": "uint96"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "upkeepType",
-        "type": "string"
       }
     ],
-    "name": "CleaningUpkeepRegistered",
+    "name": "BurnFeeRateUpdated",
     "type": "event"
   },
   {
@@ -601,25 +565,6 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      }
-    ],
-    "name": "FeeWithdrawn",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
         "internalType": "uint64",
         "name": "version",
         "type": "uint64"
@@ -647,17 +592,11 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "user",
+        "name": "escrow",
         "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
       }
     ],
-    "name": "LargeWithdrawalProcessed",
+    "name": "LiquidityEscrowSet",
     "type": "event"
   },
   {
@@ -665,18 +604,12 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
+        "internalType": "uint32",
+        "name": "ops",
+        "type": "uint32"
       }
     ],
-    "name": "LargeWithdrawalRequested",
+    "name": "LiquidityOpsPerUpkeepUpdated",
     "type": "event"
   },
   {
@@ -703,6 +636,31 @@
       }
     ],
     "name": "ProtocolFeeRecipientUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "payer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "assets",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "reason",
+        "type": "uint8"
+      }
+    ],
+    "name": "QueuedLiquidityRejected",
     "type": "event"
   },
   {
@@ -786,7 +744,19 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "roundId",
+        "name": "cleanedRoundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newRoundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "boundaryTimestamp",
         "type": "uint256"
       },
       {
@@ -813,7 +783,7 @@
         "type": "tuple"
       }
     ],
-    "name": "RoundCleaned",
+    "name": "RoundCleaningCompleted",
     "type": "event"
   },
   {
@@ -896,6 +866,63 @@
     "inputs": [
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "reason",
+        "type": "uint8"
+      }
+    ],
+    "name": "WithdrawalEjected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "WithdrawalProcessed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "WithdrawalRequested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "batchSize",
         "type": "uint256"
@@ -903,6 +930,19 @@
     ],
     "name": "WithdrawalSettingsUpdated",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "CLEANING_UPKEEP_GAS_LIMIT",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -919,12 +959,12 @@
   },
   {
     "inputs": [],
-    "name": "DEFAULT_LARGE_WITHDRAWAL_BATCH_SIZE",
+    "name": "DEFAULT_LIQUIDITY_OPS_PER_UPKEEP",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint32",
         "name": "",
-        "type": "uint256"
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -945,12 +985,25 @@
   },
   {
     "inputs": [],
-    "name": "MAX_LARGE_WITHDRAWAL_BATCH_SIZE",
+    "name": "DEFAULT_WITHDRAWAL_BATCH_SIZE",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_LIQUIDITY_OPS_PER_UPKEEP",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -972,6 +1025,19 @@
   {
     "inputs": [],
     "name": "MAX_PROTOCOL_FEE",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_WITHDRAWAL_BATCH_SIZE",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1090,7 +1156,7 @@
   },
   {
     "inputs": [],
-    "name": "cancelLargeWithdrawal",
+    "name": "cancelWithdrawal",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1250,15 +1316,56 @@
   },
   {
     "inputs": [],
-    "name": "getBRBReferal",
+    "name": "getLiquidityOpsPerCleaningUpkeep",
     "outputs": [
       {
-        "internalType": "contract IERC20Mintable",
+        "internalType": "uint32",
         "name": "",
-        "type": "address"
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getMaxPayout",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getOperationalLimits",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "maxWithdrawalBatchSize",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxQueueLength",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint32",
+        "name": "maxLiquidityOpsPerCleaningUpkeep",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "cleaningUpkeepGasLimit",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -1300,29 +1407,6 @@
       {
         "internalType": "uint256",
         "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getStakingStats",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "totalShares",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "totalBRBDeposited",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "exchangeRate",
         "type": "uint256"
       }
     ],
@@ -1402,12 +1486,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "largeWithdrawalBatchSize",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "totalPendingLargeWithdrawals",
+        "name": "withdrawalBatchSize",
         "type": "uint256"
       },
       {
@@ -1497,6 +1576,19 @@
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "lastRoundBoundaryTimestamp",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1615,6 +1707,13 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "onBettingWindowClosed",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1878,25 +1977,6 @@
   {
     "inputs": [
       {
-        "internalType": "uint96",
-        "name": "linkAmount",
-        "type": "uint96"
-      }
-    ],
-    "name": "registerCleaningUpkeep",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "bytes32",
         "name": "role",
         "type": "bytes32"
@@ -1928,6 +2008,32 @@
     "name": "revokeRole",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "roundResolutionLocked",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "roundTransitionInProgress",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1972,12 +2078,25 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "newBatchSize",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "escrow",
+        "type": "address"
       }
     ],
-    "name": "setLargeWithdrawalBatchSize",
+    "name": "setLiquidityEscrow",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "newOps",
+        "type": "uint32"
+      }
+    ],
+    "name": "setLiquidityOpsPerCleaningUpkeep",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -2011,22 +2130,12 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "keeperRegistrar",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "keeperRegistry",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "linkToken",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "newBatchSize",
+        "type": "uint256"
       }
     ],
-    "name": "setupChainlink",
+    "name": "setWithdrawalBatchSize",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

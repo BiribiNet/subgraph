@@ -130,10 +130,8 @@ The subgraph supports all European roulette bet types:
 ### StakedBRB Events
 - `Deposit` - Records deposits to the vault
 - `Withdraw` - Records withdrawals from the vault
-- `LargeWithdrawalRequested` - Records large withdrawal requests
-- `LargeWithdrawalProcessed` - Records processed large withdrawals
-- `ProtocolFeeCollected` - Records protocol fee collection
-- `RoundTransition` - Tracks round transitions
+- `LargeWithdrawalRequested` / `LargeWithdrawalProcessed` - Large withdrawal queue (see ABI)
+- `RoundCleaningCompleted` - Emitted once per cleaning upkeep: settled round id, new round id, boundary timestamp, and fee tuple (replaces separate clean/start logs)
 - `BetPlaced` - Records bets placed through the vault
 
 ## Usage Examples

@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0xd56556bcfbdbc9fdca720a5aab04efa3dc4c6dc1"  # Replace with actual BRB token address
-      startBlock: 251362768
+      address: "0x8c6cae5e3a638cc7cded0d1bcb02b76f8bace3f2"  # Replace with actual BRB token address
+      startBlock: 253300245
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -37,8 +37,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x79eb301aa13aa7b1ac65cfb22f3eeac740b31af2"  # Replace with actual RouletteClean address
-      startBlock: 251362807
+      address: "0x8761cea90cc7ab474d371b039b3bae7bc22d5e96"  # Replace with actual RouletteClean address
+      startBlock: 253300280
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -59,24 +59,22 @@ dataSources:
           handler: handleMinJackpotConditionUpdated
         - event: JackpotResultEvent(uint256,uint256)
           handler: handleJackpotResultEvent
-        - event: RoundStarted(uint256,uint256,uint256)
-          handler: handleRoundStarted
+        - event: VrfRequested(indexed uint256,uint256,uint256)
+          handler: handleVrfRequested
         - event: RoundResolved(uint256)
           handler: handleRoundResolved
         - event: VRFResult(uint256,uint256,uint256)
           handler: handleVRFResult
         - event: BatchProcessed(uint256,uint256,uint256)
           handler: handleBatchProcessed
-        - event: ChainlinkSetupCompleted(uint256,address,address)
-          handler: handleChainlinkSetupCompleted
       file: ./src/mappings/roulette.ts
   - name: StakedBRB
     kind: ethereum/contract
     network: arbitrum-sepolia
     source:
       abi: StakedBRB
-      address: "0x1973733539fa4eea8b9bd8cb03ccdee00dceaea9"  # Replace with actual StakedBRB address
-      startBlock: 251362814
+      address: "0x306a67e1ca543c0892011174fa02cb1848172965"  # Replace with actual StakedBRB address
+      startBlock: 253300275
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -86,6 +84,9 @@ dataSources:
         - StakedBRBDeposit
         - StakedBRBWithdrawal
         - LargeWithdrawalRequest
+        - BettingWindowClosedLog
+        - QueuedLiquidityRejectedLog
+        - WithdrawalEjectedLog
         - User
         - RouletteRound
         - RouletteBet
@@ -94,16 +95,26 @@ dataSources:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
       eventHandlers:
-        - event: RoundCleaned(uint256,(uint256,uint256,uint256))
-          handler: handleRoundCleaned
+        - event: RoundCleaningCompleted(uint256,uint256,uint256,(uint256,uint256,uint256))
+          handler: handleRoundCleaningCompleted
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit
         - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
           handler: handleWithdraw
-        - event: LargeWithdrawalRequested(address,uint256)
-          handler: handleLargeWithdrawalRequested
-        - event: LargeWithdrawalProcessed(address,uint256)
-          handler: handleLargeWithdrawalProcessed
+        - event: WithdrawalRequested(address,uint256)
+          handler: handleWithdrawalRequested
+        - event: WithdrawalProcessed(address,uint256)
+          handler: handleWithdrawalProcessed
+        - event: BettingWindowClosed(uint256)
+          handler: handleBettingWindowClosed
+        - event: LiquidityEscrowSet(address)
+          handler: handleLiquidityEscrowSet
+        - event: LiquidityOpsPerUpkeepUpdated(uint32)
+          handler: handleLiquidityOpsPerUpkeepUpdated
+        - event: QueuedLiquidityRejected(address,uint256,uint8)
+          handler: handleQueuedLiquidityRejected
+        - event: WithdrawalEjected(address,uint8)
+          handler: handleWithdrawalEjected
         - event: ProtocolFeeRecipientUpdated(address)
           handler: handleProtocolFeeRecipientUpdated
         - event: ProtocolFeeRateUpdated(uint256)
@@ -126,8 +137,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferal
-      address: "0xca2322393b402fa96e3a57415a7fbee43749d70e"  # Replace with actual BRBReferal address
-      startBlock: 251362760  # Update with appropriate start block
+      address: "0xa670a9f1aa3e3d9b489e8d0cc68768556d264a62"  # Replace with actual BRBReferal address
+      startBlock: 253300240  # Update with appropriate start block
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
