@@ -136,11 +136,13 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
   if (isPayout) {
     if (isWin) {
       user.totalRouletteWins = user.totalRouletteWins.plus(amount)
+      user.totalWon = user.totalWon.plus(amount)
       user.netProfit = user.netProfit.plus(amount)
       user.winCount = user.winCount.plus(ONE)
     }
   } else {
     user.totalRouletteBets = user.totalRouletteBets.plus(amount)
+    user.totalLost = user.totalLost.plus(amount)
     user.netProfit = user.netProfit.minus(amount)
   }
 

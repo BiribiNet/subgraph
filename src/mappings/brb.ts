@@ -1,7 +1,7 @@
 import { BigInt } from "@graphprotocol/graph-ts"
 import { Transfer, Approval } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction, TokenApproval } from "../../generated/schema"
-import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
+import { updateUserBRBBalance, updateUserRouletteStats, updateUserLastActive } from "../helpers/user"
 import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
@@ -22,14 +22,20 @@ export function handleTransfer(event: Transfer): void {
   updateUserBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
   updateUserBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
 
+  // Update user activity timestamps
+  updateUserLastActive(event.params.from, event.block.timestamp)
+  updateUserLastActive(event.params.to, event.block.timestamp)
+
   const globalState = getOrCreateGlobalState()
 
   const fromHex = event.params.from.toHexString()
   const toHex = event.params.to.toHexString();
 
-  // Mints (from zero address): balance updates already handled above.
-  // Skip payout/burn/jackpot logic — mints don't trigger any of these flows.
+  // Mints (from zero address): track total supply, then skip payout/burn/jackpot logic.
   if (fromHex == ZERO_ADDRESS) {
+    const protocolStats = getOrCreateProtocolStats()
+    protocolStats.brbTotalSupply = protocolStats.brbTotalSupply.plus(event.params.value)
+    protocolStats.save()
     return
   }
 
@@ -60,6 +66,11 @@ export function handleTransfer(event: Transfer): void {
       }
     }
     burn.save()
+
+    // Update ProtocolStats burn tracking
+    const protocolStatsBurn = getOrCreateProtocolStats()
+    protocolStatsBurn.brbTotalSupply = protocolStatsBurn.brbTotalSupply.minus(event.params.value)
+    protocolStatsBurn.save()
 
     // Update DailyStats burn tracking
     const dailyStatsBurn = getOrCreateDailyStats(event.block.timestamp)
@@ -98,6 +109,11 @@ export function handleTransfer(event: Transfer): void {
           jackpotPayoutTx.save()
           globalState.currentJackpot = globalState.currentJackpot.minus(event.params.value)
           globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
+
+          // Update ProtocolStats jackpot tracking
+          const protocolStatsJackpot = getOrCreateProtocolStats()
+          protocolStatsJackpot.totalJackpotsPaid = protocolStatsJackpot.totalJackpotsPaid.plus(event.params.value)
+          protocolStatsJackpot.save()
           updateUserRouletteStats(event.params.to, event.params.value, true, true)
           bet.won = true
 
