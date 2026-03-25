@@ -27,6 +27,8 @@ export function handleTransfer(event: Transfer): void {
   const fromHex = event.params.from.toHexString()
   const toHex = event.params.to.toHexString();
 
+  // Mints (from zero address): balance updates already handled above.
+  // Skip payout/burn/jackpot logic — mints don't trigger any of these flows.
   if (fromHex == ZERO_ADDRESS) {
     return
   }

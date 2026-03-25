@@ -1,214 +1,167 @@
-# BRB Ecosystem Subgraph
+# Biribi Subgraph
 
-This subgraph indexes the BRB (BiRiBi) token ecosystem, including the BRB token, RouletteClean contract, and StakedBRB vault contract.
+Indexes all on-chain events from the Biribi protocol — the first fully decentralized French roulette on Arbitrum. Provides the GraphQL API powering the frontend, analytics dashboard, staking interface, and jackpot display.
 
-## Overview
+## Data Sources
 
-The BRB ecosystem consists of three main components:
+| Contract | Key Events |
+|----------|-----------|
+| **BRB Token (ERC-20)** | `Transfer` (balances, burns, payouts, jackpot funding) |
+| **RouletteClean** | `VrfRequested`, `VRFResult`, `RoundResolved`, `BatchProcessed`, `ComputedPayouts`, `JackpotResultEvent` |
+| **StakedBRB (ERC-4626)** | `Deposit`, `Withdraw`, `BetPlaced`, `RoundCleaningCompleted`, `Transfer` (sBRB shares) |
+| **BRBReferal** | `Transfer` (referral token balances) |
 
-1. **BRB Token** - The native ERC20 token with ERC677 functionality for betting
-2. **RouletteClean** - A decentralized roulette game contract with VRF-based randomness
-3. **StakedBRB** - An ERC4626 vault that allows users to stake BRB tokens and earn from betting losses
+## Key Entities
 
-## Schema Entities
+### User
+Player/staker profile with balances and analytics.
+- `brbBalance`, `sbrbBalance`, `brbReferalBalance` — live token balances
+- `totalStaked`, `totalUnstaked` — cumulative staking stats
+- `totalRouletteBets`, `totalRouletteWins`, `netProfit`, `winCount` — roulette P&L
+- `firstSeenAt`, `lastActiveAt` — activity timestamps
+- `cumulativeDepositValue`, `cumulativeDepositShares` — cost basis tracking
 
-### Core Entities
+### GlobalState (singleton)
+Protocol-wide metrics.
+- `totalAssets`, `totalShares`, `sharePrice` — vault state
+- `apy7Day`, `apy30Day`, `apy365Day`, `apyLifetime` — rolling APYs
+- `totalRounds`, `uniquePlayersCount`, `stakersCount` — counters
+- `totalBurned`, `currentJackpot`, `totalStakerRevenue` — protocol stats
+- `maxBetAmount`, `pendingBets` — game state
 
-#### User
-- **id**: User address
-- **brbBalance**: Current BRB token balance
-- **totalStaked**: Total amount of BRB staked
-- **totalUnstaked**: Total amount of BRB unstaked
-- **totalRouletteBets**: Total amount bet in roulette games
-- **totalRouletteWins**: Total amount won from roulette games
-- **rouletteBets**: Array of roulette bets made by user
-- **stakedBRBDeposits**: Array of deposits to StakedBRB vault
-- **stakedBRBWithdrawals**: Array of withdrawals from StakedBRB vault
-- **largeWithdrawalRequests**: Array of large withdrawal requests
+### RouletteRound
+Round lifecycle from betting to cleanup.
+- Status: `BETTING` → `VRF` → `COMPUTING_PAYOUT` → `PAYOUT` → `CLEAN`
+- `winningNumber`, `jackpotNumber` — VRF results
+- `totalBets`, `totalPayouts` — round volume
+- `stakersRevenue`, `infraRevenue`, `roundBurnAmount`, `jackpotRevenue` — revenue split
 
-#### BRBToken
-- **id**: Contract address
-- **totalSupply**: Total supply of BRB tokens
-- **name**: Token name ("BiRiBi")
-- **symbol**: Token symbol ("BRB")
-- **decimals**: Token decimals (18)
-- **transfers**: Array of all token transfers
+### RouletteBet
+Per-user per-round bet aggregation.
+- `amounts[]`, `betTypes[]`, `numbers[]` — individual bet details
+- `totalAmount` — sum of all bets in this round
+- `actualPayout` — payout received (null until resolved)
+- `won` — whether the bet won (null until resolved)
 
-#### RouletteClean
-- **id**: Contract address
-- **currentRound**: Current active round ID
-- **lastRoundStartTime**: Timestamp of last round start
-- **lastRoundPaid**: Last round that was fully processed
-- **gamePeriod**: Game period in seconds
-- **totalBets**: Total amount bet across all rounds
-- **totalPayouts**: Total amount paid out across all rounds
-- **rounds**: Array of all roulette rounds
-- **bets**: Array of all roulette bets
+### Aggregations
+- **DailyStats** — daily volume, betCount, uniquePlayers, revenue, burns, jackpot
+- **HourlyVolumeSnapshot** — hourly volume, betCount, uniquePlayers
+- **APYSnapshot** — daily vault snapshots for APY calculation
 
-#### StakedBRB
-- **id**: Contract address
-- **brbToken**: BRB token contract address
-- **rouletteContract**: RouletteClean contract address
-- **protocolFeeBasisPoints**: Protocol fee rate in basis points
-- **feeRecipient**: Address that receives protocol fees
-- **totalAssets**: Total assets under management
-- **totalShares**: Total shares issued
-- **pendingBets**: Amount locked in unresolved bets
-- **currentRound**: Current active round
-- **lastRoundResolved**: Last round that was resolved
-- **lastRoundPaid**: Last round that was fully paid
-- **roundTransitionInProgress**: Whether round transition is in progress
-- **largeWithdrawalBatchSize**: Number of large withdrawals processed per batch
-- **maxQueueLength**: Maximum queue length for large withdrawals
-- **totalPendingLargeWithdrawals**: Total amount of pending large withdrawals
+## Bet Types
 
-### Round Status Tracking
-
-Roulette rounds have four distinct statuses:
-
-1. **BETTING** - Round is active and accepting bets
-2. **VRF** - Round has ended, VRF request submitted
-3. **PAYOUT** - VRF result received, payouts being processed
-4. **CLEAN** - Round fully resolved, protocol fees collected
-
-### Bet Types
-
-The subgraph supports all European roulette bet types:
-
-- **STRAIGHT** - Single number (0-36)
-- **SPLIT** - Two adjacent numbers
-- **STREET** - Three numbers in a row
-- **CORNER** - Four numbers in a square
-- **LINE** - Six numbers (two streets)
-- **COLUMN** - Column bet (12 numbers)
-- **DOZEN** - Dozen bet (12 numbers)
-- **RED** - Red numbers
-- **BLACK** - Black numbers
-- **ODD** - Odd numbers
-- **EVEN** - Even numbers
-- **LOW** - Low numbers (1-18)
-- **HIGH** - High numbers (19-36)
-- **TRIO_012** - Trio 0-1-2
-- **TRIO_023** - Trio 0-2-3
-
-## Key Features
-
-### Round Lifecycle Tracking
-- Complete round lifecycle from betting to cleanup
-- Status transitions: BETTING → VRF → PAYOUT → CLEAN
-- Timestamp tracking for each phase
-
-### User Statistics
-- Comprehensive user statistics including:
-  - BRB token balance
-  - Total staked/unstaked amounts
-  - Roulette betting activity
-  - Win/loss tracking
-
-### Protocol Fee Tracking
-- Protocol fees collected from betting losses
-- Fee recipient tracking
-- Round-based fee collection
-
-### Large Withdrawal Management
-- Queue-based large withdrawal system
-- Batch processing of withdrawals
-- Anti-spam protection
-
-## Event Handlers
-
-### BRB Token Events
-- `Transfer` - Tracks all token transfers and updates user balances
-
-### RouletteClean Events
-- `BetPlaced` - Records individual bets and updates round totals
-- `RoundStarted` - Initiates new round and transitions previous round to VRF
-- `VRFResult` - Updates round with winning number and transitions to PAYOUT
-- `RoundResolved` - Marks round as fully resolved (CLEAN status)
-- `BatchProcessed` - Tracks payout batch processing
-
-### StakedBRB Events
-- `Deposit` - Records deposits to the vault
-- `Withdraw` - Records withdrawals from the vault
-- `LargeWithdrawalRequested` / `LargeWithdrawalProcessed` - Large withdrawal queue (see ABI)
-- `RoundCleaningCompleted` - Emitted once per cleaning upkeep: settled round id, new round id, boundary timestamp, and fee tuple (replaces separate clean/start logs)
-- `BetPlaced` - Records bets placed through the vault
+STRAIGHT, SPLIT, STREET, CORNER, LINE, COLUMN, DOZEN, RED, BLACK, ODD, EVEN, LOW, HIGH, TRIO_012, TRIO_023
 
 ## Usage Examples
 
-### Query User Statistics
+### Query User Stats
 ```graphql
-query GetUserStats($userAddress: Bytes!) {
-  user(id: $userAddress) {
+query GetUserStats($address: Bytes!) {
+  user(id: $address) {
     brbBalance
-    totalStaked
-    totalUnstaked
+    sbrbBalance
     totalRouletteBets
     totalRouletteWins
-    rouletteBets(first: 10, orderBy: timestamp, orderDirection: desc) {
-      amount
-      betType
-      isWinning
+    netProfit
+    winCount
+    firstSeenAt
+    lastActiveAt
+    rouletteBets(first: 10, orderBy: latestBetTimestamp, orderDirection: desc) {
+      totalAmount
+      betTypes
+      won
       actualPayout
-      timestamp
+      firstBetTimestamp
+      latestBetTimestamp
     }
   }
 }
 ```
 
-### Query Round Information
+### Query Round Info
 ```graphql
-query GetRoundInfo($roundId: BigInt!) {
-  rouletteRounds(where: { roundNumber: $roundId }) {
+query GetRoundInfo($roundId: Bytes!) {
+  rouletteRound(id: $roundId) {
     roundNumber
     status
     winningNumber
+    jackpotNumber
     totalBets
     totalPayouts
+    stakersRevenue
     startedAt
     endedAt
     bets(first: 10) {
-      user
-      amount
-      betType
-      isWinning
+      user { id }
+      totalAmount
+      betTypes
+      won
+      actualPayout
     }
   }
 }
 ```
 
-### Query Vault Statistics
+### Query Protocol Stats
 ```graphql
-query GetVaultStats {
-  stakedBRBs {
+query GetProtocolStats {
+  globalState(id: "0x0000000000000000000000000000000000000001") {
     totalAssets
     totalShares
-    pendingBets
-    currentRound
-    protocolFeeBasisPoints
-    totalPendingLargeWithdrawals
+    sharePrice
+    apy7Day
+    apy30Day
+    apyLifetime
+    totalRounds
+    uniquePlayersCount
+    stakersCount
+    totalBurned
+    currentJackpot
+    totalStakerRevenue
+    maxBetAmount
   }
 }
 ```
 
-## Configuration
+### Query Daily Analytics
+```graphql
+query GetDailyStats($dayId: ID!) {
+  dailyStats(id: $dayId) {
+    volume
+    betCount
+    uniquePlayers
+    revenue
+    burnAmount
+    jackpotFunded
+    vaultSharePrice
+    roundsCompleted
+    totalPayouts
+  }
+}
+```
 
-Before deploying, update the following in `subgraph.yaml`:
+## Development
 
-1. Replace placeholder addresses with actual contract addresses
-2. Update start blocks to the deployment blocks
-3. Ensure ABI files are correctly referenced
+```bash
+yarn install          # Install dependencies
+yarn codegen          # Generate types from schema + ABIs
+yarn build            # Compile to WASM
+yarn test             # Run Matchstick tests
+```
 
 ## Deployment
 
-1. Install dependencies: `npm install`
-2. Generate code: `npm run codegen`
-3. Build: `npm run build`
-4. Deploy: `npm run deploy`
+```bash
+yarn deploy:subgraph <version>   # Deploy to Goldsky
+yarn prod:subgraph <version>     # Tag as production
+yarn deploy <version>            # Codegen + build + deploy + tag
+```
 
-## Notes
+## Revenue Distribution Per Round
 
-- The subgraph tracks the complete lifecycle of roulette rounds
-- User statistics are automatically aggregated across all activities
-- Large withdrawals are processed in batches to prevent gas issues
-- Protocol fees are collected from betting losses and distributed to fee recipients
+```
+95.0%  → sBRB Vault (stakers, auto-compound)
+ 2.5%  → Jackpot Pool
+ 0.5%  → BRB Burn (permanent, deflationary)
+ 2.0%  → Infrastructure
+```
