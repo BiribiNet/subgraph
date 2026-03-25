@@ -18,15 +18,19 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.totalRouletteBets = BigInt.fromI32(0)
     user.totalRouletteWins = BigInt.fromI32(0)
     user.netProfit = BigInt.fromI32(0)
-    user.winCount = BigInt.fromI32(0)
+    user.tier = "BRONZE"
+    user.brbpPoints = BigInt.fromI32(0)
     user.firstSeenAt = BigInt.fromI32(0)
     user.lastActiveAt = BigInt.fromI32(0)
+    user.totalWon = BigInt.fromI32(0)
+    user.totalLost = BigInt.fromI32(0)
+    user.winCount = BigInt.fromI32(0)
     user.save()
   }
   return user
 }
 
-export function updateUserActivity(userAddress: Bytes, timestamp: BigInt): void {
+export function updateUserLastActive(userAddress: Bytes, timestamp: BigInt): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }

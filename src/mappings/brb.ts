@@ -1,10 +1,10 @@
 import { BigInt } from "@graphprotocol/graph-ts"
-import { Transfer } from "../../generated/BRBToken/BRB"
-import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction } from "../../generated/schema"
+import { Transfer, Approval } from "../../generated/BRBToken/BRB"
+import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction, TokenApproval } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats } from "../helpers/user"
 import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState } from "../helpers/globalState"
+import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
 import { getOrCreateDailyStats } from "../helpers/aggregation"
 
 export function handleTransfer(event: Transfer): void {
@@ -147,4 +147,17 @@ export function handleTransfer(event: Transfer): void {
     }
   }
   globalState.save()
+}
+
+export function handleApproval(event: Approval): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const approval = new TokenApproval(id)
+  approval.token = "BRB"
+  approval.owner = event.params.owner
+  approval.spender = event.params.spender
+  approval.value = event.params.value
+  approval.blockNumber = event.block.number
+  approval.timestamp = event.block.timestamp
+  approval.transactionHash = event.transaction.hash
+  approval.save()
 }
