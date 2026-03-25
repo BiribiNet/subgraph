@@ -37,7 +37,6 @@ import {
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   WithdrawTransaction,
-  FeeWithdrawal,
   BettingWindowClosedLog,
   QueuedLiquidityRejectedLog,
   WithdrawalEjectedLog,
@@ -51,17 +50,9 @@ import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, 
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState, calculateAllAPYs, getOrCreateVaultState, getOrCreateProtocolStats } from "../helpers/globalState"
+import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice, getOrCreateVaultState, getOrCreateProtocolStats } from "../helpers/globalState"
 import { ONE, ZERO } from "../helpers/number"
-import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot } from "../helpers/aggregation"
-
-function zerosArray(length: number): Array<BigInt> {
-  const arr = new Array<BigInt>(length)
-  for (let i = 0; i < length; i++) {
-    arr[i] = BigInt.fromI32(0)
-  }
-  return arr
-}
+import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot, trackHourlyUniquePlayer } from "../helpers/aggregation"
 
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
@@ -80,7 +71,8 @@ export function handleDeposit(event: Deposit): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, true)
-  
+  updateUserLastActive(event.params.owner, event.block.timestamp)
+
   // Update cumulative deposit cost basis
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
 
@@ -91,6 +83,9 @@ export function handleDeposit(event: Deposit): void {
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
   globalState.totalShares = globalState.totalShares.plus(event.params.shares)
   
+  // Update share price
+  updateSharePrice(globalState)
+
   // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
@@ -152,18 +147,16 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
     round.stakersRevenue = ZERO
   }
 
-  // Update cumulative staker revenue
-  if (round.stakersRevenue !== null) {
-    const sr = round.stakersRevenue as BigInt
-    if (sr.gt(ZERO)) {
-      globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
-    }
+  // Update cumulative staker revenue (stakersRevenue is always set above)
+  const sr = round.stakersRevenue as BigInt
+  if (sr.gt(ZERO)) {
+    globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
   }
 
   // Update DailyStats with round completion data
+  // Note: totalPayouts is tracked in real-time in brb.ts handleTransfer
   const dailyStats = getOrCreateDailyStats(event.block.timestamp)
   dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
-  dailyStats.totalPayouts = dailyStats.totalPayouts.plus(round.totalPayouts)
   if (round.totalBets.gt(round.totalPayouts)) {
     dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
   }
@@ -196,6 +189,11 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
     globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts))
   }
 
+  // Update share price and APYs after revenue distribution
+  updateSharePrice(globalState)
+  calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
+
+  round.save()
   globalState.save()
 
   // Update VaultState singleton
@@ -252,28 +250,29 @@ export function handleWithdraw(event: Withdraw): void {
 
   // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, false)
-  
+  updateUserLastActive(event.params.owner, event.block.timestamp)
+
   // Update cumulative deposit cost basis (remove cost basis of withdrawn shares)
   updateUserWithdrawalCostBasis(event.params.owner, event.params.shares)
 
   const withdrawTransaction = WithdrawTransaction.load(event.transaction.hash)
   if (withdrawTransaction == null) {
-    new WithdrawTransaction(event.transaction.hash).save()
+    const wt = new WithdrawTransaction(event.transaction.hash)
+    wt.user = event.params.owner
+    wt.blockNumber = event.block.number
+    wt.timestamp = event.block.timestamp
+    wt.save()
   }
-
-  // Check if user will have zero sBRB balance after this withdrawal
-  // The balance update happens in handleTransfer, so we check if shares withdrawn equals current balance
-  const willBeZeroBalance = user.sbrbBalance.equals(event.params.shares)
 
   // Update global totals
+  // Note: stakersCount is decremented in updateUserSBRBBalance (via handleTransfer)
+  // when the sBRB Transfer event fires and balance reaches zero
   globalState.totalAssets = globalState.totalAssets.minus(event.params.assets)
   globalState.totalShares = globalState.totalShares.minus(event.params.shares)
-  
-  // Decrement stakers count if user unstakes everything
-  if (willBeZeroBalance) {
-    globalState.stakersCount = globalState.stakersCount.minus(ONE)
-  }
-  
+
+  // Update share price
+  updateSharePrice(globalState)
+
   // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
@@ -638,6 +637,7 @@ export function handleBetPlaced(event: BetPlaced): void {
   }
   
   updateUserRouletteStats(event.params.user, event.params.amount, false, false);
+  updateUserLastActive(event.params.user, event.block.timestamp);
   if (decoded) {
     const s = decoded.toTuple()
     const amounts = s[0].toBigIntArray()
@@ -652,20 +652,24 @@ export function handleBetPlaced(event: BetPlaced): void {
       return
     }
 
+    // Capture max payout BEFORE processing bets (for delta calculation)
+    const previousMaxPayout = calculateMaxPayoutFromRoundComponents(round)
+
     // Process each bet
     for (let i = 0; i < amountsLength; i++) {
       // Process the individual bet (create/update RouletteBet entity + update maxPayout components)
       processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
     }
 
-    // Compute and persist maxPayout after processing the full decoded bet batch
-    const maxPayoutThisCall = calculateMaxPayoutFromRoundComponents(round)
+    // Compute max payout AFTER processing bets and use the delta
+    const currentMaxPayout = calculateMaxPayoutFromRoundComponents(round)
+    const delta = currentMaxPayout.minus(previousMaxPayout)
 
     // StakedBRB increases both:
-    // - per-round maxPayoutPerRound[roundId] += maxPayout
-    // - global maxPayout (i.e., $.maxPayout) += maxPayout
-    round.maxBetAmount = round.maxBetAmount.plus(maxPayoutThisCall)
-    globalState.maxBetAmount = globalState.maxBetAmount.plus(maxPayoutThisCall)
+    // - per-round maxPayoutPerRound[roundId] += delta
+    // - global maxPayout (i.e., $.maxPayout) += delta
+    round.maxBetAmount = round.maxBetAmount.plus(delta)
+    globalState.maxBetAmount = globalState.maxBetAmount.plus(delta)
 
     round.save()
   }
@@ -684,6 +688,10 @@ export function handleBetPlaced(event: BetPlaced): void {
   const hourly = getOrCreateHourlySnapshot(event.block.timestamp)
   hourly.volume = hourly.volume.plus(event.params.amount)
   hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
+  const isNewHourly = trackHourlyUniquePlayer(event.block.timestamp, event.params.user.toHexString())
+  if (isNewHourly) {
+    hourly.uniquePlayers = hourly.uniquePlayers.plus(BigInt.fromI32(1))
+  }
   hourly.save()
 
   // Update ProtocolStats
@@ -702,9 +710,9 @@ export function handleBetPlaced(event: BetPlaced): void {
 }
 
 export function handleTransfer(event: StakedBRBTransfer): void {
-  // Update sBRB balances
-  updateUserSBRBBalance(event.params.from, event.params.value, false)
-  updateUserSBRBBalance(event.params.to, event.params.value, true)
+  // Update sBRB balances for users (including mint/burn from zero address)
+  updateUserSBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
+  updateUserSBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
 }
 
 export function handleApproval(event: Approval): void {

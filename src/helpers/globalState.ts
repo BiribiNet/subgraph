@@ -35,6 +35,8 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.uniquePlayersCount = ZERO
     globalState.totalAssets = ZERO
     globalState.totalShares = ZERO
+    globalState.sharePrice = BigDecimal.fromString("1")
+    globalState.totalRounds = ZERO
     globalState.pendingBets = ZERO
     globalState.lastRoundResolved = ZERO
     globalState.roundTransitionInProgress = false
@@ -296,6 +298,17 @@ export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: Big
     currentTimestamp,
     globalState.apyLifetimeBaselineTimestamp
   )
+}
+
+export function updateSharePrice(globalState: GlobalState): void {
+  if (globalState.totalShares.gt(ZERO)) {
+    const PRECISION = BigInt.fromI32(10).pow(18)
+    globalState.sharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
+      .div(globalState.totalShares.toBigDecimal())
+      .div(PRECISION.toBigDecimal())
+  } else {
+    globalState.sharePrice = BigDecimal.fromString("1")
+  }
 }
 
 export function getOrCreateVaultState(): VaultState {

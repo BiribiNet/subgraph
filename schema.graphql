@@ -52,6 +52,8 @@ type User @entity(immutable: false) {
   totalRouletteBets: BigInt!
   "Total BRB won in roulette"
   totalRouletteWins: BigInt!
+  "Net profit (totalRouletteWins - totalRouletteBets, can be negative)"
+  netProfit: BigInt!
   "Array of Roulette bets"
   rouletteBets: [RouletteBet]! @derivedFrom(field: "user")
   "Array of StakedBRB deposits"
@@ -152,8 +154,6 @@ type RouletteRound @entity(immutable: false) {
   winningNumber: BigInt
   "Jackpot number"
   jackpotNumber: BigInt
-  "Jackpot winner share"
-  jackpotWinnerShare: BigInt
   "Jackpot winner count"
   jackpotWinnerCount: BigInt
   "VRF request ID"
@@ -241,6 +241,8 @@ type RouletteBet @entity(immutable: false) {
   betCount: BigInt!
   "Actual payout received"
   actualPayout: BigInt
+  "Whether the bet won (null until round resolved)"
+  won: Boolean
   "First bet block number"
   firstBetBlockNumber: BigInt!
   "Latest bet block number"
@@ -332,6 +334,10 @@ type GlobalState @entity(immutable: false) {
   totalAssets: BigInt!
   "Total shares issued by StakedBRB"
   totalShares: BigInt!
+  "Current sBRB share price (BRB per sBRB)"
+  sharePrice: BigDecimal!
+  "Total number of rounds created"
+  totalRounds: BigInt!
   "Pending bets amount"
   pendingBets: BigInt!
   "Last round resolved"
@@ -422,6 +428,12 @@ type StakedBRBDeposit @entity(immutable: true) {
 type WithdrawTransaction @entity(immutable: true) {
   "Transaction hash"
   id: Bytes!
+  "User who withdrew"
+  user: Bytes!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
 }
 
 type StakedBRBWithdrawal @entity(immutable: true) {
@@ -505,8 +517,15 @@ type HourlyVolumeSnapshot @entity(immutable: false) {
   volume: BigInt!
   "Number of bets"
   betCount: BigInt!
+  "Number of unique players this hour"
+  uniquePlayers: BigInt!
   "Timestamp"
   timestamp: BigInt!
+}
+
+type HourlyPlayer @entity(immutable: true) {
+  "Hour ID + player address"
+  id: ID!
 }
 
 type BRBBurn @entity(immutable: true) {
@@ -550,21 +569,6 @@ type QueuedLiquidityRejectedLog @entity(immutable: true) {
   blockNumber: BigInt!
   "Timestamp"
   timestamp: BigInt!
-  "Transaction hash"
-  transactionHash: Bytes!
-}
-
-type FeeWithdrawal @entity(immutable: true) {
-  "Transaction hash + log index"
-  id: Bytes!
-  "Amount withdrawn"
-  amount: BigInt!
-  "Fee recipient"
-  recipient: Bytes!
-  "Block timestamp"
-  timestamp: BigInt!
-  "Block number"
-  blockNumber: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
 }

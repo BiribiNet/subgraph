@@ -110,10 +110,10 @@ dataSources:
         - RouletteRound
         - RouletteBet
         - WithdrawTransaction
-        - FeeWithdrawal
         - DailyStats
         - DailyPlayer
         - HourlyVolumeSnapshot
+        - HourlyPlayer
         - TokenApproval
         - AdminRoleChange
         - ContractUpgrade

@@ -35,6 +35,9 @@ const initializeBet = (): void => {
   betPlacedEvent.parameters.push(new ethereum.EventParam('data', ethereum.Value.fromBytes(Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001"))));
   betPlacedEvent.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("1"))));
   betPlacedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  betPlacedEvent.logIndex = BigInt.fromI32(0);
+  betPlacedEvent.block.timestamp = BigInt.fromI32(1_000_000);
+  betPlacedEvent.block.number = BigInt.fromI32(10000);
   handleBetPlaced(betPlacedEvent);
 };
 
@@ -45,6 +48,9 @@ const vrfResult = (): void => {
   vrfResultEvent.parameters.push(new ethereum.EventParam('jackpotNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("5"))));
   vrfResultEvent.parameters.push(new ethereum.EventParam('winningNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("7"))));
   vrfResultEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  vrfResultEvent.logIndex = BigInt.fromI32(0);
+  vrfResultEvent.block.timestamp = BigInt.fromI32(1_000_100);
+  vrfResultEvent.block.number = BigInt.fromI32(10001);
   handleVRFResult(vrfResultEvent);
 };
 describe('RouletteBet tests', () => {

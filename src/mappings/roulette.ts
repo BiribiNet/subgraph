@@ -93,6 +93,7 @@ export function handleVrfRequested(event: VrfRequested): void {
   globalState.currentRoundNumber = newRoundId
   globalState.lastRoundStartTime = event.params.timestamp
   globalState.roundTransitionInProgress = true
+  globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
   globalState.save()
 
   // Update previous round status to VRF
@@ -155,6 +156,15 @@ export function handleBatchProcessed(event: BatchProcessed): void {
 
   // Update round payout totals
   round.currentPayoutsCount = round.currentPayoutsCount.plus(event.params.payoutsCount)
+
+  // Set payoutCompletedAt when all expected payouts have been processed
+  if (round.computedPayoutsCount !== null) {
+    const computed = round.computedPayoutsCount as BigInt
+    if (round.currentPayoutsCount.ge(computed)) {
+      round.payoutCompletedAt = event.block.timestamp
+    }
+  }
+
   round.save()
 }
 

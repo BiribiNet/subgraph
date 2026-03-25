@@ -1,4 +1,4 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { User } from "../../generated/schema"
 import { ZERO_ADDRESS } from "./constant"
 import { getOrCreateGlobalState } from "./globalState"
@@ -17,6 +17,7 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.cumulativeDepositShares = BigInt.fromI32(0)
     user.totalRouletteBets = BigInt.fromI32(0)
     user.totalRouletteWins = BigInt.fromI32(0)
+    user.netProfit = BigInt.fromI32(0)
     user.tier = "BRONZE"
     user.brbpPoints = BigInt.fromI32(0)
     user.firstSeenAt = BigInt.fromI32(0)
@@ -34,10 +35,12 @@ export function updateUserLastActive(userAddress: Bytes, timestamp: BigInt): voi
     return
   }
   const user = getOrCreateUser(userAddress)
-  if (user.firstSeenAt.equals(BigInt.fromI32(0))) {
+
+  if (user.firstSeenAt.equals(ZERO)) {
     user.firstSeenAt = timestamp
   }
   user.lastActiveAt = timestamp
+
   user.save()
 }
 
@@ -46,13 +49,18 @@ export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncre
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+
   if (isIncrease) {
     user.brbBalance = user.brbBalance.plus(amount)
   } else {
-    user.brbBalance = user.brbBalance.minus(amount)
+    if (user.brbBalance.lt(amount)) {
+      log.warning("BRB balance underflow for user {}: {} < {}", [userAddress.toHexString(), user.brbBalance.toString(), amount.toString()])
+      user.brbBalance = ZERO
+    } else {
+      user.brbBalance = user.brbBalance.minus(amount)
+    }
   }
-  
+
   user.save()
 }
 
@@ -69,7 +77,12 @@ export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncr
     }
     user.sbrbBalance = user.sbrbBalance.plus(amount)
   } else {
-    user.sbrbBalance = user.sbrbBalance.minus(amount)
+    if (user.sbrbBalance.lt(amount)) {
+      log.warning("sBRB balance underflow for user {}: {} < {}", [userAddress.toHexString(), user.sbrbBalance.toString(), amount.toString()])
+      user.sbrbBalance = ZERO
+    } else {
+      user.sbrbBalance = user.sbrbBalance.minus(amount)
+    }
     if (user.sbrbBalance.equals(ZERO)) {
       globalState.stakersCount = globalState.stakersCount.minus(ONE)
     }
@@ -84,13 +97,18 @@ export function updateUserBRBReferalBalance(userAddress: Bytes, amount: BigInt, 
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+
   if (isIncrease) {
     user.brbReferalBalance = user.brbReferalBalance.plus(amount)
   } else {
-    user.brbReferalBalance = user.brbReferalBalance.minus(amount)
+    if (user.brbReferalBalance.lt(amount)) {
+      log.warning("BRBReferal balance underflow for user {}: {} < {}", [userAddress.toHexString(), user.brbReferalBalance.toString(), amount.toString()])
+      user.brbReferalBalance = ZERO
+    } else {
+      user.brbReferalBalance = user.brbReferalBalance.minus(amount)
+    }
   }
-  
+
   user.save()
 }
 
@@ -99,13 +117,13 @@ export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDep
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+
   if (isDeposit) {
     user.totalStaked = user.totalStaked.plus(amount)
   } else {
     user.totalUnstaked = user.totalUnstaked.plus(amount)
   }
-  
+
   user.save()
 }
 
@@ -114,27 +132,18 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+
   if (isPayout) {
     if (isWin) {
       user.totalRouletteWins = user.totalRouletteWins.plus(amount)
+      user.netProfit = user.netProfit.plus(amount)
+      user.winCount = user.winCount.plus(ONE)
     }
   } else {
     user.totalRouletteBets = user.totalRouletteBets.plus(amount)
+    user.netProfit = user.netProfit.minus(amount)
   }
-  
-  user.save()
-}
 
-export function updateUserGeneralStats(userAddress: Bytes, betAmount: BigInt, winAmount: BigInt): void {
-  if (userAddress.toHexString() == ZERO_ADDRESS) {
-    return
-  }
-  const user = getOrCreateUser(userAddress)
-  
-  user.totalRouletteBets = user.totalRouletteBets.plus(betAmount)
-  user.totalRouletteWins = user.totalRouletteWins.plus(winAmount)
-  
   user.save()
 }
 
@@ -143,11 +152,11 @@ export function updateUserDepositCostBasis(userAddress: Bytes, assets: BigInt, s
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+
   // Add deposit to cumulative values
   user.cumulativeDepositValue = user.cumulativeDepositValue.plus(assets)
   user.cumulativeDepositShares = user.cumulativeDepositShares.plus(shares)
-  
+
   user.save()
 }
 
@@ -156,12 +165,12 @@ export function updateUserWithdrawalCostBasis(userAddress: Bytes, shares: BigInt
     return
   }
   const user = getOrCreateUser(userAddress)
-  
+
   // If user has no cumulative shares, nothing to remove
   if (user.cumulativeDepositShares.equals(ZERO)) {
     return
   }
-  
+
   // Calculate cost basis removed using scaled integer math with precision factor
   // Use precision factor to maintain accuracy during division
   const PRECISION = BigInt.fromI32(10).pow(18)
@@ -171,7 +180,7 @@ export function updateUserWithdrawalCostBasis(userAddress: Bytes, shares: BigInt
     .times(PRECISION)
     .div(user.cumulativeDepositShares)
     .div(PRECISION)
-  
+
   // Validate that we're not removing more than we have (shouldn't happen, but safety check)
   // If shares exceed cumulative shares, reset everything to zero
   if (shares.ge(user.cumulativeDepositShares)) {
@@ -180,7 +189,7 @@ export function updateUserWithdrawalCostBasis(userAddress: Bytes, shares: BigInt
   } else {
     // Subtract shares first
     user.cumulativeDepositShares = user.cumulativeDepositShares.minus(shares)
-    
+
     // Subtract cost basis, but cap at cumulativeDepositValue to prevent underflow
     if (costBasisRemoved.gt(user.cumulativeDepositValue)) {
       // Due to rounding, cost basis removed might slightly exceed cumulative value
@@ -189,12 +198,12 @@ export function updateUserWithdrawalCostBasis(userAddress: Bytes, shares: BigInt
     } else {
       user.cumulativeDepositValue = user.cumulativeDepositValue.minus(costBasisRemoved)
     }
-    
+
     // If no shares remaining after subtraction, reset cost basis to zero
     if (user.cumulativeDepositShares.equals(ZERO)) {
       user.cumulativeDepositValue = ZERO
     }
   }
-  
+
   user.save()
 }
