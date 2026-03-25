@@ -3,8 +3,8 @@ import {
   Deposit,
   Withdraw,
   Transfer as StakedBRBTransfer,
-  LargeWithdrawalRequested,
-  LargeWithdrawalProcessed,
+  WithdrawalRequested,
+  WithdrawalProcessed,
   ProtocolFeeRateUpdated,
   BetPlaced,
   WithdrawalSettingsUpdated,
@@ -12,8 +12,12 @@ import {
   BurnFeeRateUpdated,
   JackpotFeeRateUpdated,
   ProtocolFeeRecipientUpdated,
-  RoundCleaned,
-  FeeWithdrawn
+  RoundCleaningCompleted,
+  BettingWindowClosed,
+  LiquidityEscrowSet,
+  LiquidityOpsPerUpkeepUpdated,
+  QueuedLiquidityRejected,
+  WithdrawalEjected
 } from "../../generated/StakedBRB/StakedBRB"
 import {
   RouletteRound,
@@ -22,7 +26,10 @@ import {
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   WithdrawTransaction,
-  FeeWithdrawal
+  FeeWithdrawal,
+  BettingWindowClosedLog,
+  QueuedLiquidityRejectedLog,
+  WithdrawalEjectedLog
 } from "../../generated/schema"
 import { BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE, BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN, BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER, BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED, BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW, BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, ROUND_STATUS_BETTING, JACKPOT_CONTRACT_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis } from "../helpers/user"
@@ -74,10 +81,11 @@ export function handleDeposit(event: Deposit): void {
   globalState.save()
 }
 
-export function handleRoundCleaned(event: RoundCleaned): void {
+export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): void {
   const globalState = getOrCreateGlobalState()
-  const roundId = event.params.roundId
-  globalState.lastRoundResolved = roundId;
+  const roundId = event.params.cleanedRoundId
+  globalState.lastRoundResolved = roundId
+  globalState.lastRoundStartTime = event.params.boundaryTimestamp
   const round = RouletteRound.load(bigintToBytes(roundId))
   if (!round) {
     log.error("Round not found for batch processing: {}", [roundId.toString()])
@@ -207,45 +215,95 @@ export function handleWithdraw(event: Withdraw): void {
   globalState.save()
 }
 
-export function handleLargeWithdrawalRequested(event: LargeWithdrawalRequested): void {
-  // Get or create GlobalState entity
+export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   const globalState = getOrCreateGlobalState()
+  const user = getOrCreateUser(event.params.user)
 
-  // Create large withdrawal request entity
-  const requestId = event.params.user.concat(bigintToBytes(event.block.timestamp))
+  const requestId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.user
   request.amount = event.params.amount
-  request.queuePosition = BigInt.fromI32(0) // Will be updated when processed
+  request.queuePosition = BigInt.fromI32(0)
   request.requestedAt = event.block.timestamp
   request.isCancelled = false
   request.blockNumber = event.block.number
   request.transactionHash = event.transaction.hash
   request.save()
 
-  // Update global totals
+  user.openWithdrawalRequestId = requestId
+  user.save()
+
   globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.plus(event.params.amount)
   globalState.save()
 }
 
-export function handleLargeWithdrawalProcessed(event: LargeWithdrawalProcessed): void {
-  // Get or create GlobalState entity
+export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
   const globalState = getOrCreateGlobalState()
+  const user = getOrCreateUser(event.params.user)
 
-  // Find and update the large withdrawal request
-  const requestId = event.params.user.concat(bigintToBytes(event.block.timestamp))
-  const request = LargeWithdrawalRequest.load(requestId)
-  if (request) {
-    request.processedAt = event.block.timestamp
-    request.save()
+  const openReqId = user.openWithdrawalRequestId
+  if (openReqId) {
+    const req = LargeWithdrawalRequest.load(openReqId)
+    if (req) {
+      req.processedAt = event.block.timestamp
+      req.save()
+    }
+    user.openWithdrawalRequestId = null
+    user.save()
   }
 
-  // Update user stats
-  updateUserStakingStats(event.params.user, event.params.amount, false)
-
-  // Update global totals
   globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.amount)
   globalState.save()
+}
+
+export function handleBettingWindowClosed(event: BettingWindowClosed): void {
+  const globalState = getOrCreateGlobalState()
+  globalState.lastBettingWindowClosedRoundId = event.params.roundId
+  globalState.lastBettingWindowClosedAt = event.block.timestamp
+  globalState.save()
+
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const row = new BettingWindowClosedLog(id)
+  row.roundId = event.params.roundId
+  row.blockNumber = event.block.number
+  row.timestamp = event.block.timestamp
+  row.transactionHash = event.transaction.hash
+  row.save()
+}
+
+export function handleLiquidityEscrowSet(event: LiquidityEscrowSet): void {
+  const globalState = getOrCreateGlobalState()
+  globalState.liquidityEscrow = changetype<Bytes>(event.params.escrow)
+  globalState.save()
+}
+
+export function handleLiquidityOpsPerUpkeepUpdated(event: LiquidityOpsPerUpkeepUpdated): void {
+  const globalState = getOrCreateGlobalState()
+  globalState.liquidityOpsPerCleaningUpkeep = event.params.ops
+  globalState.save()
+}
+
+export function handleQueuedLiquidityRejected(event: QueuedLiquidityRejected): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const row = new QueuedLiquidityRejectedLog(id)
+  row.payer = changetype<Bytes>(event.params.payer)
+  row.assets = event.params.assets
+  row.reason = event.params.reason
+  row.blockNumber = event.block.number
+  row.timestamp = event.block.timestamp
+  row.transactionHash = event.transaction.hash
+  row.save()
+}
+
+export function handleWithdrawalEjected(event: WithdrawalEjected): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const row = new WithdrawalEjectedLog(id)
+  row.user = changetype<Bytes>(event.params.user)
+  row.reason = event.params.reason
+  row.blockNumber = event.block.number
+  row.timestamp = event.block.timestamp
+  row.transactionHash = event.transaction.hash
+  row.save()
 }
 
 export function handleBurnFeeRateUpdated(event: BurnFeeRateUpdated): void {
@@ -303,22 +361,6 @@ export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpd
   globalState.save()
 }
 
-export function handleFeeWithdrawn(event: FeeWithdrawn): void {
-  // Create immutable record
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const withdrawal = new FeeWithdrawal(id)
-  withdrawal.amount = event.params.amount
-  withdrawal.recipient = event.params.recipient
-  withdrawal.timestamp = event.block.timestamp
-  withdrawal.blockNumber = event.block.number
-  withdrawal.transactionHash = event.transaction.hash
-  withdrawal.save()
-
-  // Update global state
-  const globalState = getOrCreateGlobalState()
-  globalState.totalFees = globalState.totalFees.plus(event.params.amount)
-  globalState.save()
-}
 
 function getBetTypeFromNumber(betTypeNumber: BigInt): string {
   const betTypeInt = betTypeNumber.toI32()

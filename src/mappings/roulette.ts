@@ -1,11 +1,10 @@
 import { BigInt, log } from "@graphprotocol/graph-ts"
 import {
-  RoundStarted,
+  VrfRequested,
   RoundResolved,
   VRFResult,
   BatchProcessed,
   JackpotResultEvent,
-  ChainlinkSetupCompleted,
   ComputedPayouts,
   MinJackpotConditionUpdated
 } from "../../generated/RouletteClean/Game"
@@ -52,12 +51,14 @@ export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdat
   globalState.save()
 }
 
-export function handleRoundStarted(event: RoundStarted): void {
+/** VRF requested for the round that just ended; `newRoundId` is the next betting round id. */
+export function handleVrfRequested(event: VrfRequested): void {
   const globalState = getOrCreateGlobalState()
 
-  const roundId = bigintToBytes(event.params.roundId);
+  const newRoundId = event.params.newRoundId
+  const roundId = bigintToBytes(newRoundId);
   const round = new RouletteRound(roundId);
-  round.roundNumber = event.params.roundId;
+  round.roundNumber = newRoundId;
   round.status = ROUND_STATUS_BETTING;
   round.totalBets = BigInt.fromI32(0)
   round.maxBetAmount = BigInt.fromI32(0)
@@ -82,13 +83,13 @@ export function handleRoundStarted(event: RoundStarted): void {
 
   // Update current round
   globalState.currentRound = roundId;
-  globalState.currentRoundNumber = event.params.roundId
+  globalState.currentRoundNumber = newRoundId
   globalState.lastRoundStartTime = event.params.timestamp
   globalState.roundTransitionInProgress = true
   globalState.save()
 
   // Update previous round status to VRF
-  const previousRoundId = event.params.roundId.minus(BigInt.fromI32(1))
+  const previousRoundId = newRoundId.minus(BigInt.fromI32(1))
   const previousRound = RouletteRound.load(bigintToBytes(previousRoundId))
   if (previousRound) {
     previousRound.status = ROUND_STATUS_VRF
@@ -97,38 +98,6 @@ export function handleRoundStarted(event: RoundStarted): void {
     previousRound.endedAt = event.block.timestamp
     previousRound.save()
   }
-}
-
-export function handleChainlinkSetupCompleted(event: ChainlinkSetupCompleted): void {
-  const round = new RouletteRound(bigintToBytes(BigInt.fromI32(1)));
-  round.roundNumber = BigInt.fromI32(1);
-  round.status = ROUND_STATUS_BETTING;
-  round.totalBets = BigInt.fromI32(0)
-  round.maxBetAmount = BigInt.fromI32(0)
-  round.maxStraightBet = BigInt.fromI32(0)
-  round.maxStreetBet = BigInt.fromI32(0)
-  round.straightBetsTotals = zerosArray(37)
-  round.streetBetsTotals = zerosArray(37)
-  round.redBetsSum = BigInt.fromI32(0)
-  round.blackBetsSum = BigInt.fromI32(0)
-  round.oddBetsSum = BigInt.fromI32(0)
-  round.evenBetsSum = BigInt.fromI32(0)
-  round.lowBetsSum = BigInt.fromI32(0)
-  round.highBetsSum = BigInt.fromI32(0)
-  round.dozenBetsSum = zerosArray(4)
-  round.columnBetsSum = zerosArray(4)
-  round.otherBetsPayout = BigInt.fromI32(0)
-  round.currentPayoutsCount = BigInt.fromI32(0);
-  round.totalPayouts = BigInt.fromI32(0);
-  round.startedAt = event.block.timestamp;
-
-  round.save();
-
-  const globalState = getOrCreateGlobalState()
-  globalState.chainlinkKeeperRegistry = event.params.keeperRegistry
-  globalState.chainlinkKeeperRegistrar = event.params.keeperRegistrar
-  globalState.subscriptionId = event.params.subscriptionId
-  globalState.save()
 }
 
 export function handleVRFResult(event: VRFResult): void {

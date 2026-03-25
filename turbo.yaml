@@ -1,0 +1,66 @@
+# Goldsky Turbo pipeline: raw_logs → decoded events → webhook (biribi).
+# After deploy: run from contracts `yarn update:subgraph:abis`, then here `DEPLOY_JSON=... yarn sync:pipeline`.
+# The ABI literal in _gs_log_decode is refreshed from abis/MergedEvents.json by scripts/sync-pipeline.mjs.
+name: biribi-roulette-events
+resource_size: s
+use_dedicated_ip: false
+job: false
+sources:
+  raw_logs:
+    dataset_name: arbitrum_sepolia.raw_logs
+    start_at: latest
+    type: dataset
+    version: 1.0.0
+transforms:
+  decoded_events:
+    primary_key: id
+    sql: |-
+      SELECT
+        id,
+        address,
+        _gs_log_decode(
+          '[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[],"name":"EIP712DomainChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"batchIndex","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"payoutsCount","type":"uint256"}],"name":"BatchProcessed","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"totalWinningBets","type":"uint256"}],"name":"ComputedPayouts","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint64","name":"version","type":"uint64"}],"name":"Initialized","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"jackpotWinnerCount","type":"uint256"}],"name":"JackpotResultEvent","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMinJackpotCondition","type":"uint256"}],"name":"MinJackpotConditionUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"previousAdminRole","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"newAdminRole","type":"bytes32"}],"name":"RoleAdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleGranted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleRevoked","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"}],"name":"RoundResolved","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"implementation","type":"address"}],"name":"Upgraded","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"winningNumber","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"jackpotNumber","type":"uint256"}],"name":"VRFResult","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"newRoundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"requestId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"VrfRequested","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"maxQueueLength","type":"uint256"}],"name":"AntiSpamSettingsUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"bytes","name":"data","type":"bytes"},{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"}],"name":"BetPlaced","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"roundId","type":"uint256"}],"name":"BettingWindowClosed","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newFee","type":"uint256"}],"name":"BurnFeeRateUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"sender","type":"address"},{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":false,"internalType":"uint256","name":"assets","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"shares","type":"uint256"}],"name":"Deposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newFee","type":"uint256"}],"name":"JackpotFeeRateUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"escrow","type":"address"}],"name":"LiquidityEscrowSet","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint32","name":"ops","type":"uint32"}],"name":"LiquidityOpsPerUpkeepUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newFee","type":"uint256"}],"name":"ProtocolFeeRateUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"newRecipient","type":"address"}],"name":"ProtocolFeeRecipientUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"payer","type":"address"},{"indexed":false,"internalType":"uint256","name":"assets","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"reason","type":"uint8"}],"name":"QueuedLiquidityRejected","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"cleanedRoundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newRoundId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"boundaryTimestamp","type":"uint256"},{"components":[{"internalType":"uint256","name":"protocolFees","type":"uint256"},{"internalType":"uint256","name":"burnAmount","type":"uint256"},{"internalType":"uint256","name":"jackpotAmount","type":"uint256"}],"indexed":false,"internalType":"struct StakedBRB.Fees","name":"fees","type":"tuple"}],"name":"RoundCleaningCompleted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"sender","type":"address"},{"indexed":true,"internalType":"address","name":"receiver","type":"address"},{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":false,"internalType":"uint256","name":"assets","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"shares","type":"uint256"}],"name":"Withdraw","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint8","name":"reason","type":"uint8"}],"name":"WithdrawalEjected","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"WithdrawalProcessed","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"WithdrawalRequested","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"batchSize","type":"uint256"}],"name":"WithdrawalSettingsUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"upkeepId","type":"uint256"},{"indexed":true,"internalType":"address","name":"forwarder","type":"address"},{"indexed":false,"internalType":"uint32","name":"gasLimit","type":"uint32"},{"indexed":false,"internalType":"uint96","name":"linkAmount","type":"uint96"},{"indexed":false,"internalType":"string","name":"upkeepType","type":"string"}],"name":"CleaningUpkeepRegistered","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"maxSupportedBets","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"totalPayoutUpkeeps","type":"uint256"}],"name":"MaxSupportedBetsUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"upkeepId","type":"uint256"},{"indexed":true,"internalType":"address","name":"forwarder","type":"address"},{"indexed":false,"internalType":"uint32","name":"gasLimit","type":"uint32"},{"indexed":false,"internalType":"uint96","name":"linkAmount","type":"uint96"},{"indexed":false,"internalType":"uint256","name":"checkDataLength","type":"uint256"},{"indexed":false,"internalType":"string","name":"upkeepType","type":"string"}],"name":"UpkeepRegistered","type":"event"}]',
+          topics,
+          data
+        ) as decoded,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index,
+        _gs_op
+      FROM raw_logs
+      WHERE address IN (
+        '0x8c6cae5e3a638cc7cded0d1bcb02b76f8bace3f2',
+        '0x8761cea90cc7ab474d371b039b3bae7bc22d5e96',
+        '0x306a67e1ca543c0892011174fa02cb1848172965',
+        '0xa670a9f1aa3e3d9b489e8d0cc68768556d264a62'
+      )
+    type: sql
+  roulette_events:
+    primary_key: id
+    sql: |-
+      SELECT
+        id,
+        address,
+        decoded.event_signature AS `event_signature`,
+        decoded.event_params[1] AS param1,
+        decoded.event_params[2] AS param2,
+        decoded.event_params[3] AS param3,
+        decoded.event_params[4] AS param4,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index,
+        _gs_op
+      FROM decoded_events
+      WHERE decoded IS NOT NULL
+    type: sql
+sinks:
+  webhook_events:
+    from: roulette_events
+    headers: null
+    one_row_per_request: false
+    payload_version: null
+    type: webhook
+    url: >-
+      https://biribi.net/api/mirror?secret=${WEBHOOK_SECRET}

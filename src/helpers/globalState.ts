@@ -56,6 +56,10 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.chainlinkKeeperRegistry = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
     globalState.chainlinkKeeperRegistrar = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
     globalState.subscriptionId = ZERO
+    globalState.liquidityEscrow = Bytes.fromHexString("0x0000000000000000000000000000000000000000")
+    globalState.liquidityOpsPerCleaningUpkeep = BigInt.fromI32(40)
+    globalState.lastBettingWindowClosedRoundId = ZERO
+    globalState.lastBettingWindowClosedAt = ZERO
   }
   return globalState
 }

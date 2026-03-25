@@ -9,11 +9,11 @@ import {
 } from 'matchstick-as';
 
 import { Transfer } from '../generated/BRBToken/BRB';
-import { RoundCleaned, Deposit, BetPlaced } from '../generated/StakedBRB/StakedBRB';
+import { RoundCleaningCompleted, Deposit, BetPlaced } from '../generated/StakedBRB/StakedBRB';
 import { handleTransfer } from '../src/mappings/brb';
-import { handleRoundCleaned, handleDeposit, handleBetPlaced } from '../src/mappings/stakedBRB';
-import { ChainlinkSetupCompleted, RoundStarted } from '../generated/RouletteClean/Game';
-import { handleChainlinkSetupCompleted, handleRoundStarted } from '../src/mappings/roulette';
+import { handleRoundCleaningCompleted, handleDeposit, handleBetPlaced } from '../src/mappings/stakedBRB';
+import { VrfRequested } from '../generated/RouletteClean/Game';
+import { handleVrfRequested } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from '../src/helpers/constant';
 
@@ -24,21 +24,18 @@ const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
 const OTHER_ADDRESS = '0xdddddddc53842141be8f70df9efe4d08538a6666';
 
 // Helper function to initialize round
-const initializeRound = (roundId: string = '1', timestamp: i32 = 1000000): void => {
-  const chainlinkSetupCompletedEvent = changetype<ChainlinkSetupCompleted>(newMockEvent());
-  chainlinkSetupCompletedEvent.parameters = new Array<ethereum.EventParam>();
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('subscriptionId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('1')))
+/** Seeds round `newRoundId` via `VrfRequested` (replaces legacy ChainlinkSetup + RoundStarted). */
+const initializeRound = (_roundId: string = '1', timestamp: i32 = 1000000): void => {
+  const ev = changetype<VrfRequested>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(
+    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1)))
   );
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('keeperRegistry', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS)))
-  );
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('keeperRegistrar', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS)))
-  );
-  chainlinkSetupCompletedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  chainlinkSetupCompletedEvent.block.timestamp = BigInt.fromI32(timestamp);
-  handleChainlinkSetupCompleted(chainlinkSetupCompletedEvent);
+  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
+  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  handleVrfRequested(ev);
 };
 
 // Helper function to create BRB Transfer event
@@ -113,52 +110,49 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
   handleBetPlaced(betPlacedEvent);
 };
 
-// Helper function to create RoundCleaned event
-const createRoundCleaned = (
-  roundId: i32,
+// Helper: StakedBRB emits RoundCleaningCompleted after cleaning (replaces former RoundCleaned + RoundStarted)
+const createRoundCleaningCompleted = (
+  cleanedRoundId: i32,
   protocolFees: string,
   burnAmount: string,
   jackpotAmount: string,
   timestamp: i32
 ): void => {
-  const roundCleanedEvent = changetype<RoundCleaned>(newMockEvent());
-  roundCleanedEvent.parameters = new Array<ethereum.EventParam>();
-  roundCleanedEvent.parameters.push(
-    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
+  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(
+    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
   );
-  
-  // Create Fees tuple
+  ev.parameters.push(
+    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
+  );
+
   const feesTuple = new ethereum.Tuple();
   feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
   feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
   feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
-  
-  roundCleanedEvent.parameters.push(
-    new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple))
-  );
-  roundCleanedEvent.address = Address.fromString(STAKED_BRB_CONTRACT_ADDRESS);
-  roundCleanedEvent.block.timestamp = BigInt.fromI32(timestamp);
-  roundCleanedEvent.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundCleaned(roundCleanedEvent);
+  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
+
+  ev.address = Address.fromString(STAKED_BRB_CONTRACT_ADDRESS);
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  ev.block.number = BigInt.fromI32(timestamp / 100);
+  handleRoundCleaningCompleted(ev);
 };
 
 // Helper function to start a new round
 const startRound = (roundId: i32, timestamp: i32, requestId: i32 = 1): void => {
-  const roundStartedEvent = changetype<RoundStarted>(newMockEvent());
-  roundStartedEvent.parameters = new Array<ethereum.EventParam>();
-  roundStartedEvent.parameters.push(
-    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
-  );
-  roundStartedEvent.parameters.push(
-    new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(requestId)))
-  );
-  roundStartedEvent.parameters.push(
-    new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
-  );
-  roundStartedEvent.address = Address.fromString('0x3c1db00c9b0d4e08d3d666c845a6dd1a0f271a51');
-  roundStartedEvent.block.timestamp = BigInt.fromI32(timestamp);
-  roundStartedEvent.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundStarted(roundStartedEvent);
+  const ev = changetype<VrfRequested>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId))));
+  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(requestId))));
+  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
+  ev.address = Address.fromString('0x3c1db00c9b0d4e08d3d666c845a6dd1a0f271a51');
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  ev.block.number = BigInt.fromI32(timestamp / 100);
+  handleVrfRequested(ev);
 };
 
 // Test Suite 1: Transfer Tracking
@@ -239,7 +233,7 @@ describe('Donation Calculation Tests', () => {
     
     // Clean round: donations = 200 - 50 - 10 = 140 BRB
     // Note: The bet data hardcodes 10 ETH (10000000000000000000), not the amount parameter
-    createRoundCleaned(1, '0', '0', '0', 1000300);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000300);
     
     // Check that totalAssets includes the donation (140 BRB)
     // Initial: 50 from deposit = 50
@@ -259,7 +253,7 @@ describe('Donation Calculation Tests', () => {
     createDeposit(USER_ADDRESS_2, '500000000000000000', '500000000000000000', 1000100);
     
     // Clean round: donations = 100 - 50 - 0 = 50 BRB
-    createRoundCleaned(1, '0', '0', '0', 1000200);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000200);
     
     // Check that donations were added to totalAssets
     // Initial: 50 from deposit
@@ -274,7 +268,7 @@ describe('Donation Calculation Tests', () => {
     createBet(USER_ADDRESS, '10000000000000000000', 1000100, 1);
     
     // Clean round: donations = 100 - 0 - 10 = 90 BRB
-    createRoundCleaned(1, '0', '0', '0', 1000200);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000200);
     
     // Check snapshots were updated
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPoolAtLastClean', '1000000000000000000');
@@ -290,7 +284,7 @@ describe('Donation Calculation Tests', () => {
     createBet(USER_ADDRESS, '10000000000000000000', 1000200, 1);
     
     // Clean round: donations = 200 - 50 - 10 = 140 BRB
-    createRoundCleaned(1, '0', '0', '0', 1000300);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000300);
     
     // Verify snapshots updated
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPoolAtLastClean', '2000000000000000000');
@@ -303,7 +297,7 @@ describe('Donation Calculation Tests', () => {
     // No deposits, no bets
     
     // Clean round: donations = 100 - 0 - 0 = 100 BRB
-    createRoundCleaned(1, '0', '0', '0', 1000100);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000100);
     
     // totalAssets should include the donation
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalAssets', '1000000000000000000');
@@ -319,7 +313,7 @@ describe('Donation Calculation Tests', () => {
     
     // Clean round: donations = 0.5 - 1 - 10 = -10.5 ETH (negative)
     // Negative donations should not subtract from totalAssets
-    createRoundCleaned(1, '0', '0', '0', 1000300);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000300);
     
     // totalAssets calculation:
     // - Deposit: 1 ETH
@@ -342,7 +336,7 @@ describe('Round Cleanup Snapshot Updates Tests', () => {
     
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPoolAtLastClean', '0');
     
-    createRoundCleaned(1, '0', '0', '0', 1000100);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000100);
     
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPoolAtLastClean', '1000000000000000000');
   });
@@ -352,7 +346,7 @@ describe('Round Cleanup Snapshot Updates Tests', () => {
     
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalDepositsAtLastClean', '0');
     
-    createRoundCleaned(1, '0', '0', '0', 1000100);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000100);
     
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalDepositsAtLastClean', '1000000000000000000');
   });
@@ -361,7 +355,7 @@ describe('Round Cleanup Snapshot Updates Tests', () => {
     // Round 1: Transfer 100, Deposit 50
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '1000000000000000000', 1000000);
     createDeposit(USER_ADDRESS_2, '500000000000000000', '500000000000000000', 1000100);
-    createRoundCleaned(1, '0', '0', '0', 1000200);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000200);
     
     // Round 2: Transfer 50 more, Deposit 25 more
     startRound(2, 1000300);
@@ -369,7 +363,7 @@ describe('Round Cleanup Snapshot Updates Tests', () => {
     createDeposit(USER_ADDRESS_2, '250000000000000000', '250000000000000000', 1000400);
     
     // Clean round 2: donations = (150 - 100) - (75 - 50) - 0 = 50 - 25 = 25
-    createRoundCleaned(2, '0', '0', '0', 1000500);
+    createRoundCleaningCompleted(2, '0', '0', '0', 1000500);
     
     // Verify snapshots updated for round 2
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPoolAtLastClean', '1500000000000000000');
@@ -389,14 +383,14 @@ describe('Multi-Round Scenarios Tests', () => {
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '1000000000000000000', 1000000);
     createDeposit(USER_ADDRESS_2, '500000000000000000', '500000000000000000', 1000100);
     createBet(USER_ADDRESS, '10000000000000000000', 1000200, 1);
-    createRoundCleaned(1, '0', '0', '0', 1000300);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000300);
     
     // Round 2: Transfer 200, Deposit 100, Bet 20
     startRound(2, 1000400);
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '2000000000000000000', 1000400);
     createDeposit(USER_ADDRESS_2, '1000000000000000000', '1000000000000000000', 1000500);
     createBet(USER_ADDRESS, '20000000000000000000', 1000600, 2);
-    createRoundCleaned(2, '0', '0', '0', 1000700);
+    createRoundCleaningCompleted(2, '0', '0', '0', 1000700);
     
     // Verify cumulative totals
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '3000000000000000000');
@@ -406,13 +400,13 @@ describe('Multi-Round Scenarios Tests', () => {
   test('Each round calculates donations independently', () => {
     // Round 1: Transfer 100, no deposits, no bets → donation = 100
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '1000000000000000000', 1000000);
-    createRoundCleaned(1, '0', '0', '0', 1000100);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000100);
     
     // Round 2: Transfer 50, Deposit 50, no bets → donation = 0
     startRound(2, 1000200);
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '500000000000000000', 1000200);
     createDeposit(USER_ADDRESS_2, '500000000000000000', '500000000000000000', 1000300);
-    createRoundCleaned(2, '0', '0', '0', 1000400);
+    createRoundCleaningCompleted(2, '0', '0', '0', 1000400);
     
     // Round 1 added 100 to totalAssets, Round 2 added 0
     // So totalAssets should be 100 (from round 1 donation) + 50 (from round 2 deposit) = 150
@@ -432,7 +426,7 @@ describe('Edge Cases Tests', () => {
   test('Round with only donations (no deposits, no bets)', () => {
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '1000000000000000000', 1000000);
     
-    createRoundCleaned(1, '0', '0', '0', 1000100);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000100);
     
     // Donation = 100 - 0 - 0 = 100
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalAssets', '1000000000000000000');
@@ -442,7 +436,7 @@ describe('Edge Cases Tests', () => {
     createDeposit(USER_ADDRESS, '1000000000000000000', '1000000000000000000', 1000000);
     createBet(USER_ADDRESS, '10000000000000000000', 1000100, 1);
     
-    createRoundCleaned(1, '0', '0', '0', 1000200);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000200);
     
     // Donation = 0 - 1 - 10 = -11 ETH (negative, so not added)
     // totalAssets calculation:
@@ -460,7 +454,7 @@ describe('Edge Cases Tests', () => {
     createDeposit(USER_ADDRESS_2, '1000000000000000000', '1000000000000000000', 1000100);
     // Bet 10 ETH (hardcoded to 10 ETH in bet data)
     createBet(USER_ADDRESS, '10000000000000000000', 1000200, 1);
-    createRoundCleaned(1, '0', '0', '0', 1000300);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000300);
     
     // Donation = 11 - 1 - 10 = 0 ETH (zero donations)
     // totalAssets calculation:

@@ -8,10 +8,10 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit, Withdraw, RoundCleaned } from '../generated/StakedBRB/StakedBRB';
-import { handleBetPlaced, handleDeposit, handleWithdraw, handleRoundCleaned } from '../src/mappings/stakedBRB';
-import { ChainlinkSetupCompleted } from '../generated/RouletteClean/Game';
-import { handleChainlinkSetupCompleted } from '../src/mappings/roulette';
+import { BetPlaced, Deposit, Withdraw, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { handleBetPlaced, handleDeposit, handleWithdraw, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
+import { VrfRequested } from '../generated/RouletteClean/Game';
+import { handleVrfRequested } from '../src/mappings/roulette';
 import { MinJackpotConditionUpdated } from '../generated/RouletteClean/Game';
 import { handleMinJackpotConditionUpdated } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
@@ -21,21 +21,15 @@ const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
 
-const initializeRound = (roundId: string = '1', timestamp: i32 = 1000000): void => {
-  const chainlinkSetupCompletedEvent = changetype<ChainlinkSetupCompleted>(newMockEvent());
-  chainlinkSetupCompletedEvent.parameters = new Array<ethereum.EventParam>();
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('subscriptionId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('1')))
-  );
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('keeperRegistry', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS)))
-  );
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('keeperRegistrar', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS)))
-  );
-  chainlinkSetupCompletedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  chainlinkSetupCompletedEvent.block.timestamp = BigInt.fromI32(timestamp);
-  handleChainlinkSetupCompleted(chainlinkSetupCompletedEvent);
+const initializeRound = (_roundId: string = '1', timestamp: i32 = 1000000): void => {
+  const ev = changetype<VrfRequested>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
+  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  handleVrfRequested(ev);
 };
 
 const createDeposit = (user: string, assets: string, shares: string, timestamp: i32): void => {
@@ -110,25 +104,35 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
   handleBetPlaced(betPlacedEvent);
 };
 
-const createRoundCleaned = (roundId: i32, protocolFees: string, burnAmount: string, jackpotAmount: string, timestamp: i32): void => {
-  const roundCleanedEvent = changetype<RoundCleaned>(newMockEvent());
-  roundCleanedEvent.parameters = new Array<ethereum.EventParam>();
-  roundCleanedEvent.parameters.push(
-    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
+const createRoundCleaningCompleted = (
+  cleanedRoundId: i32,
+  protocolFees: string,
+  burnAmount: string,
+  jackpotAmount: string,
+  timestamp: i32
+): void => {
+  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(
+    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
   );
 
   const feesTuple = new ethereum.Tuple();
   feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
   feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
   feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
-  roundCleanedEvent.parameters.push(
-    new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple))
-  );
+  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
 
-  roundCleanedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  roundCleanedEvent.block.timestamp = BigInt.fromI32(timestamp);
-  roundCleanedEvent.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundCleaned(roundCleanedEvent);
+  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  ev.block.number = BigInt.fromI32(timestamp / 100);
+  handleRoundCleaningCompleted(ev);
 };
 
 const createMinJackpotConditionUpdated = (minJackpotCondition: string, timestamp: i32 = 1000000): void => {
@@ -304,7 +308,7 @@ describe('Max Bet Amount Tests', () => {
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
   });
 
-  test('maxBetAmount resets to 0 on RoundCleaned', () => {
+  test('maxBetAmount resets to 0 on RoundCleaningCompleted', () => {
     // Place a single bet to ensure maxBetAmount is non-zero
     createBet(USER_ADDRESS, '10000000000000000000', 1000000, 1);
 
@@ -313,7 +317,7 @@ describe('Max Bet Amount Tests', () => {
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'maxBetAmount', '99000000000000000000');
 
     // Clean the round, which resets StakedBRB's active maxPayout contribution
-    createRoundCleaned(1, '0', '0', '0', 1000500);
+    createRoundCleaningCompleted(1, '0', '0', '0', 1000500);
 
     // Contract keeps the per-round maxPayoutPerRound value, but reduces global maxPayout.
     assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '99000000000000000000');

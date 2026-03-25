@@ -67,6 +67,11 @@
             "internalType": "address",
             "name": "brbToken",
             "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "upkeepManager",
+            "type": "address"
           }
         ],
         "internalType": "struct RouletteClean.ConstructorParams",
@@ -117,6 +122,11 @@
   {
     "inputs": [],
     "name": "BetLimitExceeded",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "BettingClosed",
     "type": "error"
   },
   {
@@ -177,11 +187,6 @@
   },
   {
     "inputs": [],
-    "name": "MaxUpkeepLimitReached",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "NotInitializing",
     "type": "error"
   },
@@ -212,19 +217,8 @@
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "value",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "length",
-        "type": "uint256"
-      }
-    ],
-    "name": "StringsInsufficientHexLength",
+    "inputs": [],
+    "name": "StakedBRBNotInitialized",
     "type": "error"
   },
   {
@@ -246,11 +240,6 @@
   {
     "inputs": [],
     "name": "UnauthorizedCaller",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "UpkeepRegistrationFailed",
     "type": "error"
   },
   {
@@ -286,31 +275,6 @@
       }
     ],
     "name": "BatchProcessed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "subscriptionId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "keeperRegistrar",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "keeperRegistry",
-        "type": "address"
-      }
-    ],
-    "name": "ChainlinkSetupCompleted",
     "type": "event"
   },
   {
@@ -362,25 +326,6 @@
       }
     ],
     "name": "JackpotResultEvent",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "maxSupportedBets",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "totalUpkeeps",
-        "type": "uint256"
-      }
-    ],
-    "name": "MaxSupportedBetsUpdated",
     "type": "event"
   },
   {
@@ -488,31 +433,6 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "roundId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "requestId",
-        "type": "uint256"
-      }
-    ],
-    "name": "RoundStarted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": true,
         "internalType": "address",
         "name": "implementation",
@@ -520,49 +440,6 @@
       }
     ],
     "name": "Upgraded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "upkeepId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "forwarder",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "gasLimit",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint96",
-        "name": "linkAmount",
-        "type": "uint96"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "checkDataLength",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "upkeepType",
-        "type": "string"
-      }
-    ],
-    "name": "UpkeepRegistered",
     "type": "event"
   },
   {
@@ -588,6 +465,31 @@
       }
     ],
     "name": "VRFResult",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "newRoundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "VrfRequested",
     "type": "event"
   },
   {
@@ -683,6 +585,19 @@
         "internalType": "bytes",
         "name": "performData",
         "type": "bytes"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "gamePeriod",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -875,22 +790,22 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "maxSupportedBets",
+        "name": "",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "registeredUpkeepCount",
+        "name": "",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "batchSize",
+        "name": "",
         "type": "uint256"
       },
       {
         "internalType": "uint32",
-        "name": "upkeepGasLimit",
+        "name": "",
         "type": "uint32"
       }
     ],
@@ -950,24 +865,35 @@
         "internalType": "address",
         "name": "admin",
         "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "keeperRegistrar",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "keeperRegistry",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "linkToken",
-        "type": "address"
       }
     ],
     "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "isBettingOpen",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "boundaryTimestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "onRoundBoundary",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1013,62 +939,6 @@
     ],
     "name": "rawFulfillRandomWords",
     "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint96",
-        "name": "linkAmount",
-        "type": "uint96"
-      }
-    ],
-    "name": "registerComputeTotalWinningBetsUpkeep",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "upkeepCount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint96",
-        "name": "linkAmountPerUpkeep",
-        "type": "uint96"
-      }
-    ],
-    "name": "registerPayoutUpkeeps",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint96",
-        "name": "linkAmount",
-        "type": "uint96"
-      }
-    ],
-    "name": "registerVRFUpkeep",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1138,24 +1008,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "rouletteNumber",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "jackpotNumber",
-        "type": "uint256"
-      }
-    ],
-    "name": "testForceNumber",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

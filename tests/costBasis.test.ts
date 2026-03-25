@@ -10,28 +10,22 @@ import {
 
 import { Deposit, Withdraw } from '../generated/StakedBRB/StakedBRB';
 import { handleDeposit, handleWithdraw } from '../src/mappings/stakedBRB';
-import { ChainlinkSetupCompleted } from '../generated/RouletteClean/Game';
-import { handleChainlinkSetupCompleted } from '../src/mappings/roulette';
+import { VrfRequested } from '../generated/RouletteClean/Game';
+import { handleVrfRequested } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 
-const initializeRound = (roundId: string = '1', timestamp: i32 = 1000000): void => {
-  const chainlinkSetupCompletedEvent = changetype<ChainlinkSetupCompleted>(newMockEvent());
-  chainlinkSetupCompletedEvent.parameters = new Array<ethereum.EventParam>();
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('subscriptionId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('1')))
-  );
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('keeperRegistry', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS)))
-  );
-  chainlinkSetupCompletedEvent.parameters.push(
-    new ethereum.EventParam('keeperRegistrar', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS)))
-  );
-  chainlinkSetupCompletedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  chainlinkSetupCompletedEvent.block.timestamp = BigInt.fromI32(timestamp);
-  handleChainlinkSetupCompleted(chainlinkSetupCompletedEvent);
+const initializeRound = (_roundId: string = '1', timestamp: i32 = 1000000): void => {
+  const ev = changetype<VrfRequested>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
+  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  handleVrfRequested(ev);
 };
 
 const createDeposit = (user: string, assets: string, shares: string, timestamp: i32): void => {

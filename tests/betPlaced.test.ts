@@ -10,8 +10,8 @@ import {
 
 import { BetPlaced } from '../generated/StakedBRB/StakedBRB';
 import { handleBetPlaced } from '../src/mappings/stakedBRB';
-import { ChainlinkSetupCompleted, VRFResult } from '../generated/RouletteClean/Game';
-import { handleChainlinkSetupCompleted, handleVRFResult } from '../src/mappings/roulette';
+import { VrfRequested, VRFResult } from '../generated/RouletteClean/Game';
+import { handleVrfRequested, handleVRFResult } from '../src/mappings/roulette';
 import { ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
@@ -19,13 +19,13 @@ import { bigintToBytes } from '../src/helpers/bigintToBytes';
 // https://thegraph.com/docs/en/developer/matchstick/#tests-structure-0-5-0
 
 const initializeRound = (): void => {
-    const chainlinkSetupCompletedEvent = changetype<ChainlinkSetupCompleted>(newMockEvent());
-    chainlinkSetupCompletedEvent.parameters = new Array<ethereum.EventParam>();
-    chainlinkSetupCompletedEvent.parameters.push(new ethereum.EventParam('subscriptionId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("1"))));
-    chainlinkSetupCompletedEvent.parameters.push(new ethereum.EventParam('keeperRegistry', ethereum.Value.fromAddress(Address.fromString('0xbbbbedc42dc53842141be8f70df9efe4d08538a4'))));
-    chainlinkSetupCompletedEvent.parameters.push(new ethereum.EventParam('keeperRegistrar', ethereum.Value.fromAddress(Address.fromString('0xbbbbedc42dc53842141be8f70df9efe4d08538a4'))));
-    chainlinkSetupCompletedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-    handleChainlinkSetupCompleted(chainlinkSetupCompletedEvent)
+    const ev = changetype<VrfRequested>(newMockEvent());
+    ev.parameters = new Array<ethereum.EventParam>();
+    ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1_000_000))));
+    ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+    handleVrfRequested(ev);
 }
 const initializeBet = (): void => {
   const betPlacedEvent = changetype<BetPlaced>(newMockEvent());

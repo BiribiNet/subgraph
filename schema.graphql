@@ -53,6 +53,8 @@ type User @entity(immutable: false) {
   stakedBRBWithdrawals: [StakedBRBWithdrawal]! @derivedFrom(field: "user")
   "Array of large withdrawal requests"
   largeWithdrawalRequests: [LargeWithdrawalRequest]! @derivedFrom(field: "user")
+  "If set, id of the user's open queued withdrawal request (FIFO queue; one pending per user on-chain)"
+  openWithdrawalRequestId: Bytes
   "Array of payout transactions"
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "user")
   "Array of BRBReferal transfers"
@@ -345,6 +347,14 @@ type GlobalState @entity(immutable: false) {
   brbPrice: BigDecimal!
   "BRB price last updated at"
   brbPriceUpdatedAt: BigInt!
+  "StakedBRB liquidity escrow (BRB held for queued deposit/mint)"
+  liquidityEscrow: Bytes!
+  "Max deposit/mint queue ops per cleaning upkeep (StakedBRB admin param)"
+  liquidityOpsPerCleaningUpkeep: BigInt!
+  "Last round id for which StakedBRB emitted BettingWindowClosed"
+  lastBettingWindowClosedRoundId: BigInt!
+  "Block timestamp of last BettingWindowClosed event"
+  lastBettingWindowClosedAt: BigInt!
 }
 
 # Daily snapshot for APY calculations
@@ -411,11 +421,11 @@ type StakedBRBWithdrawal @entity(immutable: true) {
 }
 
 type LargeWithdrawalRequest @entity(immutable: false) {
-  "User address + request timestamp"
+  "Log id: tx hash + log index"
   id: Bytes!
   "User who requested withdrawal"
   user: User!
-  "Requested amount"
+  "Requested amount (accounting assets)"
   amount: BigInt!
   "Queue position"
   queuePosition: BigInt!
@@ -493,6 +503,36 @@ type BRBBurn @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+type BettingWindowClosedLog @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "StakedBRB currentRound when the betting window closed (pre-VRF)"
+  roundId: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type QueuedLiquidityRejectedLog @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "Payer whose queued deposit/mint was refunded"
+  payer: Bytes!
+  "Asset amount"
+  assets: BigInt!
+  "Rejection reason code (contract-defined)"
+  reason: Int!
+  "Block number"
+  blockNumber: BigInt!
+  "Timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
 type FeeWithdrawal @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
@@ -504,6 +544,21 @@ type FeeWithdrawal @entity(immutable: true) {
   timestamp: BigInt!
   "Block number"
   blockNumber: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type WithdrawalEjectedLog @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "User whose queued withdrawal was ejected"
+  user: Bytes!
+  "Ejection reason code (contract-defined)"
+  reason: Int!
+  "Block number"
+  blockNumber: BigInt!
+  "Timestamp"
+  timestamp: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
 }

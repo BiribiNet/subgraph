@@ -1,0 +1,15 @@
+{
+  "startBlock": 251362760,
+  "startBlocks": {
+    "brb": 251362768,
+    "roulette": 251362807,
+    "stakedBRB": 251362814,
+    "brbReferal": 251362760
+  },
+  "addresses": {
+    "brb": "0xd56556bcfbdbc9fdca720a5aab04efa3dc4c6dc1",
+    "roulette": "0x79eb301aa13aa7b1ac65cfb22f3eeac740b31af2",
+    "stakedBRB": "0x1973733539fa4eea8b9bd8cb03ccdee00dceaea9",
+    "brbReferal": "0xca2322393b402fa96e3a57415a7fbee43749d70e"
+  }
+}
