@@ -1,5 +1,5 @@
 import { Bytes, BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { GlobalState, APYSnapshot } from "../../generated/schema"
+import { GlobalState, APYSnapshot, VaultState, ProtocolStats } from "../../generated/schema"
 import { ZERO } from "./number"
 import { bigintToBytes } from "./bigintToBytes"
 
@@ -296,6 +296,35 @@ export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: Big
     currentTimestamp,
     globalState.apyLifetimeBaselineTimestamp
   )
+}
+
+export function getOrCreateVaultState(): VaultState {
+  let vault = VaultState.load("vault")
+  if (!vault) {
+    vault = new VaultState("vault")
+    vault.totalAssets = ZERO
+    vault.totalShares = ZERO
+    vault.sharePrice = BigDecimal.fromString("1")
+    vault.stakerCount = ZERO
+    vault.allTimeRevenue = ZERO
+  }
+  return vault
+}
+
+export function getOrCreateProtocolStats(): ProtocolStats {
+  let stats = ProtocolStats.load("stats")
+  if (!stats) {
+    stats = new ProtocolStats("stats")
+    stats.totalWagered = ZERO
+    stats.totalBets = ZERO
+    stats.totalRounds = ZERO
+    stats.totalPlayers = ZERO
+    stats.totalBurned = ZERO
+    stats.totalJackpotsPaid = ZERO
+    stats.totalStakerRevenue = ZERO
+    stats.brbTotalSupply = ZERO
+  }
+  return stats
 }
 
 export { GLOBAL_STATE_ID }

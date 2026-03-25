@@ -22,7 +22,14 @@ enum BetType {
   HIGH
   TRIO_012
   TRIO_023
+  VOISINS
+  TIERS
+  ORPHELINS
+  JEU_ZERO
 }
+
+enum PlayerTier { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, LEGEND }
+enum StakingActionType { DEPOSIT, WITHDRAW }
 
 type User @entity(immutable: false) {
   "User address"
@@ -59,6 +66,20 @@ type User @entity(immutable: false) {
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "user")
   "Array of BRBReferal transfers"
   brbReferalTransfers: [BRBReferalTransfer]! @derivedFrom(field: "user")
+  "Player tier"
+  tier: PlayerTier!
+  "BRBP points"
+  brbpPoints: BigInt!
+  "First seen timestamp"
+  firstSeenAt: BigInt!
+  "Last active timestamp"
+  lastActiveAt: BigInt!
+  "Total BRB won"
+  totalWon: BigInt!
+  "Total BRB lost"
+  totalLost: BigInt!
+  "Number of winning bets"
+  winCount: BigInt!
 }
 
 # BRB Token Transfer
@@ -561,4 +582,143 @@ type WithdrawalEjectedLog @entity(immutable: true) {
   timestamp: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
+}
+
+# === NEW ENTITIES ===
+
+"Token approval event (BRB, sBRB, BRBR)"
+type TokenApproval @entity(immutable: true) {
+  id: Bytes!
+  "Token name: BRB, sBRB, or BRBR"
+  token: String!
+  "Owner address"
+  owner: Bytes!
+  "Spender address"
+  spender: Bytes!
+  "Approved amount"
+  value: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+"Admin role change event (RoleGranted, RoleRevoked, RoleAdminChanged)"
+type AdminRoleChange @entity(immutable: true) {
+  id: Bytes!
+  "Contract name: Game or StakedBRB"
+  contract: String!
+  "Event type: GRANTED, REVOKED, or ADMIN_CHANGED"
+  eventType: String!
+  "Role identifier"
+  role: Bytes!
+  "Account affected (for GRANTED/REVOKED)"
+  account: Bytes
+  "Sender (for GRANTED/REVOKED)"
+  sender: Bytes
+  "Previous admin role (for ADMIN_CHANGED)"
+  previousAdminRole: Bytes
+  "New admin role (for ADMIN_CHANGED)"
+  newAdminRole: Bytes
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+"Contract upgrade event (UUPS proxy)"
+type ContractUpgrade @entity(immutable: true) {
+  id: Bytes!
+  "Contract name: Game or StakedBRB"
+  contract: String!
+  "New implementation address"
+  implementation: Bytes!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+"Chainlink upkeep registration"
+type UpkeepRegistration @entity(immutable: true) {
+  id: Bytes!
+  "Registration type: CLEANING or STANDARD"
+  registrationType: String!
+  "Chainlink upkeep ID"
+  upkeepId: BigInt!
+  "Forwarder address"
+  forwarder: Bytes!
+  "Gas limit"
+  gasLimit: BigInt!
+  "LINK amount funded"
+  linkAmount: BigInt!
+  "Check data length (STANDARD only)"
+  checkDataLength: BigInt
+  "Upkeep type"
+  upkeepType: String!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+"Max supported bets update"
+type MaxBetsUpdate @entity(immutable: true) {
+  id: Bytes!
+  "New max supported bets"
+  maxSupportedBets: BigInt!
+  "Total payout upkeeps"
+  totalPayoutUpkeeps: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+"Singleton vault state for sBRB metrics"
+type VaultState @entity(immutable: false) {
+  "Singleton: vault"
+  id: ID!
+  "Total BRB assets in vault"
+  totalAssets: BigInt!
+  "Total sBRB shares"
+  totalShares: BigInt!
+  "Current share price (BRB per sBRB)"
+  sharePrice: BigDecimal!
+  "Number of active stakers"
+  stakerCount: BigInt!
+  "Cumulative staker revenue"
+  allTimeRevenue: BigInt!
+}
+
+"Singleton protocol-wide lifetime stats"
+type ProtocolStats @entity(immutable: false) {
+  "Singleton: stats"
+  id: ID!
+  "Total BRB wagered all time"
+  totalWagered: BigInt!
+  "Total bets placed all time"
+  totalBets: BigInt!
+  "Total rounds completed"
+  totalRounds: BigInt!
+  "Total unique players"
+  totalPlayers: BigInt!
+  "Total BRB burned"
+  totalBurned: BigInt!
+  "Total jackpots paid out"
+  totalJackpotsPaid: BigInt!
+  "Total revenue distributed to stakers"
+  totalStakerRevenue: BigInt!
+  "Current BRB total supply"
+  brbTotalSupply: BigInt!
 }
