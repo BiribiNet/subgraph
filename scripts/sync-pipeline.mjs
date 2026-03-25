@@ -120,8 +120,7 @@ turbo = turbo.replace(
   `FROM raw_logs\n      WHERE address IN (\n${inList}\n      )`,
 );
 writeFileSync(join(root, "turbo.yaml"), turbo, "utf8");
-writeFileSync(join(root, "turbo.synced.yaml"), turbo, "utf8");
-console.log("Wrote turbo.yaml and turbo.synced.yaml");
+console.log("Wrote turbo.yaml");
 
 let subgraph = readFileSync(join(root, "subgraph.yaml"), "utf8");
 const dsMap = [
