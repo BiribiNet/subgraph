@@ -142,7 +142,7 @@ export function handleRoundResolved(event: RoundResolved): void {
   globalState.save();
 
   round.status = ROUND_STATUS_CLEAN
-  round.cleaningCompletedAt = event.block.timestamp
+  round.resolvedAt = event.block.timestamp
   round.save()
 }
 

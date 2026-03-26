@@ -25,6 +25,7 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.totalWon = BigInt.fromI32(0)
     user.totalLost = BigInt.fromI32(0)
     user.winCount = BigInt.fromI32(0)
+    user.betCount = BigInt.fromI32(0)
     user.save()
   }
   return user

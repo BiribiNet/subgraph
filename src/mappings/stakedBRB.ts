@@ -32,6 +32,7 @@ import {
 } from "../../generated/StakedBRB/MergedEvents"
 import {
   RouletteRound,
+  RouletteBet,
   StakedBRBDeposit,
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
@@ -95,6 +96,11 @@ export function handleDeposit(event: Deposit): void {
   dailyStatsDeposit.depositCount = dailyStatsDeposit.depositCount.plus(BigInt.fromI32(1))
   dailyStatsDeposit.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStatsDeposit.save()
+
+  // Update ProtocolStats cumulative deposit volume
+  const protocolStatsDeposit = getOrCreateProtocolStats()
+  protocolStatsDeposit.totalDeposited = protocolStatsDeposit.totalDeposited.plus(event.params.assets)
+  protocolStatsDeposit.save()
 
   globalState.save()
 
@@ -208,6 +214,7 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   protocolStats.totalBurned = globalState.totalBurned
   protocolStats.save()
 
+  round.cleaningCompletedAt = event.block.timestamp
   round.save()
 }
 
@@ -263,6 +270,11 @@ export function handleWithdraw(event: Withdraw): void {
   dailyStatsWithdraw.withdrawalCount = dailyStatsWithdraw.withdrawalCount.plus(BigInt.fromI32(1))
   dailyStatsWithdraw.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStatsWithdraw.save()
+
+  // Update ProtocolStats cumulative withdrawal volume
+  const protocolStatsWithdraw = getOrCreateProtocolStats()
+  protocolStatsWithdraw.totalWithdrawn = protocolStatsWithdraw.totalWithdrawn.plus(event.params.assets)
+  protocolStatsWithdraw.save()
 
   globalState.save()
 
@@ -454,6 +466,10 @@ export function handleBetPlaced(event: BetPlaced): void {
       return
     }
 
+    // Check if this is the user's first bet in this round (for betCount tracking)
+    const betEntityId = event.params.user.concat(roundId)
+    const isNewBetForRound = RouletteBet.load(betEntityId) == null
+
     // Capture max payout BEFORE processing bets (for delta calculation)
     const previousMaxPayout = calculateMaxPayoutFromRoundComponents(round)
 
@@ -461,6 +477,13 @@ export function handleBetPlaced(event: BetPlaced): void {
     for (let i = 0; i < amountsLength; i++) {
       // Process the individual bet (create/update RouletteBet entity + update maxPayout components)
       processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
+    }
+
+    // Increment user's betCount if this is their first bet in this round
+    if (isNewBetForRound) {
+      const betUser = getOrCreateUser(event.params.user)
+      betUser.betCount = betUser.betCount.plus(ONE)
+      betUser.save()
     }
 
     // Compute max payout AFTER processing bets and use the delta

@@ -12,7 +12,8 @@ export function handleTransfer(event: Transfer): void {
   // Update user balances (skip zero addresses)
   if (!fromIsZero) {
     updateUserBRBReferalBalance(event.params.from, event.params.value, false) // Subtract from sender
-    
+    updateUserLastActive(event.params.from, event.block.timestamp)
+
     // Create transfer entity for sender (debit)
     const transferIdFrom = event.transaction.hash.concat(bigintToBytes(event.logIndex)).concat(event.params.from)
     const transferFrom = new BRBReferalTransfer(transferIdFrom)

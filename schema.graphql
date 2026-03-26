@@ -82,6 +82,8 @@ type User @entity(immutable: false) {
   totalLost: BigInt!
   "Number of winning bets"
   winCount: BigInt!
+  "Number of distinct rounds bet on"
+  betCount: BigInt!
 }
 
 # BRB Token Transfer
@@ -204,6 +206,8 @@ type RouletteRound @entity(immutable: false) {
   vrfResultAt: BigInt
   "Payout completion timestamp"
   payoutCompletedAt: BigInt
+  "Round resolved timestamp (Game contract RoundResolved event)"
+  resolvedAt: BigInt
   "Cleaning completion timestamp"
   cleaningCompletedAt: BigInt
   "Stakers revenue share (95% of house edge)"
@@ -240,9 +244,9 @@ type RouletteBet @entity(immutable: false) {
   "Number of bets placed by this user in this round"
   betCount: BigInt!
   "Actual payout received"
-  actualPayout: BigInt
-  "Whether the bet won (null until round resolved)"
-  won: Boolean
+  actualPayout: BigInt!
+  "Whether the bet won"
+  won: Boolean!
   "First bet block number"
   firstBetBlockNumber: BigInt!
   "Latest bet block number"
@@ -735,4 +739,8 @@ type ProtocolStats @entity(immutable: false) {
   brbTotalSupply: BigInt!
   "Total BRB paid out to winners all time"
   totalPayouts: BigInt!
+  "Total BRB deposited into sBRB vault all time"
+  totalDeposited: BigInt!
+  "Total BRB withdrawn from sBRB vault all time"
+  totalWithdrawn: BigInt!
 }

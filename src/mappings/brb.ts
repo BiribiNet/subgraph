@@ -119,12 +119,7 @@ export function handleTransfer(event: Transfer): void {
           bet.won = true
 
           // Accumulate jackpot payout into bet.actualPayout
-          const currentJackpotPayout = bet.actualPayout
-          if (currentJackpotPayout !== null) {
-            bet.actualPayout = currentJackpotPayout.plus(event.params.value)
-          } else {
-            bet.actualPayout = event.params.value
-          }
+          bet.actualPayout = bet.actualPayout.plus(event.params.value)
 
           // Track payout in DailyStats
           const dailyStatsJackpotPayout = getOrCreateDailyStats(event.block.timestamp)
@@ -145,12 +140,7 @@ export function handleTransfer(event: Transfer): void {
             payoutTx.save()
 
             // Update the corresponding RouletteBet entity
-            const currentPayout = bet.actualPayout
-            if (currentPayout !== null) {
-              bet.actualPayout = currentPayout.plus(event.params.value)
-            } else {
-              bet.actualPayout = event.params.value
-            }
+            bet.actualPayout = bet.actualPayout.plus(event.params.value)
             bet.won = true
 
             // Update round totals
