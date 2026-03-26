@@ -56,6 +56,8 @@ export function getOrCreateHourlySnapshot(timestamp: BigInt): HourlyVolumeSnapsh
     snapshot.uniquePlayers = ZERO
     snapshot.depositVolume = ZERO
     snapshot.withdrawalVolume = ZERO
+    snapshot.totalPayouts = ZERO
+    snapshot.stakersRevenue = ZERO
     snapshot.timestamp = hourNumber.times(SECONDS_PER_HOUR)
   }
   return snapshot

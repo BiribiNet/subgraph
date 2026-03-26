@@ -176,6 +176,16 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
   dailyStats.save()
 
+  // Update HourlyVolumeSnapshot with round completion data
+  const hourlyRound = getOrCreateHourlySnapshot(event.block.timestamp)
+  if (round.stakersRevenue !== null) {
+    const srHourly = round.stakersRevenue as BigInt
+    if (srHourly.gt(ZERO)) {
+      hourlyRound.stakersRevenue = hourlyRound.stakersRevenue.plus(srHourly)
+    }
+  }
+  hourlyRound.save()
+
   // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
   const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
   const depositsThisRound = globalState.totalDeposits.minus(globalState.totalDepositsAtLastClean)
@@ -313,7 +323,8 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.user
   request.amount = event.params.amount
-  request.queuePosition = BigInt.fromI32(0)
+  globalState.withdrawalQueueCounter = globalState.withdrawalQueueCounter.plus(ONE)
+  request.queuePosition = globalState.withdrawalQueueCounter
   request.requestedAt = event.block.timestamp
   request.isCancelled = false
   request.blockNumber = event.block.number
@@ -342,7 +353,15 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     user.save()
   }
 
-  globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.amount)
+  if (globalState.totalPendingLargeWithdrawals.lt(event.params.amount)) {
+    log.warning("totalPendingLargeWithdrawals underflow: {} < {}", [
+      globalState.totalPendingLargeWithdrawals.toString(),
+      event.params.amount.toString()
+    ])
+    globalState.totalPendingLargeWithdrawals = ZERO
+  } else {
+    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.amount)
+  }
   globalState.save()
 }
 
@@ -397,29 +416,22 @@ export function handleWithdrawalEjected(event: WithdrawalEjected): void {
 }
 
 export function handleBurnFeeRateUpdated(event: BurnFeeRateUpdated): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-
-  // Update burn fee basis points
+  log.info("Burn fee updated: {} -> {} bps", [globalState.burnFeeBasisPoints.toString(), event.params.newFee.toString()])
   globalState.burnFeeBasisPoints = event.params.newFee
   globalState.save()
 }
 
 export function handleJackpotFeeRateUpdated(event: JackpotFeeRateUpdated): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-
-  // Update jackpot fee basis points
+  log.info("Jackpot fee updated: {} -> {} bps", [globalState.jackpotFeeBasisPoints.toString(), event.params.newFee.toString()])
   globalState.jackpotFeeBasisPoints = event.params.newFee
   globalState.save()
 }
 
 export function handleProtocolFeeRateUpdated(event: ProtocolFeeRateUpdated): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-
-  // Update protocol fee basis points
-  // The ABI shows only one parameter: newFee
+  log.info("Protocol fee updated: {} -> {} bps", [globalState.protocolFeeBasisPoints.toString(), event.params.newFee.toString()])
   globalState.protocolFeeBasisPoints = event.params.newFee
   globalState.save()
 }
@@ -501,8 +513,12 @@ export function handleBetPlaced(event: BetPlaced): void {
       processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
     }
 
-    // Increment user's betCount if this is their first bet in this round
+    // Increment round's total individual bet count
+    round.betCount = round.betCount.plus(BigInt.fromI32(amountsLength))
+
+    // Increment user's betCount and round's uniqueBettors if first bet in round
     if (isNewBetForRound) {
+      round.uniqueBettors = round.uniqueBettors.plus(ONE)
       const betUser = getOrCreateUser(event.params.user)
       betUser.betCount = betUser.betCount.plus(ONE)
       betUser.save()

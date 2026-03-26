@@ -5,7 +5,7 @@ import { updateUserBRBBalance, updateUserRouletteStats, updateUserLastActive } f
 import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
-import { getOrCreateDailyStats } from "../helpers/aggregation"
+import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 
 export function handleTransfer(event: Transfer): void {
   // Create transfer entity
@@ -121,10 +121,13 @@ export function handleTransfer(event: Transfer): void {
           // Accumulate jackpot payout into bet.actualPayout
           bet.actualPayout = bet.actualPayout.plus(event.params.value)
 
-          // Track payout in DailyStats
+          // Track payout in DailyStats and HourlyVolumeSnapshot
           const dailyStatsJackpotPayout = getOrCreateDailyStats(event.block.timestamp)
           dailyStatsJackpotPayout.totalPayouts = dailyStatsJackpotPayout.totalPayouts.plus(event.params.value)
           dailyStatsJackpotPayout.save()
+          const hourlyJackpotPayout = getOrCreateHourlySnapshot(event.block.timestamp)
+          hourlyJackpotPayout.totalPayouts = hourlyJackpotPayout.totalPayouts.plus(event.params.value)
+          hourlyJackpotPayout.save()
         } else if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) {
           const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
           if (withdrawTx == null) { // if we are in a withdraw scenario exit
@@ -154,10 +157,13 @@ export function handleTransfer(event: Transfer): void {
             protocolStatsPayout.totalPayouts = protocolStatsPayout.totalPayouts.plus(event.params.value)
             protocolStatsPayout.save()
 
-            // Track payout in DailyStats
+            // Track payout in DailyStats and HourlyVolumeSnapshot
             const dailyStatsRegularPayout = getOrCreateDailyStats(event.block.timestamp)
             dailyStatsRegularPayout.totalPayouts = dailyStatsRegularPayout.totalPayouts.plus(event.params.value)
             dailyStatsRegularPayout.save()
+            const hourlyRegularPayout = getOrCreateHourlySnapshot(event.block.timestamp)
+            hourlyRegularPayout.totalPayouts = hourlyRegularPayout.totalPayouts.plus(event.params.value)
+            hourlyRegularPayout.save()
           }
         }
 

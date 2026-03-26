@@ -251,6 +251,8 @@ describe('handleVrfRequested', () => {
     assert.fieldEquals('RouletteRound', roundId, 'otherBetsPayout', '0');
     assert.fieldEquals('RouletteRound', roundId, 'currentPayoutsCount', '0');
     assert.fieldEquals('RouletteRound', roundId, 'totalPayouts', '0');
+    assert.fieldEquals('RouletteRound', roundId, 'uniqueBettors', '0');
+    assert.fieldEquals('RouletteRound', roundId, 'betCount', '0');
     assert.fieldEquals('RouletteRound', roundId, 'startedAt', '1000000');
 
     // GlobalState should be updated

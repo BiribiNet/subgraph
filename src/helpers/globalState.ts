@@ -43,6 +43,7 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.largeWithdrawalBatchSize = BigInt.fromI32(5)
     globalState.maxQueueLength = BigInt.fromI32(100)
     globalState.totalPendingLargeWithdrawals = ZERO
+    globalState.withdrawalQueueCounter = ZERO
     globalState.totalFees = ZERO
     globalState.minJackpotCondition = ZERO
     globalState.totalTransfersToPool = ZERO

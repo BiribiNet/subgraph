@@ -78,11 +78,11 @@ type User @entity(immutable: false) {
   lastActiveAt: BigInt!
   "Total BRB won"
   totalWon: BigInt!
-  "Total BRB lost"
+  "Total BRB lost (derived: totalRouletteBets - totalWon, always consistent)"
   totalLost: BigInt!
   "Number of winning bets"
   winCount: BigInt!
-  "Number of distinct rounds bet on"
+  "Number of distinct rounds this user bet on (not individual bets)"
   betCount: BigInt!
   "Total BRBR earned from referral credits"
   totalBrbrEarned: BigInt!
@@ -166,7 +166,11 @@ type RouletteRound @entity(immutable: false) {
   requestId: BigInt
   "VRF transaction hash"
   vrfTxHash: Bytes
-  "Total bets in round"
+  "Number of unique users who placed bets in this round"
+  uniqueBettors: BigInt!
+  "Total individual bet placements in this round (sum across all users)"
+  betCount: BigInt!
+  "Total BRB wagered in round"
   totalBets: BigInt!
   "Max payout buffer for the round (RouletteClean maxPayout * safety buffer)"
   maxBetAmount: BigInt!
@@ -358,6 +362,8 @@ type GlobalState @entity(immutable: false) {
   maxQueueLength: BigInt!
   "Total pending large withdrawals"
   totalPendingLargeWithdrawals: BigInt!
+  "Counter for withdrawal queue position (monotonically increasing)"
+  withdrawalQueueCounter: BigInt!
   "Total protocol fees collected"
   totalFees: BigInt!
   "Minimum jackpot condition threshold (bet amount) used by RouletteClean"
@@ -493,7 +499,7 @@ type DailyStats @entity(immutable: false) {
   betCount: BigInt!
   "Number of unique players"
   uniquePlayers: BigInt!
-  "Revenue collected (house edge)"
+  "Revenue collected (gross house edge: totalBets - totalPayouts, before fee splits)"
   revenue: BigInt!
   "BRB burned this day"
   burnAmount: BigInt!
@@ -541,6 +547,10 @@ type HourlyVolumeSnapshot @entity(immutable: false) {
   depositVolume: BigInt!
   "Total BRB withdrawn from sBRB vault this hour"
   withdrawalVolume: BigInt!
+  "Total BRB paid out to winners this hour"
+  totalPayouts: BigInt!
+  "Revenue distributed to stakers this hour"
+  stakersRevenue: BigInt!
   "Timestamp"
   timestamp: BigInt!
 }
