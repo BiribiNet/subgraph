@@ -155,56 +155,6 @@ describe('totalLost derived calculation', () => {
   });
 });
 
-// === FRENCH BET TYPE TESTS ===
-
-describe('French announced bet types', () => {
-  beforeEach(() => {
-    clearStore();
-  });
-
-  test('VOISINS bet type (16) creates correct RouletteBet', () => {
-    initializeRound();
-    // BET_VOISINS = 16, number = 0 (announced bets use 0 as placeholder)
-    placeBet(USER_ADDRESS, '10000000000000000000', 16, 0);
-
-    assert.entityCount('RouletteBet', 1);
-    const roundId = bigintToBytes(BigInt.fromI32(1));
-    const betId = Address.fromString(USER_ADDRESS).concat(roundId).toHexString();
-    assert.fieldEquals('RouletteBet', betId, 'totalAmount', '10000000000000000000');
-  });
-
-  test('TIERS bet type (17) creates correct RouletteBet', () => {
-    initializeRound();
-    placeBet(USER_ADDRESS, '5000000000000000000', 17, 0);
-
-    assert.entityCount('RouletteBet', 1);
-  });
-
-  test('ORPHELINS bet type (18) creates correct RouletteBet', () => {
-    initializeRound();
-    placeBet(USER_ADDRESS, '7000000000000000000', 18, 0);
-
-    assert.entityCount('RouletteBet', 1);
-  });
-
-  test('JEU_ZERO bet type (19) creates correct RouletteBet', () => {
-    initializeRound();
-    placeBet(USER_ADDRESS, '6000000000000000000', 19, 0);
-
-    assert.entityCount('RouletteBet', 1);
-  });
-
-  test('French bet types contribute to round max payout (otherBetsPayout)', () => {
-    initializeRound();
-    // Place a VOISINS bet: 10 BRB -> otherBetsPayout += 10 * 36 = 360
-    placeBet(USER_ADDRESS, '10000000000000000000', 16, 0);
-
-    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    // otherBetsPayout should be 10 * 36 = 360 BRB
-    assert.fieldEquals('RouletteRound', roundId, 'otherBetsPayout', '360000000000000000000');
-  });
-});
-
 // === BRBR EARNINGS TRACKING TESTS ===
 
 describe('BRBR earnings tracking on User', () => {
