@@ -25,6 +25,7 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.totalWon = BigInt.fromI32(0)
     user.totalLost = BigInt.fromI32(0)
     user.winCount = BigInt.fromI32(0)
+    user.betCount = BigInt.fromI32(0)
     user.save()
   }
   return user
@@ -136,11 +137,13 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
   if (isPayout) {
     if (isWin) {
       user.totalRouletteWins = user.totalRouletteWins.plus(amount)
+      user.totalWon = user.totalWon.plus(amount)
       user.netProfit = user.netProfit.plus(amount)
       user.winCount = user.winCount.plus(ONE)
     }
   } else {
     user.totalRouletteBets = user.totalRouletteBets.plus(amount)
+    user.totalLost = user.totalLost.plus(amount)
     user.netProfit = user.netProfit.minus(amount)
   }
 

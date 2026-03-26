@@ -98,14 +98,7 @@ function createOrUpdateSnapshot(
     snapshot.blockNumber = blockNumber
 
     // Enriched vault snapshot fields
-    if (globalState.totalShares.gt(ZERO)) {
-      const PRECISION = BigInt.fromI32(10).pow(18)
-      snapshot.sharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
-        .div(globalState.totalShares.toBigDecimal())
-        .div(PRECISION.toBigDecimal())
-    } else {
-      snapshot.sharePrice = BigDecimal.fromString("1")
-    }
+    snapshot.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
     snapshot.stakerCount = globalState.stakersCount
     snapshot.apy7Day = globalState.apy7Day
     snapshot.apy30Day = globalState.apy30Day
@@ -300,15 +293,27 @@ export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: Big
   )
 }
 
-export function updateSharePrice(globalState: GlobalState): void {
-  if (globalState.totalShares.gt(ZERO)) {
+export function calculateSharePrice(totalAssets: BigInt, totalShares: BigInt): BigDecimal {
+  if (totalShares.gt(ZERO)) {
     const PRECISION = BigInt.fromI32(10).pow(18)
-    globalState.sharePrice = globalState.totalAssets.times(PRECISION).toBigDecimal()
-      .div(globalState.totalShares.toBigDecimal())
+    return totalAssets.times(PRECISION).toBigDecimal()
+      .div(totalShares.toBigDecimal())
       .div(PRECISION.toBigDecimal())
-  } else {
-    globalState.sharePrice = BigDecimal.fromString("1")
   }
+  return BigDecimal.fromString("1")
+}
+
+export function updateSharePrice(globalState: GlobalState): void {
+  globalState.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+}
+
+export function syncVaultState(globalState: GlobalState): VaultState {
+  const vault = getOrCreateVaultState()
+  vault.totalAssets = globalState.totalAssets
+  vault.totalShares = globalState.totalShares
+  vault.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+  vault.stakerCount = globalState.stakersCount
+  return vault // caller must call vault.save()
 }
 
 export function getOrCreateVaultState(): VaultState {
@@ -336,6 +341,9 @@ export function getOrCreateProtocolStats(): ProtocolStats {
     stats.totalJackpotsPaid = ZERO
     stats.totalStakerRevenue = ZERO
     stats.brbTotalSupply = ZERO
+    stats.totalPayouts = ZERO
+    stats.totalDeposited = ZERO
+    stats.totalWithdrawn = ZERO
   }
   return stats
 }
