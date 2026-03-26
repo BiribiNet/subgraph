@@ -113,9 +113,18 @@ export function handleTransfer(event: Transfer): void {
           // Update ProtocolStats jackpot tracking
           const protocolStatsJackpot = getOrCreateProtocolStats()
           protocolStatsJackpot.totalJackpotsPaid = protocolStatsJackpot.totalJackpotsPaid.plus(event.params.value)
+          protocolStatsJackpot.totalPayouts = protocolStatsJackpot.totalPayouts.plus(event.params.value)
           protocolStatsJackpot.save()
           updateUserRouletteStats(event.params.to, event.params.value, true, true)
           bet.won = true
+
+          // Accumulate jackpot payout into bet.actualPayout
+          const currentJackpotPayout = bet.actualPayout
+          if (currentJackpotPayout !== null) {
+            bet.actualPayout = currentJackpotPayout.plus(event.params.value)
+          } else {
+            bet.actualPayout = event.params.value
+          }
 
           // Track payout in DailyStats
           const dailyStatsJackpotPayout = getOrCreateDailyStats(event.block.timestamp)
@@ -149,6 +158,11 @@ export function handleTransfer(event: Transfer): void {
             // Update global totals
             globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
             updateUserRouletteStats(event.params.to, event.params.value, true, true)
+
+            // Update ProtocolStats.totalPayouts
+            const protocolStatsPayout = getOrCreateProtocolStats()
+            protocolStatsPayout.totalPayouts = protocolStatsPayout.totalPayouts.plus(event.params.value)
+            protocolStatsPayout.save()
 
             // Track payout in DailyStats
             const dailyStatsRegularPayout = getOrCreateDailyStats(event.block.timestamp)

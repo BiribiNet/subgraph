@@ -341,6 +341,7 @@ export function getOrCreateProtocolStats(): ProtocolStats {
     stats.totalJackpotsPaid = ZERO
     stats.totalStakerRevenue = ZERO
     stats.brbTotalSupply = ZERO
+    stats.totalPayouts = ZERO
   }
   return stats
 }

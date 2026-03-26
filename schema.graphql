@@ -499,6 +499,14 @@ type DailyStats @entity(immutable: false) {
   roundsCompleted: BigInt!
   "Total payouts"
   totalPayouts: BigInt!
+  "Total BRB deposited into sBRB vault"
+  depositVolume: BigInt!
+  "Number of deposits"
+  depositCount: BigInt!
+  "Total BRB withdrawn from sBRB vault"
+  withdrawalVolume: BigInt!
+  "Number of withdrawals"
+  withdrawalCount: BigInt!
   "Timestamp of first event on this day"
   timestamp: BigInt!
 }
@@ -725,4 +733,6 @@ type ProtocolStats @entity(immutable: false) {
   totalStakerRevenue: BigInt!
   "Current BRB total supply"
   brbTotalSupply: BigInt!
+  "Total BRB paid out to winners all time"
+  totalPayouts: BigInt!
 }

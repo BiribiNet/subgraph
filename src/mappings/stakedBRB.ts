@@ -89,6 +89,13 @@ export function handleDeposit(event: Deposit): void {
   // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
+  // Update DailyStats with deposit volume
+  const dailyStatsDeposit = getOrCreateDailyStats(event.block.timestamp)
+  dailyStatsDeposit.depositVolume = dailyStatsDeposit.depositVolume.plus(event.params.assets)
+  dailyStatsDeposit.depositCount = dailyStatsDeposit.depositCount.plus(BigInt.fromI32(1))
+  dailyStatsDeposit.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+  dailyStatsDeposit.save()
+
   globalState.save()
 
   // Update VaultState singleton
@@ -158,6 +165,9 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   const donations = transfersThisRound.minus(depositsThisRound).minus(round.totalBets)
   
   // Add donations to totalAssets (direct donations that weren't tracked via Deposit events)
+  if (donations.lt(BigInt.fromI32(0))) {
+    log.warning("Negative donation detected for round {}: {}", [roundId.toString(), donations.toString()])
+  }
   if (donations.gt(BigInt.fromI32(0))) {
     globalState.totalAssets = globalState.totalAssets.plus(donations)
   }
@@ -246,6 +256,13 @@ export function handleWithdraw(event: Withdraw): void {
 
   // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
+
+  // Update DailyStats with withdrawal volume
+  const dailyStatsWithdraw = getOrCreateDailyStats(event.block.timestamp)
+  dailyStatsWithdraw.withdrawalVolume = dailyStatsWithdraw.withdrawalVolume.plus(event.params.assets)
+  dailyStatsWithdraw.withdrawalCount = dailyStatsWithdraw.withdrawalCount.plus(BigInt.fromI32(1))
+  dailyStatsWithdraw.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+  dailyStatsWithdraw.save()
 
   globalState.save()
 

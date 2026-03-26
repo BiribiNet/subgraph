@@ -153,6 +153,8 @@ export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt,
     bet.latestBetBlockNumber = event.block.number
     bet.latestBetTimestamp = event.block.timestamp
     bet.latestTransactionHash = event.transaction.hash
+    bet.won = false
+    bet.actualPayout = BigInt.fromI32(0)
   } else {
     // Update existing bet entity
     const currentAmounts = bet.amounts
