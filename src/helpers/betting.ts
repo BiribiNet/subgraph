@@ -1,16 +1,14 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { RouletteRound, RouletteBet } from "../../generated/schema"
 import { BetPlaced } from "../../generated/StakedBRB/StakedBRB"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
   BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN,
   BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023,
-  BET_VOISINS, BET_TIERS, BET_ORPHELINS, BET_JEU_ZERO,
   BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER,
   BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED,
   BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW,
-  BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023,
-  BET_TYPE_VOISINS, BET_TYPE_TIERS, BET_TYPE_ORPHELINS, BET_TYPE_JEU_ZERO
+  BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023
 } from "./constant"
 
 function getBetTypeFromNumber(betTypeNumber: BigInt): string {
@@ -46,15 +44,8 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
       return BET_TYPE_TRIO_012
     case BET_TRIO_023:
       return BET_TYPE_TRIO_023
-    case BET_VOISINS:
-      return BET_TYPE_VOISINS
-    case BET_TIERS:
-      return BET_TYPE_TIERS
-    case BET_ORPHELINS:
-      return BET_TYPE_ORPHELINS
-    case BET_JEU_ZERO:
-      return BET_TYPE_JEU_ZERO
     default:
+      log.warning("Unknown bet type: {}", [betTypeNumber.toString()])
       return BET_TYPE_STRAIGHT
   }
 }
@@ -116,10 +107,6 @@ function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, be
     round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(6)))
   } else if (betTypeInt == BET_TRIO_012 || betTypeInt == BET_TRIO_023) {
     round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(12)))
-  } else if (betTypeInt == BET_VOISINS || betTypeInt == BET_TIERS || betTypeInt == BET_ORPHELINS || betTypeInt == BET_JEU_ZERO) {
-    // French announced bets are composite (multiple sub-bets).
-    // Conservative max payout: 36x (worst case includes straight sub-bets).
-    round.otherBetsPayout = round.otherBetsPayout.plus(amount.times(BigInt.fromI32(36)))
   }
 }
 
