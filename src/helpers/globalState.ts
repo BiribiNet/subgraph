@@ -197,6 +197,11 @@ function calculateAPYInternal(
  * @param blockNumber - Current block number
  */
 export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: BigInt, blockNumber: BigInt): void {
+  // Guard against timestamp going backwards during chain reorganization
+  if (!globalState.lastApySnapshotTimestamp.equals(ZERO) && currentTimestamp.lt(globalState.lastApySnapshotTimestamp)) {
+    return
+  }
+
   // Create a snapshot if we haven't taken one today
   const SECONDS_PER_DAY = BigInt.fromI32(86400)
   const timeSinceLastSnapshot = currentTimestamp.minus(globalState.lastApySnapshotTimestamp)
@@ -307,12 +312,13 @@ export function updateSharePrice(globalState: GlobalState): void {
   globalState.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
 }
 
-export function syncVaultState(globalState: GlobalState): VaultState {
+export function syncVaultState(globalState: GlobalState, timestamp: BigInt = ZERO): VaultState {
   const vault = getOrCreateVaultState()
   vault.totalAssets = globalState.totalAssets
   vault.totalShares = globalState.totalShares
   vault.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   vault.stakerCount = globalState.stakersCount
+  vault.lastUpdatedAt = timestamp
   return vault // caller must call vault.save()
 }
 
@@ -325,6 +331,7 @@ export function getOrCreateVaultState(): VaultState {
     vault.sharePrice = BigDecimal.fromString("1")
     vault.stakerCount = ZERO
     vault.allTimeRevenue = ZERO
+    vault.lastUpdatedAt = ZERO
   }
   return vault
 }

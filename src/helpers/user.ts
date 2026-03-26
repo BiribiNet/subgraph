@@ -26,6 +26,8 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.totalLost = BigInt.fromI32(0)
     user.winCount = BigInt.fromI32(0)
     user.betCount = BigInt.fromI32(0)
+    user.totalBrbrEarned = BigInt.fromI32(0)
+    user.totalBrbrSpent = BigInt.fromI32(0)
     user.save()
   }
   return user
@@ -143,8 +145,25 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
     }
   } else {
     user.totalRouletteBets = user.totalRouletteBets.plus(amount)
-    user.totalLost = user.totalLost.plus(amount)
     user.netProfit = user.netProfit.minus(amount)
+  }
+
+  // Derive totalLost from totalRouletteBets - totalWon (always accurate)
+  user.totalLost = user.totalRouletteBets.minus(user.totalWon)
+
+  user.save()
+}
+
+export function updateUserBrbrEarnings(userAddress: Bytes, amount: BigInt, isCredit: boolean): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
+  const user = getOrCreateUser(userAddress)
+
+  if (isCredit) {
+    user.totalBrbrEarned = user.totalBrbrEarned.plus(amount)
+  } else {
+    user.totalBrbrSpent = user.totalBrbrSpent.plus(amount)
   }
 
   user.save()

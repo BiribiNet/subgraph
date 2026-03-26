@@ -1,6 +1,6 @@
 import { Transfer, Approval } from "../../generated/BRBReferal/BRBReferal"
 import { BRBReferalTransfer, TokenApproval } from "../../generated/schema"
-import { updateUserBRBReferalBalance, updateUserLastActive } from "../helpers/user"
+import { updateUserBRBReferalBalance, updateUserLastActive, updateUserBrbrEarnings } from "../helpers/user"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 
 export function handleTransfer(event: Transfer): void {
@@ -12,6 +12,7 @@ export function handleTransfer(event: Transfer): void {
   // Update user balances (skip zero addresses)
   if (!fromIsZero) {
     updateUserBRBReferalBalance(event.params.from, event.params.value, false) // Subtract from sender
+    updateUserBrbrEarnings(event.params.from, event.params.value, false) // Track BRBR spent
     updateUserLastActive(event.params.from, event.block.timestamp)
 
     // Create transfer entity for sender (debit)
@@ -30,6 +31,7 @@ export function handleTransfer(event: Transfer): void {
 
   if (!toIsZero) {
     updateUserBRBReferalBalance(event.params.to, event.params.value, true)   // Add to receiver
+    updateUserBrbrEarnings(event.params.to, event.params.value, true) // Track BRBR earned
     updateUserLastActive(event.params.to, event.block.timestamp)
     
     // Create transfer entity for receiver (credit)
