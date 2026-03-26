@@ -8,7 +8,7 @@ job: false
 sources:
   raw_logs:
     dataset_name: arbitrum_sepolia.raw_logs
-    start_at: latest
+    start_at: earliest
     type: dataset
     version: 1.0.0
 transforms:
@@ -47,6 +47,8 @@ transforms:
         decoded.event_params[2] AS param2,
         decoded.event_params[3] AS param3,
         decoded.event_params[4] AS param4,
+        decoded.event_params[5] AS param5,
+        decoded.event_params[6] AS param6,
         block_number,
         block_timestamp,
         transaction_hash,
