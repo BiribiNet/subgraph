@@ -10,7 +10,8 @@
     "sync:pipeline": "node scripts/sync-pipeline.mjs",
     "deploy:subgraph": "yarn goldsky subgraph deploy biribi/\"$@\"",
     "prod:subgraph": "yarn goldsky subgraph tag create biribi/\"$@\" --tag prod",
-    "deploy": "yarn codegen && yarn build && yarn deploy:subgraph $@ && yarn prod:subgraph $@"
+    "deploy": "yarn codegen && yarn build && yarn deploy:subgraph $@ && yarn prod:subgraph $@",
+    "deploy:api": "yarn codegen && yarn build && node scripts/goldsky-deploy.mjs"
   },
   "devDependencies": {
     "@goldskycom/cli": "^13.3.3",

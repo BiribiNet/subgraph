@@ -138,3 +138,7 @@ generated/
 .DS_Store
 
 src/whitelist.ts
+
+# Goldsky deploy artifacts
+.goldsky-bundle.zip
+turbo.applied.yaml
