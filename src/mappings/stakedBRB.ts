@@ -313,7 +313,8 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.user
   request.amount = event.params.amount
-  request.queuePosition = BigInt.fromI32(0)
+  globalState.withdrawalQueueCounter = globalState.withdrawalQueueCounter.plus(ONE)
+  request.queuePosition = globalState.withdrawalQueueCounter
   request.requestedAt = event.block.timestamp
   request.isCancelled = false
   request.blockNumber = event.block.number
@@ -501,8 +502,9 @@ export function handleBetPlaced(event: BetPlaced): void {
       processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
     }
 
-    // Increment user's betCount if this is their first bet in this round
+    // Increment user's betCount and round's uniqueBettors if first bet in round
     if (isNewBetForRound) {
+      round.uniqueBettors = round.uniqueBettors.plus(ONE)
       const betUser = getOrCreateUser(event.params.user)
       betUser.betCount = betUser.betCount.plus(ONE)
       betUser.save()
