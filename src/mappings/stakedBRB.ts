@@ -176,6 +176,16 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
   dailyStats.save()
 
+  // Update HourlyVolumeSnapshot with round completion data
+  const hourlyRound = getOrCreateHourlySnapshot(event.block.timestamp)
+  if (round.stakersRevenue !== null) {
+    const srHourly = round.stakersRevenue as BigInt
+    if (srHourly.gt(ZERO)) {
+      hourlyRound.stakersRevenue = hourlyRound.stakersRevenue.plus(srHourly)
+    }
+  }
+  hourlyRound.save()
+
   // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
   const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
   const depositsThisRound = globalState.totalDeposits.minus(globalState.totalDepositsAtLastClean)
@@ -501,6 +511,9 @@ export function handleBetPlaced(event: BetPlaced): void {
       // Process the individual bet (create/update RouletteBet entity + update maxPayout components)
       processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
     }
+
+    // Increment round's total individual bet count
+    round.betCount = round.betCount.plus(BigInt.fromI32(amountsLength))
 
     // Increment user's betCount and round's uniqueBettors if first bet in round
     if (isNewBetForRound) {

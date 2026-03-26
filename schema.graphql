@@ -168,6 +168,8 @@ type RouletteRound @entity(immutable: false) {
   vrfTxHash: Bytes
   "Number of unique users who placed bets in this round"
   uniqueBettors: BigInt!
+  "Total individual bet placements in this round (sum across all users)"
+  betCount: BigInt!
   "Total BRB wagered in round"
   totalBets: BigInt!
   "Max payout buffer for the round (RouletteClean maxPayout * safety buffer)"
@@ -545,6 +547,10 @@ type HourlyVolumeSnapshot @entity(immutable: false) {
   depositVolume: BigInt!
   "Total BRB withdrawn from sBRB vault this hour"
   withdrawalVolume: BigInt!
+  "Total BRB paid out to winners this hour"
+  totalPayouts: BigInt!
+  "Revenue distributed to stakers this hour"
+  stakersRevenue: BigInt!
   "Timestamp"
   timestamp: BigInt!
 }

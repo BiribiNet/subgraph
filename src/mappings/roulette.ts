@@ -85,6 +85,7 @@ export function handleVrfRequested(event: VrfRequested): void {
   round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
   round.uniqueBettors = BigInt.fromI32(0);
+  round.betCount = BigInt.fromI32(0);
   round.startedAt = event.params.timestamp;
 
   round.save();
