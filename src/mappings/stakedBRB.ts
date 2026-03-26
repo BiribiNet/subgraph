@@ -353,7 +353,15 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     user.save()
   }
 
-  globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.amount)
+  if (globalState.totalPendingLargeWithdrawals.lt(event.params.amount)) {
+    log.warning("totalPendingLargeWithdrawals underflow: {} < {}", [
+      globalState.totalPendingLargeWithdrawals.toString(),
+      event.params.amount.toString()
+    ])
+    globalState.totalPendingLargeWithdrawals = ZERO
+  } else {
+    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.amount)
+  }
   globalState.save()
 }
 
@@ -408,29 +416,22 @@ export function handleWithdrawalEjected(event: WithdrawalEjected): void {
 }
 
 export function handleBurnFeeRateUpdated(event: BurnFeeRateUpdated): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-
-  // Update burn fee basis points
+  log.info("Burn fee updated: {} -> {} bps", [globalState.burnFeeBasisPoints.toString(), event.params.newFee.toString()])
   globalState.burnFeeBasisPoints = event.params.newFee
   globalState.save()
 }
 
 export function handleJackpotFeeRateUpdated(event: JackpotFeeRateUpdated): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-
-  // Update jackpot fee basis points
+  log.info("Jackpot fee updated: {} -> {} bps", [globalState.jackpotFeeBasisPoints.toString(), event.params.newFee.toString()])
   globalState.jackpotFeeBasisPoints = event.params.newFee
   globalState.save()
 }
 
 export function handleProtocolFeeRateUpdated(event: ProtocolFeeRateUpdated): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-
-  // Update protocol fee basis points
-  // The ABI shows only one parameter: newFee
+  log.info("Protocol fee updated: {} -> {} bps", [globalState.protocolFeeBasisPoints.toString(), event.params.newFee.toString()])
   globalState.protocolFeeBasisPoints = event.params.newFee
   globalState.save()
 }
