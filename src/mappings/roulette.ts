@@ -136,9 +136,18 @@ export function handleRoundResolved(event: RoundResolved): void {
   }
 
   const globalState = getOrCreateGlobalState()
-  
+
+  if (round.totalBets.gt(globalState.pendingBets)) {
+    log.warning("Round {} totalBets ({}) exceeds pendingBets ({})", [
+      roundId.toString(),
+      round.totalBets.toString(),
+      globalState.pendingBets.toString()
+    ])
+    globalState.pendingBets = BigInt.fromI32(0)
+  } else {
+    globalState.pendingBets = globalState.pendingBets.minus(round.totalBets)
+  }
   globalState.lastRoundPaid = event.params.roundId
-  globalState.pendingBets = globalState.pendingBets.minus(round.totalBets)
   globalState.save();
 
   round.status = ROUND_STATUS_CLEAN

@@ -190,13 +190,13 @@ type RouletteRound @entity(immutable: false) {
   dozenBetsSum: [BigInt!]!
   "Total column bet amount sums by column id (index 0..3; use 1..3)"
   columnBetsSum: [BigInt!]!
-  "Total payout amount from split/corner/line/trio bets (already in payout units)"
+  "Max payout liability from split/corner/line/trio bets: SPLIT*18 + CORNER*9 + LINE*6 + TRIO*12"
   otherBetsPayout: BigInt!
-  "Computed payouts count"
+  "Number of winning bets computed by the contract (set by ComputedPayouts event)"
   computedPayoutsCount: BigInt
-  "Current payouts count"
+  "Number of payouts processed so far (incremented by BatchProcessed events)"
   currentPayoutsCount: BigInt!
-  "Total payouts Amount"
+  "Total BRB paid out to winners in this round"
   totalPayouts: BigInt!
   "Round start timestamp"
   startedAt: BigInt!
@@ -241,7 +241,7 @@ type RouletteBet @entity(immutable: false) {
   numbers: [BigInt!]!
   "Total bet amount for this user in this round"
   totalAmount: BigInt!
-  "Number of bets placed by this user in this round"
+  "Number of individual bets placed by this user in this round (e.g. 3 for a straight+red+dozen combo)"
   betCount: BigInt!
   "Actual payout received"
   actualPayout: BigInt!
@@ -342,7 +342,7 @@ type GlobalState @entity(immutable: false) {
   sharePrice: BigDecimal!
   "Total number of rounds created"
   totalRounds: BigInt!
-  "Pending bets amount"
+  "Total BRB wagered in rounds not yet resolved (cleared on RoundResolved)"
   pendingBets: BigInt!
   "Last round resolved"
   lastRoundResolved: BigInt!
@@ -358,13 +358,13 @@ type GlobalState @entity(immutable: false) {
   totalFees: BigInt!
   "Minimum jackpot condition threshold (bet amount) used by RouletteClean"
   minJackpotCondition: BigInt!
-  "Cumulative total BRB transfers TO StakedBRB contract"
+  "Cumulative total BRB transfers TO StakedBRB contract (includes deposits, bets, and donations)"
   totalTransfersToPool: BigInt!
-  "Cumulative total deposits"
+  "Cumulative total BRB deposited via ERC-4626 Deposit events"
   totalDeposits: BigInt!
-  "Total transfers to pool at last round cleanup (for donation calculation)"
+  "totalTransfersToPool snapshot at last round cleanup (for per-round donation calculation)"
   totalTransfersToPoolAtLastClean: BigInt!
-  "Total deposits at last round cleanup (for donation calculation)"
+  "totalDeposits snapshot at last round cleanup (for per-round donation calculation)"
   totalDepositsAtLastClean: BigInt!
   "Chainlink keeper registry address"
   chainlinkKeeperRegistry: Bytes!
@@ -374,9 +374,9 @@ type GlobalState @entity(immutable: false) {
   subscriptionId: BigInt!
   "Cumulative total revenue distributed to stakers"
   totalStakerRevenue: BigInt!
-  "Current BRB price from DEX"
+  "Current BRB price from DEX (reserved for Uniswap V2 Pair tracking — not yet populated)"
   brbPrice: BigDecimal!
-  "BRB price last updated at"
+  "BRB price last updated at (reserved — not yet populated)"
   brbPriceUpdatedAt: BigInt!
   "StakedBRB liquidity escrow (BRB held for queued deposit/mint)"
   liquidityEscrow: Bytes!

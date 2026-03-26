@@ -172,7 +172,13 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   
   // Add donations to totalAssets (direct donations that weren't tracked via Deposit events)
   if (donations.lt(BigInt.fromI32(0))) {
-    log.warning("Negative donation detected for round {}: {}", [roundId.toString(), donations.toString()])
+    log.warning("Negative donation for round {}: amount={}, transfers={}, deposits={}, bets={}", [
+      roundId.toString(),
+      donations.toString(),
+      transfersThisRound.toString(),
+      depositsThisRound.toString(),
+      round.totalBets.toString()
+    ])
   }
   if (donations.gt(BigInt.fromI32(0))) {
     globalState.totalAssets = globalState.totalAssets.plus(donations)

@@ -121,6 +121,7 @@ dataSources:
         - MaxBetsUpdate
         - VaultState
         - ProtocolStats
+        - APYSnapshot
       abis:
         - name: StakedBRB
           file: ./abis/StakedBRB.json
