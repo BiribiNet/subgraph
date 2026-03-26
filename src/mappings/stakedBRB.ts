@@ -97,6 +97,11 @@ export function handleDeposit(event: Deposit): void {
   dailyStatsDeposit.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStatsDeposit.save()
 
+  // Update HourlyVolumeSnapshot with deposit volume
+  const hourlyDeposit = getOrCreateHourlySnapshot(event.block.timestamp)
+  hourlyDeposit.depositVolume = hourlyDeposit.depositVolume.plus(event.params.assets)
+  hourlyDeposit.save()
+
   // Update ProtocolStats cumulative deposit volume
   const protocolStatsDeposit = getOrCreateProtocolStats()
   protocolStatsDeposit.totalDeposited = protocolStatsDeposit.totalDeposited.plus(event.params.assets)
@@ -105,7 +110,7 @@ export function handleDeposit(event: Deposit): void {
   globalState.save()
 
   // Update VaultState singleton
-  const vault = syncVaultState(globalState)
+  const vault = syncVaultState(globalState, event.block.timestamp)
   vault.save()
 }
 
@@ -163,6 +168,12 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
   dailyStats.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStats.jackpotPool = globalState.currentJackpot
+  if (round.stakersRevenue !== null) {
+    const srDaily = round.stakersRevenue as BigInt
+    if (srDaily.gt(ZERO)) {
+      dailyStats.stakersRevenue = dailyStats.stakersRevenue.plus(srDaily)
+    }
+  }
   dailyStats.save()
 
   // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
@@ -199,7 +210,7 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
   // Update VaultState singleton
-  const vault = syncVaultState(globalState)
+  const vault = syncVaultState(globalState, event.block.timestamp)
   if (round.stakersRevenue !== null) {
     const sr = round.stakersRevenue as BigInt
     if (sr.gt(ZERO)) {
@@ -277,6 +288,11 @@ export function handleWithdraw(event: Withdraw): void {
   dailyStatsWithdraw.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStatsWithdraw.save()
 
+  // Update HourlyVolumeSnapshot with withdrawal volume
+  const hourlyWithdraw = getOrCreateHourlySnapshot(event.block.timestamp)
+  hourlyWithdraw.withdrawalVolume = hourlyWithdraw.withdrawalVolume.plus(event.params.assets)
+  hourlyWithdraw.save()
+
   // Update ProtocolStats cumulative withdrawal volume
   const protocolStatsWithdraw = getOrCreateProtocolStats()
   protocolStatsWithdraw.totalWithdrawn = protocolStatsWithdraw.totalWithdrawn.plus(event.params.assets)
@@ -285,7 +301,7 @@ export function handleWithdraw(event: Withdraw): void {
   globalState.save()
 
   // Update VaultState singleton
-  const vaultW = syncVaultState(globalState)
+  const vaultW = syncVaultState(globalState, event.block.timestamp)
   vaultW.save()
 }
 

@@ -26,6 +26,7 @@ export function getOrCreateDailyStats(timestamp: BigInt): DailyStats {
     stats.depositCount = ZERO
     stats.withdrawalVolume = ZERO
     stats.withdrawalCount = ZERO
+    stats.stakersRevenue = ZERO
     stats.timestamp = timestamp
   }
   return stats
@@ -53,6 +54,8 @@ export function getOrCreateHourlySnapshot(timestamp: BigInt): HourlyVolumeSnapsh
     snapshot.volume = ZERO
     snapshot.betCount = ZERO
     snapshot.uniquePlayers = ZERO
+    snapshot.depositVolume = ZERO
+    snapshot.withdrawalVolume = ZERO
     snapshot.timestamp = hourNumber.times(SECONDS_PER_HOUR)
   }
   return snapshot
