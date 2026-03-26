@@ -48,6 +48,7 @@ const createDeposit = (user: string, assets: string, shares: string, timestamp: 
     new ethereum.EventParam('shares', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(shares)))
   );
   depositEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  depositEvent.logIndex = BigInt.fromI32(0);
   depositEvent.block.timestamp = BigInt.fromI32(timestamp);
   depositEvent.block.number = BigInt.fromI32(timestamp / 100);
   handleDeposit(depositEvent);
@@ -100,7 +101,9 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
     new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
   );
   betPlacedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  betPlacedEvent.logIndex = BigInt.fromI32(0);
   betPlacedEvent.block.timestamp = BigInt.fromI32(timestamp);
+  betPlacedEvent.block.number = BigInt.fromI32(timestamp / 100);
   handleBetPlaced(betPlacedEvent);
 };
 
@@ -130,6 +133,7 @@ const createRoundCleaningCompleted = (
   ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
 
   ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   handleRoundCleaningCompleted(ev);
@@ -145,6 +149,7 @@ const createMinJackpotConditionUpdated = (minJackpotCondition: string, timestamp
     )
   );
   event.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
+  event.logIndex = BigInt.fromI32(0);
   event.block.timestamp = BigInt.fromI32(timestamp);
   event.block.number = BigInt.fromI32(timestamp / 100);
   handleMinJackpotConditionUpdated(event);
@@ -159,13 +164,20 @@ describe('Staking Statistics Tests', () => {
 
   test('stakersCount increments on first deposit', () => {
     createDeposit(USER_ADDRESS, '1000000000000000000', '1000000000000000000', 1000000);
-    
+
     // Note: stakersCount is updated via Transfer events (mint) which aren't simulated in tests
     // In production, Deposit events trigger Transfer events (mint from zero address)
     // So stakersCount will be 0 in tests, but would be 1 in production after Transfer event
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'stakersCount', '0');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalAssets', '1000000000000000000');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalShares', '1000000000000000000');
+    // Share price should be 1:1 after equal deposit
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'sharePrice', '1');
+    // Round was initialized, so totalRounds should be 1
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalRounds', '1');
+    // User activity timestamps should be set
+    assert.fieldEquals('User', USER_ADDRESS, 'firstSeenAt', '1000000');
+    assert.fieldEquals('User', USER_ADDRESS, 'lastActiveAt', '1000000');
   });
 
   test('stakersCount tracks multiple unique stakers', () => {
@@ -216,9 +228,15 @@ describe('Betting Statistics Tests', () => {
 
   test('uniquePlayersCount increments on first bet', () => {
     createBet(USER_ADDRESS, '10000000000000000000', 1000000, 1);
-    
+
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'uniquePlayersCount', '1');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPlayAllTime', '10000000000000000000');
+    // User analytics: netProfit should be negative (bet placed, no win yet)
+    assert.fieldEquals('User', USER_ADDRESS, 'netProfit', '-10000000000000000000');
+    assert.fieldEquals('User', USER_ADDRESS, 'totalRouletteBets', '10000000000000000000');
+    assert.fieldEquals('User', USER_ADDRESS, 'winCount', '0');
+    assert.fieldEquals('User', USER_ADDRESS, 'firstSeenAt', '1000000');
+    assert.fieldEquals('User', USER_ADDRESS, 'lastActiveAt', '1000000');
   });
 
   test('uniquePlayersCount tracks multiple players', () => {
@@ -241,8 +259,22 @@ describe('Betting Statistics Tests', () => {
     createBet(USER_ADDRESS, '10000000000000000000', 1000000, 1);
     createBet(USER_ADDRESS_2, '20000000000000000000', 1000100, 1);
     createBet(USER_ADDRESS, '5000000000000000000', 1000200, 1);
-    
+
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPlayAllTime', '35000000000000000000');
+    // User 1 net profit: -10 - 5 = -15 ETH
+    assert.fieldEquals('User', USER_ADDRESS, 'netProfit', '-15000000000000000000');
+    // User 2 net profit: -20 ETH
+    assert.fieldEquals('User', USER_ADDRESS_2, 'netProfit', '-20000000000000000000');
+    // DailyStats should track all bets (all in same day since timestamps are close)
+    const dayNumber = (1000000 / 86400).toString();
+    assert.fieldEquals('DailyStats', dayNumber, 'volume', '35000000000000000000');
+    assert.fieldEquals('DailyStats', dayNumber, 'betCount', '3');
+    assert.fieldEquals('DailyStats', dayNumber, 'uniquePlayers', '2');
+    // HourlyVolumeSnapshot should also track (all in same hour)
+    const hourNumber = (1000000 / 3600).toString();
+    assert.fieldEquals('HourlyVolumeSnapshot', hourNumber, 'volume', '35000000000000000000');
+    assert.fieldEquals('HourlyVolumeSnapshot', hourNumber, 'betCount', '3');
+    assert.fieldEquals('HourlyVolumeSnapshot', hourNumber, 'uniquePlayers', '2');
   });
 });
 
@@ -276,23 +308,23 @@ describe('Max Bet Amount Tests', () => {
     // Each bet adds 10 ETH (from hardcoded data field), so total = 20 ETH
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
-    // With the fixed ABI payload used in this test:
-    //  - first bet: maxPayout = 99 ETH
-    //  - second bet: maxPayout = 198 ETH
-    // contract does: maxPayoutPerRound += maxPayout each time => total = 99 + 198 = 297 ETH
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '297000000000000000000');
+    // With the fixed ABI payload (CORNER bet, 10 ETH):
+    //  - first bet: delta = 99 - 0 = 99 ETH
+    //  - second bet: delta = 198 - 99 = 99 ETH
+    // maxBetAmount = 99 + 99 = 198 ETH (delta-based accumulation)
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '198000000000000000000');
   });
 
   test('maxBetAmount does not decrease on smaller bet', () => {
     // Note: createBet uses hardcoded data field representing 10 ETH per bet
     createBet(USER_ADDRESS, '20000000000000000000', 1000000, 1);
     createBet(USER_ADDRESS_2, '5000000000000000000', 1000100, 1);
-    
+
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     // Each bet adds 10 ETH (from hardcoded data field), so total = 20 ETH
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
-    // maxPayoutPerRound accumulates => 99 + 198 = 297 ETH
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '297000000000000000000');
+    // delta-based: 99 + 99 = 198 ETH
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '198000000000000000000');
   });
 
   test('maxBetAmount tracks total amount per user', () => {
@@ -301,10 +333,11 @@ describe('Max Bet Amount Tests', () => {
     // So each call to createBet adds 10 ETH to the user's bet total
     createBet(USER_ADDRESS, '10000000000000000000', 1000000, 1);
     createBet(USER_ADDRESS, '5000000000000000000', 1000100, 1);
-    
+
     // maxPayout is driven by the bet-type components, not by a per-user maximum total.
+    // delta-based: 99 + 99 = 198 ETH
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '297000000000000000000');
+    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '198000000000000000000');
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
   });
 
@@ -458,8 +491,13 @@ describe('Integration Tests', () => {
     
     // First user withdraws
     createWithdraw(USER_ADDRESS, '1000000000000000000', '1000000000000000000', t4 + 1000);
-    
+
     // APY baseline should be set
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'apyLifetimeBaselineTimestamp', t1.toString());
+    // User 1 firstSeenAt should be deposit time, lastActiveAt should be withdraw time
+    assert.fieldEquals('User', USER_ADDRESS, 'firstSeenAt', t1.toString());
+    assert.fieldEquals('User', USER_ADDRESS, 'lastActiveAt', (t4 + 1000).toString());
+    // User 2 firstSeenAt should be deposit time
+    assert.fieldEquals('User', USER_ADDRESS_2, 'firstSeenAt', t2.toString());
   });
 });

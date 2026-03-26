@@ -1,6 +1,6 @@
-import { Transfer } from "../../generated/BRBReferal/BRBReferal"
-import { BRBReferalTransfer } from "../../generated/schema"
-import { updateUserBRBReferalBalance } from "../helpers/user"
+import { Transfer, Approval } from "../../generated/BRBReferal/BRBReferal"
+import { BRBReferalTransfer, TokenApproval } from "../../generated/schema"
+import { updateUserBRBReferalBalance, updateUserLastActive, updateUserBrbrEarnings } from "../helpers/user"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 
 export function handleTransfer(event: Transfer): void {
@@ -12,7 +12,9 @@ export function handleTransfer(event: Transfer): void {
   // Update user balances (skip zero addresses)
   if (!fromIsZero) {
     updateUserBRBReferalBalance(event.params.from, event.params.value, false) // Subtract from sender
-    
+    updateUserBrbrEarnings(event.params.from, event.params.value, false) // Track BRBR spent
+    updateUserLastActive(event.params.from, event.block.timestamp)
+
     // Create transfer entity for sender (debit)
     const transferIdFrom = event.transaction.hash.concat(bigintToBytes(event.logIndex)).concat(event.params.from)
     const transferFrom = new BRBReferalTransfer(transferIdFrom)
@@ -29,6 +31,8 @@ export function handleTransfer(event: Transfer): void {
 
   if (!toIsZero) {
     updateUserBRBReferalBalance(event.params.to, event.params.value, true)   // Add to receiver
+    updateUserBrbrEarnings(event.params.to, event.params.value, true) // Track BRBR earned
+    updateUserLastActive(event.params.to, event.block.timestamp)
     
     // Create transfer entity for receiver (credit)
     const transferIdTo = event.transaction.hash.concat(bigintToBytes(event.logIndex)).concat(event.params.to)
@@ -43,4 +47,17 @@ export function handleTransfer(event: Transfer): void {
     transferTo.transactionHash = event.transaction.hash
     transferTo.save()
   }
+}
+
+export function handleApproval(event: Approval): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const approval = new TokenApproval(id)
+  approval.token = "BRBR"
+  approval.owner = event.params.owner
+  approval.spender = event.params.spender
+  approval.value = event.params.value
+  approval.blockNumber = event.block.number
+  approval.timestamp = event.block.timestamp
+  approval.transactionHash = event.transaction.hash
+  approval.save()
 }

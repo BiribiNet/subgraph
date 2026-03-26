@@ -1,4 +1,4 @@
-import { BigInt, log } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import {
   VrfRequested,
   RoundResolved,
@@ -6,10 +6,17 @@ import {
   BatchProcessed,
   JackpotResultEvent,
   ComputedPayouts,
-  MinJackpotConditionUpdated
+  MinJackpotConditionUpdated,
+  RoleGranted,
+  RoleRevoked,
+  RoleAdminChanged,
+  Initialized,
+  Upgraded
 } from "../../generated/RouletteClean/Game"
 import {
-  RouletteRound
+  RouletteRound,
+  AdminRoleChange,
+  ContractUpgrade
 } from "../../generated/schema"
 import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_BETTING, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -77,6 +84,8 @@ export function handleVrfRequested(event: VrfRequested): void {
   round.otherBetsPayout = BigInt.fromI32(0)
   round.currentPayoutsCount = BigInt.fromI32(0);
   round.totalPayouts = BigInt.fromI32(0);
+  round.uniqueBettors = BigInt.fromI32(0);
+  round.betCount = BigInt.fromI32(0);
   round.startedAt = event.params.timestamp;
 
   round.save();
@@ -86,6 +95,7 @@ export function handleVrfRequested(event: VrfRequested): void {
   globalState.currentRoundNumber = newRoundId
   globalState.lastRoundStartTime = event.params.timestamp
   globalState.roundTransitionInProgress = true
+  globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
   globalState.save()
 
   // Update previous round status to VRF
@@ -128,13 +138,22 @@ export function handleRoundResolved(event: RoundResolved): void {
   }
 
   const globalState = getOrCreateGlobalState()
-  
+
+  if (round.totalBets.gt(globalState.pendingBets)) {
+    log.warning("Round {} totalBets ({}) exceeds pendingBets ({})", [
+      roundId.toString(),
+      round.totalBets.toString(),
+      globalState.pendingBets.toString()
+    ])
+    globalState.pendingBets = BigInt.fromI32(0)
+  } else {
+    globalState.pendingBets = globalState.pendingBets.minus(round.totalBets)
+  }
   globalState.lastRoundPaid = event.params.roundId
-  globalState.pendingBets = globalState.pendingBets.minus(round.totalBets)
   globalState.save();
 
   round.status = ROUND_STATUS_CLEAN
-  round.cleaningCompletedAt = event.block.timestamp
+  round.resolvedAt = event.block.timestamp
   round.save()
 }
 
@@ -148,7 +167,71 @@ export function handleBatchProcessed(event: BatchProcessed): void {
 
   // Update round payout totals
   round.currentPayoutsCount = round.currentPayoutsCount.plus(event.params.payoutsCount)
+
+  // Set payoutCompletedAt when all expected payouts have been processed
+  if (round.computedPayoutsCount !== null) {
+    const computed = round.computedPayoutsCount as BigInt
+    if (round.currentPayoutsCount.ge(computed)) {
+      round.payoutCompletedAt = event.block.timestamp
+    }
+  }
+
   round.save()
 }
 
+export function handleGameRoleGranted(event: RoleGranted): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "Game"
+  entity.eventType = "GRANTED"
+  entity.role = event.params.role
+  entity.account = event.params.account
+  entity.sender = event.params.sender
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
 
+export function handleGameRoleRevoked(event: RoleRevoked): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "Game"
+  entity.eventType = "REVOKED"
+  entity.role = event.params.role
+  entity.account = event.params.account
+  entity.sender = event.params.sender
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleGameRoleAdminChanged(event: RoleAdminChanged): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new AdminRoleChange(id)
+  entity.contract = "Game"
+  entity.eventType = "ADMIN_CHANGED"
+  entity.role = event.params.role
+  entity.previousAdminRole = event.params.previousAdminRole
+  entity.newAdminRole = event.params.newAdminRole
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}
+
+export function handleGameInitialized(event: Initialized): void {
+  log.info("Game contract initialized with version {}", [event.params.version.toString()])
+}
+
+export function handleGameUpgraded(event: Upgraded): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new ContractUpgrade(id)
+  entity.contract = "Game"
+  entity.implementation = event.params.implementation
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
+}

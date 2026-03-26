@@ -1,5 +1,5 @@
 import { Bytes, BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { GlobalState, APYSnapshot } from "../../generated/schema"
+import { GlobalState, APYSnapshot, VaultState, ProtocolStats } from "../../generated/schema"
 import { ZERO } from "./number"
 import { bigintToBytes } from "./bigintToBytes"
 
@@ -35,18 +35,25 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.uniquePlayersCount = ZERO
     globalState.totalAssets = ZERO
     globalState.totalShares = ZERO
+    globalState.sharePrice = BigDecimal.fromString("1")
+    globalState.totalRounds = ZERO
     globalState.pendingBets = ZERO
     globalState.lastRoundResolved = ZERO
     globalState.roundTransitionInProgress = false
     globalState.largeWithdrawalBatchSize = BigInt.fromI32(5)
     globalState.maxQueueLength = BigInt.fromI32(100)
     globalState.totalPendingLargeWithdrawals = ZERO
+    globalState.withdrawalQueueCounter = ZERO
     globalState.totalFees = ZERO
     globalState.minJackpotCondition = ZERO
     globalState.totalTransfersToPool = ZERO
     globalState.totalDeposits = ZERO
     globalState.totalTransfersToPoolAtLastClean = ZERO
     globalState.totalDepositsAtLastClean = ZERO
+
+    globalState.totalStakerRevenue = ZERO
+    globalState.brbPrice = BigDecimal.fromString("0")
+    globalState.brbPriceUpdatedAt = ZERO
 
     // Chainlink / keeper config (required non-null fields)
     globalState.chainlinkKeeperRegistry = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
@@ -75,22 +82,29 @@ function getDayId(timestamp: BigInt): Bytes {
  * Snapshots are taken once per day (at most) to track historical share values
  */
 function createOrUpdateSnapshot(
-  totalAssets: BigInt,
-  totalShares: BigInt,
+  globalState: GlobalState,
   timestamp: BigInt,
   blockNumber: BigInt
 ): void {
   const dayId = getDayId(timestamp)
   let snapshot = APYSnapshot.load(dayId)
-  
+
   // Only create snapshot if it doesn't exist for this day
   // This ensures we only snapshot once per day
   if (!snapshot) {
     snapshot = new APYSnapshot(dayId)
-    snapshot.totalAssets = totalAssets
-    snapshot.totalShares = totalShares
+    snapshot.totalAssets = globalState.totalAssets
+    snapshot.totalShares = globalState.totalShares
     snapshot.timestamp = timestamp
     snapshot.blockNumber = blockNumber
+
+    // Enriched vault snapshot fields
+    snapshot.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+    snapshot.stakerCount = globalState.stakersCount
+    snapshot.apy7Day = globalState.apy7Day
+    snapshot.apy30Day = globalState.apy30Day
+    snapshot.apyLifetime = globalState.apyLifetime
+
     snapshot.save()
   }
 }
@@ -184,12 +198,17 @@ function calculateAPYInternal(
  * @param blockNumber - Current block number
  */
 export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: BigInt, blockNumber: BigInt): void {
+  // Guard against timestamp going backwards during chain reorganization
+  if (!globalState.lastApySnapshotTimestamp.equals(ZERO) && currentTimestamp.lt(globalState.lastApySnapshotTimestamp)) {
+    return
+  }
+
   // Create a snapshot if we haven't taken one today
   const SECONDS_PER_DAY = BigInt.fromI32(86400)
   const timeSinceLastSnapshot = currentTimestamp.minus(globalState.lastApySnapshotTimestamp)
   
   if (timeSinceLastSnapshot.ge(SECONDS_PER_DAY) || globalState.lastApySnapshotTimestamp.equals(ZERO)) {
-    createOrUpdateSnapshot(globalState.totalAssets, globalState.totalShares, currentTimestamp, blockNumber)
+    createOrUpdateSnapshot(globalState, currentTimestamp, blockNumber)
     globalState.lastApySnapshotTimestamp = currentTimestamp
   }
 
@@ -278,6 +297,63 @@ export function calculateAllAPYs(globalState: GlobalState, currentTimestamp: Big
     currentTimestamp,
     globalState.apyLifetimeBaselineTimestamp
   )
+}
+
+export function calculateSharePrice(totalAssets: BigInt, totalShares: BigInt): BigDecimal {
+  if (totalShares.gt(ZERO)) {
+    const PRECISION = BigInt.fromI32(10).pow(18)
+    return totalAssets.times(PRECISION).toBigDecimal()
+      .div(totalShares.toBigDecimal())
+      .div(PRECISION.toBigDecimal())
+  }
+  return BigDecimal.fromString("1")
+}
+
+export function updateSharePrice(globalState: GlobalState): void {
+  globalState.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+}
+
+export function syncVaultState(globalState: GlobalState, timestamp: BigInt = ZERO): VaultState {
+  const vault = getOrCreateVaultState()
+  vault.totalAssets = globalState.totalAssets
+  vault.totalShares = globalState.totalShares
+  vault.sharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+  vault.stakerCount = globalState.stakersCount
+  vault.lastUpdatedAt = timestamp
+  return vault // caller must call vault.save()
+}
+
+export function getOrCreateVaultState(): VaultState {
+  let vault = VaultState.load("vault")
+  if (!vault) {
+    vault = new VaultState("vault")
+    vault.totalAssets = ZERO
+    vault.totalShares = ZERO
+    vault.sharePrice = BigDecimal.fromString("1")
+    vault.stakerCount = ZERO
+    vault.allTimeRevenue = ZERO
+    vault.lastUpdatedAt = ZERO
+  }
+  return vault
+}
+
+export function getOrCreateProtocolStats(): ProtocolStats {
+  let stats = ProtocolStats.load("stats")
+  if (!stats) {
+    stats = new ProtocolStats("stats")
+    stats.totalWagered = ZERO
+    stats.totalBets = ZERO
+    stats.totalRounds = ZERO
+    stats.totalPlayers = ZERO
+    stats.totalBurned = ZERO
+    stats.totalJackpotsPaid = ZERO
+    stats.totalStakerRevenue = ZERO
+    stats.brbTotalSupply = ZERO
+    stats.totalPayouts = ZERO
+    stats.totalDeposited = ZERO
+    stats.totalWithdrawn = ZERO
+  }
+  return stats
 }
 
 export { GLOBAL_STATE_ID }
