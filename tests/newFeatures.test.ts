@@ -10,8 +10,6 @@ import {
 
 import { BetPlaced, Deposit, Withdraw, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
 import { handleBetPlaced, handleDeposit, handleWithdraw, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
-import { VrfRequested } from '../generated/RouletteClean/Game';
-import { handleVrfRequested } from '../src/mappings/roulette';
 import { MinJackpotConditionUpdated } from '../generated/RouletteClean/Game';
 import { handleMinJackpotConditionUpdated } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
@@ -20,17 +18,6 @@ import { bigintToBytes } from '../src/helpers/bigintToBytes';
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
-
-const initializeRound = (_roundId: string = '1', timestamp: i32 = 1000000): void => {
-  const ev = changetype<VrfRequested>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
-  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  handleVrfRequested(ev);
-};
 
 const createDeposit = (user: string, assets: string, shares: string, timestamp: i32): void => {
   const depositEvent = changetype<Deposit>(newMockEvent());
@@ -137,6 +124,10 @@ const createRoundCleaningCompleted = (
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   handleRoundCleaningCompleted(ev);
+};
+
+const initializeRound = (timestamp: i32 = 1000000): void => {
+  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
 };
 
 const createMinJackpotConditionUpdated = (minJackpotCondition: string, timestamp: i32 = 1000000): void => {

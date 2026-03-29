@@ -46,7 +46,7 @@ import {
   UpkeepRegistration,
   MaxBetsUpdate
 } from "../../generated/schema"
-import { ROUND_STATUS_BETTING } from "../helpers/constant"
+import { ROUND_STATUS_BETTING, ROUND_STATUS_NO_MORE_BETS } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -54,6 +54,7 @@ import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice, getOrCreate
 import { ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot, trackHourlyUniquePlayer } from "../helpers/aggregation"
 import { processRouletteBet, calculateMaxPayoutFromRoundComponents } from "../helpers/betting"
+import { createNewRouletteRound } from "../helpers/rouletteRound"
 
 export function handleDeposit(event: Deposit): void {
   // Get or create GlobalState entity
@@ -116,133 +117,154 @@ export function handleDeposit(event: Deposit): void {
 
 export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): void {
   const globalState = getOrCreateGlobalState()
-  const roundId = event.params.cleanedRoundId
-  globalState.lastRoundResolved = roundId
-  globalState.lastRoundStartTime = event.params.boundaryTimestamp
-  const round = RouletteRound.load(bigintToBytes(roundId))
-  if (!round) {
-    log.error("Round not found for batch processing: {}", [roundId.toString()])
-    return
-  }
-  globalState.roundTransitionInProgress = false;
+  const cleanedId = event.params.cleanedRoundId
+  const newRoundId = event.params.newRoundId
+  const boundaryTs = event.params.boundaryTimestamp
 
-  // StakedBRB reduces global $.maxPayout by maxPayoutPerRound[roundId].
-  // The per-round value itself is NOT cleared in the contract, so we keep it as historical data.
-  const roundMaxPayoutPerRound = round.maxBetAmount
-  if (roundMaxPayoutPerRound.gt(BigInt.fromI32(0))) {
-    if (roundMaxPayoutPerRound.ge(globalState.maxBetAmount)) {
-      globalState.maxBetAmount = BigInt.fromI32(0)
+  globalState.lastRoundResolved = cleanedId
+  globalState.lastRoundStartTime = boundaryTs
+  globalState.roundTransitionInProgress = false
+
+  const isGenesis = cleanedId.equals(BigInt.fromI32(0))
+
+  if (!isGenesis) {
+    const round = RouletteRound.load(bigintToBytes(cleanedId))
+    if (!round) {
+      log.error("Round not found for RoundCleaningCompleted: {}", [cleanedId.toString()])
+      return
+    }
+
+    // StakedBRB reduces global $.maxPayout by maxPayoutPerRound[roundId].
+    // The per-round value itself is NOT cleared in the contract, so we keep it as historical data.
+    const roundMaxPayoutPerRound = round.maxBetAmount
+    if (roundMaxPayoutPerRound.gt(BigInt.fromI32(0))) {
+      if (roundMaxPayoutPerRound.ge(globalState.maxBetAmount)) {
+        globalState.maxBetAmount = BigInt.fromI32(0)
+      } else {
+        globalState.maxBetAmount = globalState.maxBetAmount.minus(roundMaxPayoutPerRound)
+      }
+    }
+
+    globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
+
+    // Revenue breakdown per round
+    round.infraRevenue = event.params.fees.protocolFees
+    round.roundBurnAmount = event.params.fees.burnAmount
+    round.jackpotRevenue = event.params.fees.jackpotAmount
+
+    if (round.totalBets.gt(round.totalPayouts)) {
+      const totalFeesAmount = event.params.fees.protocolFees
+        .plus(event.params.fees.burnAmount)
+        .plus(event.params.fees.jackpotAmount)
+      round.stakersRevenue = round.totalBets.minus(round.totalPayouts).minus(totalFeesAmount)
     } else {
-      globalState.maxBetAmount = globalState.maxBetAmount.minus(roundMaxPayoutPerRound)
+      round.stakersRevenue = ZERO
     }
-  }
 
-  globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
-
-  // Revenue breakdown per round
-  round.infraRevenue = event.params.fees.protocolFees
-  round.roundBurnAmount = event.params.fees.burnAmount
-  round.jackpotRevenue = event.params.fees.jackpotAmount
-
-  if (round.totalBets.gt(round.totalPayouts)) {
-    const totalFeesAmount = event.params.fees.protocolFees
-      .plus(event.params.fees.burnAmount)
-      .plus(event.params.fees.jackpotAmount)
-    round.stakersRevenue = round.totalBets.minus(round.totalPayouts).minus(totalFeesAmount)
-  } else {
-    round.stakersRevenue = ZERO
-  }
-
-  // Update cumulative staker revenue (stakersRevenue is always set above)
-  const sr = round.stakersRevenue as BigInt
-  if (sr.gt(ZERO)) {
-    globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
-  }
-
-  // Update DailyStats with round completion data
-  // Note: totalPayouts is tracked in real-time in brb.ts handleTransfer
-  const dailyStats = getOrCreateDailyStats(event.block.timestamp)
-  dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
-  if (round.totalBets.gt(round.totalPayouts)) {
-    dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
-  }
-  dailyStats.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
-  dailyStats.jackpotPool = globalState.currentJackpot
-  if (round.stakersRevenue !== null) {
-    const srDaily = round.stakersRevenue as BigInt
-    if (srDaily.gt(ZERO)) {
-      dailyStats.stakersRevenue = dailyStats.stakersRevenue.plus(srDaily)
-    }
-  }
-  dailyStats.save()
-
-  // Update HourlyVolumeSnapshot with round completion data
-  const hourlyRound = getOrCreateHourlySnapshot(event.block.timestamp)
-  if (round.stakersRevenue !== null) {
-    const srHourly = round.stakersRevenue as BigInt
-    if (srHourly.gt(ZERO)) {
-      hourlyRound.stakersRevenue = hourlyRound.stakersRevenue.plus(srHourly)
-    }
-  }
-  hourlyRound.save()
-
-  // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
-  const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
-  const depositsThisRound = globalState.totalDeposits.minus(globalState.totalDepositsAtLastClean)
-  const donations = transfersThisRound.minus(depositsThisRound).minus(round.totalBets)
-  
-  // Add donations to totalAssets (direct donations that weren't tracked via Deposit events)
-  if (donations.lt(BigInt.fromI32(0))) {
-    log.warning("Negative donation for round {}: amount={}, transfers={}, deposits={}, bets={}", [
-      roundId.toString(),
-      donations.toString(),
-      transfersThisRound.toString(),
-      depositsThisRound.toString(),
-      round.totalBets.toString()
-    ])
-  }
-  if (donations.gt(BigInt.fromI32(0))) {
-    globalState.totalAssets = globalState.totalAssets.plus(donations)
-  }
-
-  // Update "at last clean" values for next round's calculation
-  globalState.totalTransfersToPoolAtLastClean = globalState.totalTransfersToPool
-  globalState.totalDepositsAtLastClean = globalState.totalDeposits
-
-  if (round.totalBets.gt(round.totalPayouts)) { // pool won money
-    globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts).minus(event.params.fees.protocolFees.plus(event.params.fees.burnAmount).plus(event.params.fees.jackpotAmount)))
-  } else { // pool lost money
-    globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts))
-  }
-
-  // Update share price and APYs after revenue distribution
-  updateSharePrice(globalState)
-  calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
-
-  // Update VaultState singleton
-  const vault = syncVaultState(globalState, event.block.timestamp)
-  if (round.stakersRevenue !== null) {
+    // Update cumulative staker revenue (stakersRevenue is always set above)
     const sr = round.stakersRevenue as BigInt
     if (sr.gt(ZERO)) {
-      vault.allTimeRevenue = vault.allTimeRevenue.plus(sr)
+      globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
     }
-  }
-  vault.save()
 
-  // Update ProtocolStats
-  const protocolStats = getOrCreateProtocolStats()
-  protocolStats.totalRounds = protocolStats.totalRounds.plus(ONE)
-  if (round.stakersRevenue !== null) {
-    const sr2 = round.stakersRevenue as BigInt
-    if (sr2.gt(ZERO)) {
-      protocolStats.totalStakerRevenue = protocolStats.totalStakerRevenue.plus(sr2)
+    // Update DailyStats with round completion data
+    // Note: totalPayouts is tracked in real-time in brb.ts handleTransfer
+    const dailyStats = getOrCreateDailyStats(event.block.timestamp)
+    dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
+    if (round.totalBets.gt(round.totalPayouts)) {
+      dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
     }
-  }
-  protocolStats.totalBurned = globalState.totalBurned
-  protocolStats.save()
+    dailyStats.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
+    dailyStats.jackpotPool = globalState.currentJackpot
+    if (round.stakersRevenue !== null) {
+      const srDaily = round.stakersRevenue as BigInt
+      if (srDaily.gt(ZERO)) {
+        dailyStats.stakersRevenue = dailyStats.stakersRevenue.plus(srDaily)
+      }
+    }
+    dailyStats.save()
 
-  round.cleaningCompletedAt = event.block.timestamp
-  round.save()
+    // Update HourlyVolumeSnapshot with round completion data
+    const hourlyRound = getOrCreateHourlySnapshot(event.block.timestamp)
+    if (round.stakersRevenue !== null) {
+      const srHourly = round.stakersRevenue as BigInt
+      if (srHourly.gt(ZERO)) {
+        hourlyRound.stakersRevenue = hourlyRound.stakersRevenue.plus(srHourly)
+      }
+    }
+    hourlyRound.save()
+
+    // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
+    const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
+    const depositsThisRound = globalState.totalDeposits.minus(globalState.totalDepositsAtLastClean)
+    const donations = transfersThisRound.minus(depositsThisRound).minus(round.totalBets)
+
+    // Add donations to totalAssets (direct donations that weren't tracked via Deposit events)
+    if (donations.lt(BigInt.fromI32(0))) {
+      log.warning("Negative donation for round {}: amount={}, transfers={}, deposits={}, bets={}", [
+        cleanedId.toString(),
+        donations.toString(),
+        transfersThisRound.toString(),
+        depositsThisRound.toString(),
+        round.totalBets.toString()
+      ])
+    }
+    if (donations.gt(BigInt.fromI32(0))) {
+      globalState.totalAssets = globalState.totalAssets.plus(donations)
+    }
+
+    // Update "at last clean" values for next round's calculation
+    globalState.totalTransfersToPoolAtLastClean = globalState.totalTransfersToPool
+    globalState.totalDepositsAtLastClean = globalState.totalDeposits
+
+    if (round.totalBets.gt(round.totalPayouts)) { // pool won money
+      globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts).minus(event.params.fees.protocolFees.plus(event.params.fees.burnAmount).plus(event.params.fees.jackpotAmount)))
+    } else { // pool lost money
+      globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts))
+    }
+
+    // Update share price and APYs after revenue distribution
+    updateSharePrice(globalState)
+    calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
+
+    // Update VaultState singleton
+    const vault = syncVaultState(globalState, event.block.timestamp)
+    if (round.stakersRevenue !== null) {
+      const srVault = round.stakersRevenue as BigInt
+      if (srVault.gt(ZERO)) {
+        vault.allTimeRevenue = vault.allTimeRevenue.plus(srVault)
+      }
+    }
+    vault.save()
+
+    // Update ProtocolStats
+    const protocolStats = getOrCreateProtocolStats()
+    protocolStats.totalRounds = protocolStats.totalRounds.plus(ONE)
+    if (round.stakersRevenue !== null) {
+      const sr2 = round.stakersRevenue as BigInt
+      if (sr2.gt(ZERO)) {
+        protocolStats.totalStakerRevenue = protocolStats.totalStakerRevenue.plus(sr2)
+      }
+    }
+    protocolStats.totalBurned = globalState.totalBurned
+    protocolStats.save()
+
+    round.cleaningCompletedAt = event.block.timestamp
+    round.save()
+  }
+
+  const newRoundIdBytes = bigintToBytes(newRoundId)
+  if (RouletteRound.load(newRoundIdBytes) == null) {
+    const nextRound = createNewRouletteRound(newRoundId, boundaryTs)
+    nextRound.save()
+  } else {
+    log.warning("RouletteRound {} already exists at RoundCleaningCompleted; skipping create", [newRoundId.toString()])
+  }
+
+  globalState.currentRound = newRoundIdBytes
+  globalState.currentRoundNumber = newRoundId
+  globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
+  globalState.save()
 }
 
 export function handleWithdraw(event: Withdraw): void {
@@ -370,6 +392,14 @@ export function handleBettingWindowClosed(event: BettingWindowClosed): void {
   globalState.lastBettingWindowClosedRoundId = event.params.roundId
   globalState.lastBettingWindowClosedAt = event.block.timestamp
   globalState.save()
+
+  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
+  if (round) {
+    round.status = ROUND_STATUS_NO_MORE_BETS
+    round.save()
+  } else {
+    log.warning("RouletteRound not found for BettingWindowClosed: {}", [event.params.roundId.toString()])
+  }
 
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const row = new BettingWindowClosedLog(id)

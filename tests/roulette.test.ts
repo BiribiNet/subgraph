@@ -26,9 +26,12 @@ import {
   handleJackpotResultEvent,
   handleMinJackpotConditionUpdated,
 } from '../src/mappings/roulette';
+import { RoundCleaningCompleted, BettingWindowClosed } from '../generated/StakedBRB/StakedBRB';
+import { handleRoundCleaningCompleted, handleBettingWindowClosed } from '../src/mappings/stakedBRB';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import {
   ROUND_STATUS_BETTING,
+  ROUND_STATUS_NO_MORE_BETS,
   ROUND_STATUS_VRF,
   ROUND_STATUS_PAYOUT,
   ROUND_STATUS_COMPUTING_PAYOUT,
@@ -37,6 +40,55 @@ import {
 
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
+
+function createRoundCleaningCompletedEvent(
+  cleanedRoundId: i32,
+  protocolFees: string,
+  burnAmount: string,
+  jackpotAmount: string,
+  timestamp: i32
+): RoundCleaningCompleted {
+  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(
+    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
+  );
+  const feesTuple = new ethereum.Tuple();
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
+  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
+  ev.address = Address.fromString(CONTRACT_ADDRESS);
+  ev.logIndex = BigInt.fromI32(0);
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  ev.block.number = BigInt.fromI32(timestamp / 100);
+  return ev;
+}
+
+/** Seeds round 1: genesis clean (0 → 1) with `startedAt` = boundary timestamp. */
+function seedRoundOne(boundaryTimestamp: i32 = 1000000): void {
+  const ev = createRoundCleaningCompletedEvent(0, '0', '0', '0', boundaryTimestamp);
+  handleRoundCleaningCompleted(ev);
+}
+
+function createBettingWindowClosedEvent(roundId: i32, timestamp: i32 = 1000500): BettingWindowClosed {
+  const ev = changetype<BettingWindowClosed>(newMockEvent());
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(
+    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
+  );
+  ev.address = Address.fromString(CONTRACT_ADDRESS);
+  ev.logIndex = BigInt.fromI32(0);
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  ev.block.number = BigInt.fromI32(timestamp / 100);
+  return ev;
+}
 
 function createVrfRequestedEvent(
   newRoundId: i32,
@@ -71,8 +123,8 @@ function createVrfRequestedEvent(
 
 function createVRFResultEvent(
   roundId: i32,
-  jackpotNumber: i32,
   winningNumber: i32,
+  jackpotNumber: i32,
   timestamp: i32 = 1000100
 ): VRFResult {
   const ev = changetype<VRFResult>(newMockEvent());
@@ -85,14 +137,14 @@ function createVRFResultEvent(
   );
   ev.parameters.push(
     new ethereum.EventParam(
-      'jackpotNumber',
-      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(jackpotNumber))
+      'winningNumber',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(winningNumber))
     )
   );
   ev.parameters.push(
     new ethereum.EventParam(
-      'winningNumber',
-      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(winningNumber))
+      'jackpotNumber',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(jackpotNumber))
     )
   );
   ev.address = Address.fromString(CONTRACT_ADDRESS);
@@ -225,14 +277,14 @@ function createMinJackpotConditionUpdatedEvent(
   return ev;
 }
 
-describe('handleVrfRequested', () => {
+describe('handleRoundCleaningCompleted (new betting round)', () => {
   beforeEach(() => {
     clearStore();
   });
 
-  test('creates new round with correct initial state', () => {
-    const ev = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(ev);
+  test('creates new round with correct initial state and startedAt from boundaryTimestamp', () => {
+    const ev = createRoundCleaningCompletedEvent(0, '0', '0', '0', 1000000);
+    handleRoundCleaningCompleted(ev);
 
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.entityCount('RouletteRound', 1);
@@ -255,27 +307,52 @@ describe('handleVrfRequested', () => {
     assert.fieldEquals('RouletteRound', roundId, 'betCount', '0');
     assert.fieldEquals('RouletteRound', roundId, 'startedAt', '1000000');
 
-    // GlobalState should be updated
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '1');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalRounds', '1');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'lastRoundStartTime', '1000000');
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundTransitionInProgress', 'true');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundTransitionInProgress', 'false');
+  });
+});
+
+describe('handleBettingWindowClosed', () => {
+  beforeEach(() => {
+    clearStore();
   });
 
-  test('updates previous round to VRF status', () => {
-    // Create round 1
-    const ev1 = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(ev1);
+  test('sets active round to NO_MORE_BETS (table betting disabled until VRF)', () => {
+    seedRoundOne(1000000);
+    const round1Hex = bigintToBytes(BigInt.fromI32(1)).toHexString();
+    assert.fieldEquals('RouletteRound', round1Hex, 'status', ROUND_STATUS_BETTING);
 
+    const ev = createBettingWindowClosedEvent(1, 1000500);
+    handleBettingWindowClosed(ev);
+
+    assert.fieldEquals('RouletteRound', round1Hex, 'status', ROUND_STATUS_NO_MORE_BETS);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'lastBettingWindowClosedRoundId', '1');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'lastBettingWindowClosedAt', '1000500');
+  });
+});
+
+describe('handleVrfRequested', () => {
+  beforeEach(() => {
+    clearStore();
+  });
+
+  test('sets roundTransitionInProgress and moves previous round to VRF; next round appears on cleaning', () => {
+    seedRoundOne(1000000);
     const round1Id = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_BETTING);
 
-    // Create round 2, which should set round 1 to VRF status
     const ev2 = createVrfRequestedEvent(2, 200, 1000100);
     handleVrfRequested(ev2);
 
     assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_VRF);
     assert.fieldEquals('RouletteRound', round1Id, 'requestId', '200');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '2');
+    assert.entityCount('RouletteRound', 1);
+
+    const cleanEv = createRoundCleaningCompletedEvent(1, '0', '0', '0', 1000200);
+    handleRoundCleaningCompleted(cleanEv);
 
     const round2Id = bigintToBytes(BigInt.fromI32(2)).toHexString();
     assert.fieldEquals('RouletteRound', round2Id, 'status', ROUND_STATUS_BETTING);
@@ -290,12 +367,10 @@ describe('handleVRFResult', () => {
   });
 
   test('sets winning number, jackpot number, and status to PAYOUT', () => {
-    // Create round 1 first
-    const vrfEv = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(vrfEv);
+    seedRoundOne(1000000);
 
     // Emit VRFResult for round 1
-    const resultEv = createVRFResultEvent(1, 5, 17, 1000100);
+    const resultEv = createVRFResultEvent(1, 17, 5, 1000100);
     handleVRFResult(resultEv);
 
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
@@ -312,9 +387,7 @@ describe('handleComputedPayouts', () => {
   });
 
   test('sets computed count and updates status to COMPUTING_PAYOUT', () => {
-    // Create round 1
-    const vrfEv = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(vrfEv);
+    seedRoundOne(1000000);
 
     // Emit ComputedPayouts for round 1
     const computedEv = createComputedPayoutsEvent(1, 3, 1000120);
@@ -332,9 +405,7 @@ describe('handleBatchProcessed', () => {
   });
 
   test('increments currentPayoutsCount', () => {
-    // Create round 1
-    const vrfEv = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(vrfEv);
+    seedRoundOne(1000000);
 
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', roundId, 'currentPayoutsCount', '0');
@@ -359,9 +430,7 @@ describe('handleRoundResolved', () => {
   });
 
   test('sets status to CLEAN and updates globalState', () => {
-    // Create round 1
-    const vrfEv = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(vrfEv);
+    seedRoundOne(1000000);
 
     // Resolve round 1
     const resolvedEv = createRoundResolvedEvent(1, 1000200);
@@ -381,9 +450,7 @@ describe('handleJackpotResultEvent', () => {
   });
 
   test('sets jackpot winner count on round', () => {
-    // Create round 1
-    const vrfEv = createVrfRequestedEvent(1, 100, 1000000);
-    handleVrfRequested(vrfEv);
+    seedRoundOne(1000000);
 
     // Emit JackpotResultEvent for round 1
     const jackpotEv = createJackpotResultEvent(1, 2, 1000110);

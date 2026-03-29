@@ -8,10 +8,10 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced } from '../generated/StakedBRB/StakedBRB';
-import { handleBetPlaced } from '../src/mappings/stakedBRB';
-import { VrfRequested, VRFResult } from '../generated/RouletteClean/Game';
-import { handleVrfRequested, handleVRFResult } from '../src/mappings/roulette';
+import { BetPlaced, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { handleBetPlaced, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
+import { VRFResult } from '../generated/RouletteClean/Game';
+import { handleVRFResult } from '../src/mappings/roulette';
 import { ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
@@ -19,13 +19,20 @@ import { bigintToBytes } from '../src/helpers/bigintToBytes';
 // https://thegraph.com/docs/en/developer/matchstick/#tests-structure-0-5-0
 
 const initializeRound = (): void => {
-    const ev = changetype<VrfRequested>(newMockEvent());
+    const ev = changetype<RoundCleaningCompleted>(newMockEvent());
     ev.parameters = new Array<ethereum.EventParam>();
+    ev.parameters.push(new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0))));
     ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1_000_000))));
+    ev.parameters.push(new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1_000_000))));
+    const feesTuple = new ethereum.Tuple();
+    feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
+    feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
+    feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
+    ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
     ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-    handleVrfRequested(ev);
+    ev.block.timestamp = BigInt.fromI32(1_000_000);
+    ev.block.number = BigInt.fromI32(10000);
+    handleRoundCleaningCompleted(ev);
 }
 const initializeBet = (): void => {
   const betPlacedEvent = changetype<BetPlaced>(newMockEvent());

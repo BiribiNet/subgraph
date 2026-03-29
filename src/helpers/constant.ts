@@ -20,6 +20,7 @@ export const BET_TRIO_023 = 15
 
 // Constants for round status
 export const ROUND_STATUS_BETTING = "BETTING"
+export const ROUND_STATUS_NO_MORE_BETS = "NO_MORE_BETS"
 export const ROUND_STATUS_VRF = "VRF"
 export const ROUND_STATUS_COMPUTING_PAYOUT = "COMPUTING_PAYOUT"
 export const ROUND_STATUS_PAYOUT = "PAYOUT"
@@ -41,6 +42,3 @@ export const BET_TYPE_LOW = "LOW"
 export const BET_TYPE_HIGH = "HIGH"
 export const BET_TYPE_TRIO_012 = "TRIO_012"
 export const BET_TYPE_TRIO_023 = "TRIO_023"
-
-// Contract addresses for identifying event sources
-export const GAME_CONTRACT_ADDRESS = "0x8761cea90cc7ab474d371b039b3bae7bc22d5e96"

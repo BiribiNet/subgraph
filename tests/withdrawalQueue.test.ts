@@ -17,13 +17,13 @@ const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
 const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
 
-function createWithdrawalRequested(user: string, amount: string, timestamp: i32 = 1000000): void {
+function createWithdrawalRequested(user: string, amount: string, timestamp: i32 = 1000000, logIndex: i32 = 0): void {
   const ev = changetype<WithdrawalRequested>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
   ev.parameters.push(new ethereum.EventParam('user', ethereum.Value.fromAddress(Address.fromString(user))));
   ev.parameters.push(new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount))));
   ev.address = Address.fromString(CONTRACT_ADDRESS);
-  ev.logIndex = BigInt.fromI32(0);
+  ev.logIndex = BigInt.fromI32(logIndex);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   handleWithdrawalRequested(ev);
@@ -55,8 +55,8 @@ describe('Withdrawal Queue Lifecycle', () => {
   });
 
   test('Multiple requests increment queue position monotonically', () => {
-    createWithdrawalRequested(USER_ADDRESS, '50000000000000000000', 1000000);
-    createWithdrawalRequested(USER_ADDRESS_2, '30000000000000000000', 1000050);
+    createWithdrawalRequested(USER_ADDRESS, '50000000000000000000', 1000000, 0);
+    createWithdrawalRequested(USER_ADDRESS_2, '30000000000000000000', 1000050, 1);
 
     assert.entityCount('LargeWithdrawalRequest', 2);
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPendingLargeWithdrawals', '80000000000000000000');

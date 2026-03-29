@@ -12,8 +12,6 @@ import { Transfer } from '../generated/BRBToken/BRB';
 import { RoundCleaningCompleted, Deposit, BetPlaced } from '../generated/StakedBRB/StakedBRB';
 import { handleTransfer } from '../src/mappings/brb';
 import { handleRoundCleaningCompleted, handleDeposit, handleBetPlaced } from '../src/mappings/stakedBRB';
-import { VrfRequested } from '../generated/RouletteClean/Game';
-import { handleVrfRequested } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from '../src/helpers/constant';
 
@@ -22,21 +20,6 @@ const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
 const OTHER_ADDRESS = '0xdddddddc53842141be8f70df9efe4d08538a6666';
-
-// Helper function to initialize round
-/** Seeds round `newRoundId` via `VrfRequested` (replaces legacy ChainlinkSetup + RoundStarted). */
-const initializeRound = (_roundId: string = '1', timestamp: i32 = 1000000): void => {
-  const ev = changetype<VrfRequested>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(
-    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1)))
-  );
-  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
-  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  handleVrfRequested(ev);
-};
 
 // Helper function to create BRB Transfer event
 const createBRBTransfer = (from: string, to: string, value: string, timestamp: i32, logIndex: i32 = 0): void => {
@@ -142,17 +125,9 @@ const createRoundCleaningCompleted = (
   handleRoundCleaningCompleted(ev);
 };
 
-// Helper function to start a new round
-const startRound = (roundId: i32, timestamp: i32, requestId: i32 = 1): void => {
-  const ev = changetype<VrfRequested>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId))));
-  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(requestId))));
-  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
-  ev.address = Address.fromString('0x3c1db00c9b0d4e08d3d666c845a6dd1a0f271a51');
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleVrfRequested(ev);
+/** Seeds round 1 via genesis `RoundCleaningCompleted` (cleanedRoundId 0 → newRoundId 1). */
+const initializeRound = (timestamp: i32 = 1000000): void => {
+  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
 };
 
 // Test Suite 1: Transfer Tracking
@@ -357,8 +332,7 @@ describe('Round Cleanup Snapshot Updates Tests', () => {
     createDeposit(USER_ADDRESS_2, '500000000000000000', '500000000000000000', 1000100);
     createRoundCleaningCompleted(1, '0', '0', '0', 1000200);
     
-    // Round 2: Transfer 50 more, Deposit 25 more
-    startRound(2, 1000300);
+    // Round 2: Transfer 50 more, Deposit 25 more (round 2 entity created by RCC above)
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '500000000000000000', 1000300);
     createDeposit(USER_ADDRESS_2, '250000000000000000', '250000000000000000', 1000400);
     
@@ -386,7 +360,6 @@ describe('Multi-Round Scenarios Tests', () => {
     createRoundCleaningCompleted(1, '0', '0', '0', 1000300);
     
     // Round 2: Transfer 200, Deposit 100, Bet 20
-    startRound(2, 1000400);
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '2000000000000000000', 1000400);
     createDeposit(USER_ADDRESS_2, '1000000000000000000', '1000000000000000000', 1000500);
     createBet(USER_ADDRESS, '20000000000000000000', 1000600, 2);
@@ -403,7 +376,6 @@ describe('Multi-Round Scenarios Tests', () => {
     createRoundCleaningCompleted(1, '0', '0', '0', 1000100);
     
     // Round 2: Transfer 50, Deposit 50, no bets → donation = 0
-    startRound(2, 1000200);
     createBRBTransfer(USER_ADDRESS, STAKED_BRB_CONTRACT_ADDRESS, '500000000000000000', 1000200);
     createDeposit(USER_ADDRESS_2, '500000000000000000', '500000000000000000', 1000300);
     createRoundCleaningCompleted(2, '0', '0', '0', 1000400);

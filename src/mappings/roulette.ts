@@ -18,17 +18,9 @@ import {
   AdminRoleChange,
   ContractUpgrade
 } from "../../generated/schema"
-import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_BETTING, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
+import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
-
-function zerosArray(length: i32): Array<BigInt> {
-  const arr = new Array<BigInt>(length);
-  for (let i = 0; i < length; i++) {
-    arr[i] = BigInt.fromI32(0);
-  }
-  return arr;
-}
 
 export function handleJackpotResultEvent(event: JackpotResultEvent): void {
   const round = RouletteRound.load(bigintToBytes(event.params.roundId))
@@ -58,47 +50,16 @@ export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdat
   globalState.save()
 }
 
-/** VRF requested for the round that just ended; `newRoundId` is the next betting round id. */
+/** VRF requested for the round that just ended; the next `RouletteRound` entity is created in `handleRoundCleaningCompleted` (authoritative `startedAt`). Current round pointers advance here so payout indexing in `brb.ts` matches the contract round id. */
 export function handleVrfRequested(event: VrfRequested): void {
   const globalState = getOrCreateGlobalState()
-
   const newRoundId = event.params.newRoundId
-  const roundId = bigintToBytes(newRoundId);
-  const round = new RouletteRound(roundId);
-  round.roundNumber = newRoundId;
-  round.status = ROUND_STATUS_BETTING;
-  round.totalBets = BigInt.fromI32(0)
-  round.maxBetAmount = BigInt.fromI32(0)
-  round.maxStraightBet = BigInt.fromI32(0)
-  round.maxStreetBet = BigInt.fromI32(0)
-  round.straightBetsTotals = zerosArray(37) // index = roulette number (0..36)
-  round.streetBetsTotals = zerosArray(37) // index = street start number (1..34, step 3)
-  round.redBetsSum = BigInt.fromI32(0)
-  round.blackBetsSum = BigInt.fromI32(0)
-  round.oddBetsSum = BigInt.fromI32(0)
-  round.evenBetsSum = BigInt.fromI32(0)
-  round.lowBetsSum = BigInt.fromI32(0)
-  round.highBetsSum = BigInt.fromI32(0)
-  round.dozenBetsSum = zerosArray(4) // index = dozen id (1..3)
-  round.columnBetsSum = zerosArray(4) // index = column id (1..3)
-  round.otherBetsPayout = BigInt.fromI32(0)
-  round.currentPayoutsCount = BigInt.fromI32(0);
-  round.totalPayouts = BigInt.fromI32(0);
-  round.uniqueBettors = BigInt.fromI32(0);
-  round.betCount = BigInt.fromI32(0);
-  round.startedAt = event.params.timestamp;
-
-  round.save();
-
-  // Update current round
-  globalState.currentRound = roundId;
+  const roundIdBytes = bigintToBytes(newRoundId)
+  globalState.currentRound = roundIdBytes
   globalState.currentRoundNumber = newRoundId
-  globalState.lastRoundStartTime = event.params.timestamp
   globalState.roundTransitionInProgress = true
-  globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
   globalState.save()
 
-  // Update previous round status to VRF
   const previousRoundId = newRoundId.minus(BigInt.fromI32(1))
   const previousRound = RouletteRound.load(bigintToBytes(previousRoundId))
   if (previousRound) {

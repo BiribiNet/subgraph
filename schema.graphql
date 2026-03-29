@@ -1,5 +1,6 @@
 enum RoundStatus {
   BETTING
+  NO_MORE_BETS
   VRF
   COMPUTING_PAYOUT
   PAYOUT

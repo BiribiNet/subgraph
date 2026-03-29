@@ -8,8 +8,8 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit } from '../generated/StakedBRB/StakedBRB';
-import { handleBetPlaced, handleDeposit } from '../src/mappings/stakedBRB';
+import { BetPlaced, Deposit, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { handleBetPlaced, handleDeposit, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
 import { Transfer } from '../generated/BRBToken/BRB';
 import { handleTransfer } from '../src/mappings/brb';
 import { Transfer as BRBRTransfer } from '../generated/BRBReferal/BRBReferal';
@@ -24,15 +24,37 @@ const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
 const STAKED_BRB = '0x306a67e1ca543c0892011174fa02cb1848172965';
 const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
 
-function initializeRound(roundId: i32 = 1, timestamp: i32 = 1000000): void {
-  const ev = changetype<VrfRequested>(newMockEvent());
+function createRoundCleaningCompleted(
+  cleanedRoundId: i32,
+  protocolFees: string,
+  burnAmount: string,
+  jackpotAmount: string,
+  timestamp: i32
+): void {
+  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId))));
-  ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-  ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp))));
+  ev.parameters.push(
+    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
+  );
+  ev.parameters.push(
+    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
+  );
+  const feesTuple = new ethereum.Tuple();
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
+  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
+  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
   ev.address = Address.fromString(CONTRACT_ADDRESS);
   ev.block.timestamp = BigInt.fromI32(timestamp);
-  handleVrfRequested(ev);
+  ev.block.number = BigInt.fromI32(timestamp / 100);
+  handleRoundCleaningCompleted(ev);
+}
+
+function initializeRound(timestamp: i32 = 1000000): void {
+  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
 }
 
 // BetPlaced with specific bet type
@@ -119,8 +141,15 @@ describe('totalLost derived calculation', () => {
   });
 
   test('After winning payout, totalLost decreases correctly', () => {
-    initializeRound(1);
-    initializeRound(2, 1000050); // Creates round 2, sets round 1 to VRF
+    initializeRound(1000000);
+    const vrfEv = changetype<VrfRequested>(newMockEvent());
+    vrfEv.parameters = new Array<ethereum.EventParam>();
+    vrfEv.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(2))));
+    vrfEv.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    vrfEv.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1000050))));
+    vrfEv.address = Address.fromString(CONTRACT_ADDRESS);
+    vrfEv.block.timestamp = BigInt.fromI32(1000050);
+    handleVrfRequested(vrfEv); // Sets round 1 to VRF (round 2 entity is created on next cleaning)
 
     // Place bet on round 1
     placeBet(USER_ADDRESS, '10000000000000000000', 1, 4, 1);
@@ -143,7 +172,7 @@ describe('totalLost derived calculation', () => {
   });
 
   test('Multiple bets without wins: totalLost accumulates correctly', () => {
-    initializeRound(1);
+    initializeRound();
 
     placeBet(USER_ADDRESS, '5000000000000000000', 1, 4, 1);
     placeBet(USER_ADDRESS, '3000000000000000000', 8, 0, 1); // RED bet

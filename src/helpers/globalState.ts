@@ -13,7 +13,7 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.currentRoundNumber = BigInt.fromI32(1)
     globalState.lastRoundStartTime = ZERO
     globalState.lastRoundPaid = ZERO
-    globalState.gamePeriod = BigInt.fromI32(80) // Default 80 seconds
+    globalState.gamePeriod = BigInt.fromI32(60) // Default 60 seconds
     globalState.totalPayouts = ZERO
     globalState.totalBurned = ZERO
     globalState.currentJackpot = ZERO
