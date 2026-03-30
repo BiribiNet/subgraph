@@ -12,27 +12,31 @@ import { BetPlaced, RoundCleaningCompleted } from '../generated/StakedBRB/Staked
 import { handleBetPlaced, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
 import { VRFResult } from '../generated/RouletteClean/Game';
 import { handleVRFResult } from '../src/mappings/roulette';
-import { ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
+import { ROUND_STATUS_BETTING, ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
 // Tests structure (matchstick-as >=0.5.0)
 // https://thegraph.com/docs/en/developer/matchstick/#tests-structure-0-5-0
 
-const initializeRound = (): void => {
+const emitRoundCleaningCompleted = (cleanedRoundId: i32, newRoundId: i32, boundaryTs: i32): void => {
     const ev = changetype<RoundCleaningCompleted>(newMockEvent());
     ev.parameters = new Array<ethereum.EventParam>();
-    ev.parameters.push(new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0))));
-    ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    ev.parameters.push(new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1_000_000))));
+    ev.parameters.push(new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId))));
+    ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(newRoundId))));
+    ev.parameters.push(new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(boundaryTs))));
     const feesTuple = new ethereum.Tuple();
     feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
     feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
     feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
     ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
     ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-    ev.block.timestamp = BigInt.fromI32(1_000_000);
+    ev.block.timestamp = BigInt.fromI32(boundaryTs);
     ev.block.number = BigInt.fromI32(10000);
     handleRoundCleaningCompleted(ev);
+}
+
+const initializeRound = (): void => {
+  emitRoundCleaningCompleted(0, 1, 1_000_000);
 }
 const initializeBet = (): void => {
   const betPlacedEvent = changetype<BetPlaced>(newMockEvent());
@@ -74,5 +78,16 @@ describe('RouletteBet tests', () => {
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_PAYOUT)
     // assert.fieldEquals('RouletteBet', '0xbbbbedc42dc53842141be8f70df9efe4d08538a41', 'user', '0xbbbbedc42dc53842141be8f70df9efe4d08538a4');
+  });
+
+  test('BetPlaced before RoundCleaningCompleted lazily creates round (log order)', () => {
+    initializeBet();
+    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
+    assert.entityCount('RouletteRound', 1);
+    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
+    assert.fieldEquals('RouletteRound', roundId, 'startedAt', '1000000');
+
+    emitRoundCleaningCompleted(0, 1, 950_000);
+    assert.fieldEquals('RouletteRound', roundId, 'startedAt', '950000');
   });
 });

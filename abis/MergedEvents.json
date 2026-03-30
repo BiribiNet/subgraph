@@ -274,7 +274,7 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "uint256",
         "name": "newRoundId",
         "type": "uint256"
@@ -420,19 +420,6 @@
       }
     ],
     "name": "LiquidityEscrowSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "ops",
-        "type": "uint32"
-      }
-    ],
-    "name": "LiquidityOpsPerUpkeepUpdated",
     "type": "event"
   },
   {

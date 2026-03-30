@@ -25,6 +25,11 @@
         "internalType": "address",
         "name": "upkeepManager",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "secondsPerRound",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -370,12 +375,12 @@
   },
   {
     "inputs": [],
-    "name": "OnlyCleaningForwarders",
+    "name": "OnlyRoulette",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "OnlyRoulette",
+    "name": "OnlyStakedBrbForwarders",
     "type": "error"
   },
   {
@@ -597,19 +602,6 @@
       }
     ],
     "name": "LiquidityEscrowSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "ops",
-        "type": "uint32"
-      }
-    ],
-    "name": "LiquidityOpsPerUpkeepUpdated",
     "type": "event"
   },
   {
@@ -1316,12 +1308,12 @@
   },
   {
     "inputs": [],
-    "name": "getLiquidityOpsPerCleaningUpkeep",
+    "name": "gamePeriod",
     "outputs": [
       {
-        "internalType": "uint32",
+        "internalType": "uint256",
         "name": "",
-        "type": "uint32"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1330,47 +1322,6 @@
   {
     "inputs": [],
     "name": "getMaxPayout",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getOperationalLimits",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "maxWithdrawalBatchSize",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "maxQueueLength",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint32",
-        "name": "maxLiquidityOpsPerCleaningUpkeep",
-        "type": "uint32"
-      },
-      {
-        "internalType": "uint32",
-        "name": "cleaningUpkeepGasLimit",
-        "type": "uint32"
-      }
-    ],
-    "stateMutability": "pure",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getPendingBets",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1402,7 +1353,7 @@
   },
   {
     "inputs": [],
-    "name": "getSafeCapacity",
+    "name": "getSecondsFromNextUpkeepWindow",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1426,11 +1377,6 @@
       {
         "internalType": "uint256",
         "name": "pendingAmount",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "queuePosition",
         "type": "uint256"
       }
     ],
@@ -1498,6 +1444,11 @@
         "internalType": "uint256",
         "name": "maxQueueLength",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint32",
+        "name": "liquidityOpsPerCleaningUpkeep",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -1576,6 +1527,32 @@
     "name": "initialize",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "isBettingOpen",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "isVrfUpkeepNeeded",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1711,19 +1688,6 @@
   },
   {
     "inputs": [],
-    "name": "onBettingWindowClosed",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newRoundId",
-        "type": "uint256"
-      }
-    ],
     "name": "onRoundTransition",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -1802,47 +1766,6 @@
       {
         "internalType": "uint256",
         "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "lossAmount",
-        "type": "uint256"
-      }
-    ],
-    "name": "previewProtocolFee",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "protocolFees",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "burnAmount",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "jackpotAmount",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct StakedBRB.Fees",
-        "name": "fee",
-        "type": "tuple"
-      },
-      {
-        "internalType": "uint256",
-        "name": "stakerProfit",
         "type": "uint256"
       }
     ],

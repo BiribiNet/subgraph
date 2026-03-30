@@ -15,7 +15,6 @@ import {
   RoundCleaningCompleted,
   BettingWindowClosed,
   LiquidityEscrowSet,
-  LiquidityOpsPerUpkeepUpdated,
   QueuedLiquidityRejected,
   WithdrawalEjected
 } from "../../generated/StakedBRB/StakedBRB"
@@ -254,11 +253,17 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   }
 
   const newRoundIdBytes = bigintToBytes(newRoundId)
-  if (RouletteRound.load(newRoundIdBytes) == null) {
-    const nextRound = createNewRouletteRound(newRoundId, boundaryTs)
+  let nextRound = RouletteRound.load(newRoundIdBytes)
+  if (nextRound == null) {
+    nextRound = createNewRouletteRound(newRoundId, boundaryTs)
     nextRound.save()
   } else {
-    log.warning("RouletteRound {} already exists at RoundCleaningCompleted; skipping create", [newRoundId.toString()])
+    nextRound.startedAt = boundaryTs
+    nextRound.save()
+    log.warning(
+      "RouletteRound {} already existed at RoundCleaningCompleted (bets indexed first); aligned startedAt to boundaryTimestamp",
+      [newRoundId.toString()]
+    )
   }
 
   globalState.currentRound = newRoundIdBytes
@@ -416,12 +421,6 @@ export function handleLiquidityEscrowSet(event: LiquidityEscrowSet): void {
   globalState.save()
 }
 
-export function handleLiquidityOpsPerUpkeepUpdated(event: LiquidityOpsPerUpkeepUpdated): void {
-  const globalState = getOrCreateGlobalState()
-  globalState.liquidityOpsPerCleaningUpkeep = event.params.ops
-  globalState.save()
-}
-
 export function handleQueuedLiquidityRejected(event: QueuedLiquidityRejected): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const row = new QueuedLiquidityRejectedLog(id)
@@ -526,8 +525,14 @@ export function handleBetPlaced(event: BetPlaced): void {
     const roundId = bigintToBytes(event.params.roundId)
     let round = RouletteRound.load(roundId)
     if (round == null) {
-      log.critical("Round not found for bet placement: {}", [roundId.toString()])
-      return
+      // Same block can index BetPlaced before RoundCleaningCompleted (lower log index).
+      // Create the round here; RCC will set authoritative `startedAt` from `boundaryTimestamp` when it runs.
+      log.warning(
+        "RouletteRound not yet present for bet; creating provisional round {} (BetPlaced before RoundCleaningCompleted)",
+        [event.params.roundId.toString()]
+      )
+      round = createNewRouletteRound(event.params.roundId, event.block.timestamp)
+      round.save()
     }
 
     // Check if this is the user's first bet in this round (for betCount tracking)
