@@ -763,3 +763,5 @@ type ProtocolStats @entity(immutable: false) {
   "Total BRB withdrawn from sBRB vault all time"
   totalWithdrawn: BigInt!
 }
+
+# sync-pipeline-build-id: 1774909796497

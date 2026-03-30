@@ -17,11 +17,11 @@ import { handleTransfer as handleBrbrTransfer } from '../src/mappings/brbReferal
 import { VrfRequested, VRFResult } from '../generated/RouletteClean/Game';
 import { handleVrfRequested, handleVRFResult } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
+import { STAKED_BRB_CONTRACT_ADDRESS } from '../src/helpers/constant';
 
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
-const STAKED_BRB = '0x306a67e1ca543c0892011174fa02cb1848172965';
 const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
 
 function createRoundCleaningCompleted(
@@ -157,8 +157,8 @@ describe('totalLost derived calculation', () => {
     // VRF result (puts round 1 into PAYOUT status)
     fireVrfResult(1, 4); // winning number = 4 (matches our bet)
 
-    // Payout from StakedBRB to user
-    createPayoutTransfer(STAKED_BRB, USER_ADDRESS, '360000000000000000000');
+    // Payout from StakedBRB to user (must match STAKED_BRB_CONTRACT_ADDRESS in mappings)
+    createPayoutTransfer(STAKED_BRB_CONTRACT_ADDRESS, USER_ADDRESS, '360000000000000000000');
 
     // totalLost should be totalRouletteBets - totalWon = 10 - 360 = 0 (clamped by actual logic)
     // Actually: totalRouletteBets = 10, totalWon = 360

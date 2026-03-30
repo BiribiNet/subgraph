@@ -30,10 +30,10 @@ transforms:
         _gs_op
       FROM raw_logs
       WHERE address IN (
-        '0x8ef29cae1d54ee178b09537744ec6dc5c8e9c205',
-        '0xc85599951f2a8ab3d767c1c6ccb4222671cdc9c2',
-        '0x3dd6d443502fa4d5427cf00ba548ab63ef5a431c',
-        '0x9cc8d4ac4ab6d33091b88ed89d32ec1f44c0725c'
+        '0x50c6980adcb0208edb45e1c1d7d948ca57cbdaba',
+        '0x73107b81e444306fb00fbf1f410dd8a919fe1ec2',
+        '0x5bfd71df5a4c57b2d58524f281a33a0bb4f190a7',
+        '0x53142f52228d34f2afe1be77d897d570eeebd99f'
       )
     type: sql
   roulette_events:
