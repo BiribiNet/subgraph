@@ -1,15 +1,15 @@
 {
-  "startBlock": 255152081,
+  "startBlock": 255401323,
   "startBlocks": {
-    "brb": 255152087,
-    "roulette": 255152126,
-    "stakedBRB": 255152120,
-    "brbReferal": 255152081
+    "brb": 255401323,
+    "roulette": 255401360,
+    "stakedBRB": 255401355,
+    "brbReferal": 255401317
   },
   "addresses": {
-    "brb": "0x50c6980adcb0208edb45e1c1d7d948ca57cbdaba",
-    "roulette": "0x73107b81e444306fb00fbf1f410dd8a919fe1ec2",
-    "stakedBRB": "0x5bfd71df5a4c57b2d58524f281a33a0bb4f190a7",
-    "brbReferal": "0x53142f52228d34f2afe1be77d897d570eeebd99f"
+    "brb": "0x2be80f46b87100566b38e35ef3a5df5724101bf1",
+    "roulette": "0xff87a8b05d86a2929c4ae021f87bcb5ead102d42",
+    "stakedBRB": "0x76a3786fbff518a2ac81f1e735218096abc1498d",
+    "brbReferal": "0x57cff27fc1675425801a29dbce9290f46af0c16c"
   }
 }

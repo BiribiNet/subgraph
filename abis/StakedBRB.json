@@ -340,26 +340,6 @@
   },
   {
     "inputs": [],
-    "name": "MaxAmountError",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "MaxSharesError",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "MinAmountError",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "MinSharesError",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "NoWithdrawalPending",
     "type": "error"
   },
@@ -391,6 +371,17 @@
   {
     "inputs": [],
     "name": "QueueIsEmpty",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "SafeERC20FailedOperation",
     "type": "error"
   },
   {
@@ -990,6 +981,19 @@
   },
   {
     "inputs": [],
+    "name": "GAME_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MAX_LIQUIDITY_OPS_PER_UPKEEP",
     "outputs": [
       {
@@ -1239,11 +1243,6 @@
         "internalType": "address",
         "name": "receiver",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "minSharesOut",
-        "type": "uint256"
       }
     ],
     "name": "deposit",
@@ -1268,11 +1267,6 @@
         "internalType": "address",
         "name": "receiver",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "minSharesOut",
-        "type": "uint256"
       },
       {
         "internalType": "uint256",
@@ -1387,16 +1381,6 @@
     "inputs": [],
     "name": "getVaultConfig",
     "outputs": [
-      {
-        "internalType": "address",
-        "name": "brbToken",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "rouletteContract",
-        "type": "address"
-      },
       {
         "internalType": "uint256",
         "name": "protocolFeeBasisPoints",
@@ -1655,11 +1639,6 @@
         "internalType": "address",
         "name": "receiver",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "maxAmountIn",
-        "type": "uint256"
       }
     ],
     "name": "mint",
@@ -1879,11 +1858,6 @@
         "internalType": "address",
         "name": "owner",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "minAmountOut",
-        "type": "uint256"
       }
     ],
     "name": "redeem",
@@ -2208,11 +2182,6 @@
         "internalType": "address",
         "name": "owner",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "maxSharesOut",
-        "type": "uint256"
       }
     ],
     "name": "withdraw",
