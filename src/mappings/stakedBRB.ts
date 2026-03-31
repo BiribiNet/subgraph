@@ -7,6 +7,7 @@ import {
   WithdrawalProcessed,
   ProtocolFeeRateUpdated,
   BetPlaced,
+  FirstBetPlaced,
   WithdrawalSettingsUpdated,
   AntiSpamSettingsUpdated,
   BurnFeeRateUpdated,
@@ -490,6 +491,19 @@ export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpd
   // Update protocol fee recipient
   globalState.feeRecipient = event.params.newRecipient
   globalState.save()
+}
+
+/** Anchor the first-vault-bet timestamp per round from the new FirstBetPlaced event. */
+export function handleFirstBetPlaced(event: FirstBetPlaced): void {
+  const roundIdBytes = bigintToBytes(event.params.roundId)
+  const round = RouletteRound.load(roundIdBytes)
+  if (round == null) {
+    // Fallback: create round if it doesn't exist yet, using the provided timestamp.
+    return log.warning("RouletteRound not found for FirstBetPlaced: {}", [event.params.roundId.toString()])
+  } else {
+    round.firstBetAt = event.params.timestamp
+    round.save()
+  }
 }
 
 

@@ -153,6 +153,8 @@ type RouletteRound @entity(immutable: false) {
   roundNumber: BigInt!
   "Round status"
   status: RoundStatus!
+  "Timestamp of the first StakedBRB bet for this round (FirstBetPlaced event)"
+  firstBetAt: BigInt
   "Winning number (0-36)"
   winningNumber: BigInt
   "Jackpot number"

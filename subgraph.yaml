@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x465ff147187759f02f2192a5b41171bf420f8033"
-      startBlock: 255462888
+      address: "0x51ac8e3b12a9ef342b5d273bc3305c4916cb5c2c"
+      startBlock: 255473221
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -43,8 +43,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x7c16a2b7bf28eebaee74c46d68073f0bce7ba726"
-      startBlock: 255462924
+      address: "0x1b2ab925ded2ffd7e3737155bd3ef64af5cd779a"
+      startBlock: 255473258
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -92,8 +92,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: MergedEvents
-      address: "0xe97f3f00e8b95c15153b2b25dafc61cb51f29b6b"
-      startBlock: 255462918
+      address: "0x4317a59af46e1f09809a22a4ff0efb06afb4aadf"
+      startBlock: 255473253
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -154,6 +154,8 @@ dataSources:
           handler: handleBurnFeeRateUpdated
         - event: JackpotFeeRateUpdated(uint256)
           handler: handleJackpotFeeRateUpdated
+        - event: FirstBetPlaced(uint256,uint256)
+          handler: handleFirstBetPlaced
         - event: BetPlaced(address,uint256,bytes,uint256)
           handler: handleBetPlaced
         - event: Transfer(indexed address,indexed address,uint256)
@@ -186,8 +188,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferal
-      address: "0xfe9f172ba457a28281b8dfe115a58ae5c1f0389f"
-      startBlock: 255462882
+      address: "0x3d01c3ec1c845f8c8991ab302690990800d50e07"
+      startBlock: 255473216
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
