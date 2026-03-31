@@ -766,4 +766,4 @@ type ProtocolStats @entity(immutable: false) {
   totalWithdrawn: BigInt!
 }
 
-# sync-pipeline-build-id: 1774909796497
+# sync-pipeline-build-id: 1775000216171
