@@ -14,8 +14,8 @@ import { Transfer } from '../generated/BRBToken/BRB';
 import { handleTransfer } from '../src/mappings/brb';
 import { Transfer as BRBRTransfer } from '../generated/BRBReferal/BRBReferal';
 import { handleTransfer as handleBrbrTransfer } from '../src/mappings/brbReferal';
-import { VrfRequested, VRFResult } from '../generated/RouletteClean/Game';
-import { handleVrfRequested, handleVRFResult } from '../src/mappings/roulette';
+import { VrfRequested, VRFResult, ComputedPayouts } from '../generated/RouletteClean/Game';
+import { handleVrfRequested, handleVRFResult, handleComputedPayouts } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { STAKED_BRB_CONTRACT_ADDRESS } from '../src/helpers/constant';
 
@@ -100,9 +100,10 @@ function createPayoutTransfer(from: string, to: string, amount: string, timestam
 function fireVrfResult(roundId: i32 = 1, winningNumber: i32 = 7): void {
   const ev = changetype<VRFResult>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
+  // ABI order: roundId, winningNumber, jackpotNumber
   ev.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId))));
-  ev.parameters.push(new ethereum.EventParam('jackpotNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(5))));
   ev.parameters.push(new ethereum.EventParam('winningNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(winningNumber))));
+  ev.parameters.push(new ethereum.EventParam('jackpotNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(5))));
   ev.address = Address.fromString(CONTRACT_ADDRESS);
   ev.block.timestamp = BigInt.fromI32(1000100);
   ev.block.number = BigInt.fromI32(10001);
@@ -155,8 +156,17 @@ describe('totalLost derived calculation', () => {
     // Place bet on round 1
     placeBet(USER_ADDRESS, '10000000000000000000', 1, 4, 1);
 
-    // VRF result (puts round 1 into PAYOUT status)
+    // VRF result — sets winningNumber/jackpotNumber but does NOT change status
     fireVrfResult(1, 4); // winning number = 4 (matches our bet)
+
+    // ComputedPayouts advances status to COMPUTING_PAYOUT (required for payout detection)
+    const computedEv = changetype<ComputedPayouts>(newMockEvent());
+    computedEv.parameters = new Array<ethereum.EventParam>();
+    computedEv.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    computedEv.parameters.push(new ethereum.EventParam('totalWinningBets', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    computedEv.address = Address.fromString(CONTRACT_ADDRESS);
+    computedEv.block.timestamp = BigInt.fromI32(1000110);
+    handleComputedPayouts(computedEv);
 
     // Payout from StakedBRB to user (must match STAKED_BRB_CONTRACT_ADDRESS in mappings)
     createPayoutTransfer(STAKED_BRB_CONTRACT_ADDRESS, USER_ADDRESS, '360000000000000000000');
