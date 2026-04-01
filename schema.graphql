@@ -233,6 +233,12 @@ type RouletteRound @entity(immutable: false) {
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "round")
   "Array of jackpot payouts in this round"
   jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "round")
+  "Number of failed regular payout batches in this round"
+  failedPayoutBatches: BigInt!
+  "Number of failed jackpot payout batches in this round"
+  failedJackpotBatches: BigInt!
+  "Array of payout failures in this round"
+  payoutFailures: [PayoutFailure!]! @derivedFrom(field: "round")
 }
 
 type RouletteBet @entity(immutable: false) {
@@ -287,6 +293,23 @@ type PayoutTransaction @entity(immutable: true) {
   blockNumber: BigInt!
   "Block timestamp"
   timestamp: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
+type PayoutFailure @entity(immutable: true) {
+  "Transaction hash + log index"
+  id: Bytes!
+  "Round this failure belongs to"
+  round: RouletteRound!
+  "Batch index that failed"
+  batchIndex: BigInt!
+  "Failure type: JACKPOT or REGULAR"
+  failureType: String!
+  "Block timestamp"
+  timestamp: BigInt!
+  "Block number"
+  blockNumber: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
 }
