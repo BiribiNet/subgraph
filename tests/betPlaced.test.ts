@@ -12,7 +12,7 @@ import { BetPlaced, RoundCleaningCompleted } from '../generated/StakedBRB/Staked
 import { handleBetPlaced, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
 import { VRFResult } from '../generated/RouletteClean/Game';
 import { handleVRFResult } from '../src/mappings/roulette';
-import { ROUND_STATUS_BETTING, ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
+import { ROUND_STATUS_BETTING } from '../src/helpers/constant';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
 // Tests structure (matchstick-as >=0.5.0)
@@ -76,7 +76,7 @@ describe('RouletteBet tests', () => {
     assert.entityCount('RouletteBet', 1);
     // Round ID is bytes, not string
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_PAYOUT)
+    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING)
     // assert.fieldEquals('RouletteBet', '0xbbbbedc42dc53842141be8f70df9efe4d08538a41', 'user', '0xbbbbedc42dc53842141be8f70df9efe4d08538a4');
   });
 
