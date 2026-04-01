@@ -51,24 +51,26 @@ export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdat
   globalState.save()
 }
 
-/** VRF requested for the round that just ended; the next `RouletteRound` entity is created in `handleRoundCleaningCompleted` (authoritative `startedAt`). Current round pointers advance here so payout indexing in `brb.ts` matches the contract round id. */
+/** VRF requested for the round that just ended. The contract emits the
+ *  **resolving** round as the first parameter (named `newRoundId` in the ABI
+ *  due to a naming mismatch — it is actually the round being resolved, not the
+ *  next round). We apply VRF metadata directly to that round.
+ *  `globalState.currentRound` is NOT updated here — `handleRoundCleaningCompleted`
+ *  sets it authoritatively once cleaning finishes and the next round entity exists. */
 export function handleVrfRequested(event: VrfRequested): void {
   const globalState = getOrCreateGlobalState()
-  const newRoundId = event.params.newRoundId
-  const roundIdBytes = bigintToBytes(newRoundId)
-  globalState.currentRound = roundIdBytes
-  globalState.currentRoundNumber = newRoundId
   globalState.roundTransitionInProgress = true
   globalState.save()
 
-  const previousRoundId = newRoundId.minus(BigInt.fromI32(1))
-  const previousRound = RouletteRound.load(bigintToBytes(previousRoundId))
-  if (previousRound) {
-    previousRound.status = ROUND_STATUS_VRF
-    previousRound.requestId = event.params.requestId
-    previousRound.vrfTxHash = event.transaction.hash
-    previousRound.endedAt = event.block.timestamp
-    previousRound.save()
+  // Contract emits the resolving round as "newRoundId" (naming mismatch)
+  const resolvingRoundId = event.params.newRoundId
+  const round = RouletteRound.load(bigintToBytes(resolvingRoundId))
+  if (round) {
+    round.status = ROUND_STATUS_VRF
+    round.requestId = event.params.requestId
+    round.vrfTxHash = event.transaction.hash
+    round.endedAt = event.block.timestamp
+    round.save()
   }
 }
 

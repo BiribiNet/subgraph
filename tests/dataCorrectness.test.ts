@@ -144,12 +144,13 @@ describe('totalLost derived calculation', () => {
     initializeRound(1000000);
     const vrfEv = changetype<VrfRequested>(newMockEvent());
     vrfEv.parameters = new Array<ethereum.EventParam>();
-    vrfEv.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(2))));
+    // Contract emits resolving round (1) as "newRoundId" (ABI naming mismatch)
+    vrfEv.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
     vrfEv.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
     vrfEv.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1000050))));
     vrfEv.address = Address.fromString(CONTRACT_ADDRESS);
     vrfEv.block.timestamp = BigInt.fromI32(1000050);
-    handleVrfRequested(vrfEv); // Sets round 1 to VRF (round 2 entity is created on next cleaning)
+    handleVrfRequested(vrfEv); // Sets round 1 to VRF
 
     // Place bet on round 1
     placeBet(USER_ADDRESS, '10000000000000000000', 1, 4, 1);
