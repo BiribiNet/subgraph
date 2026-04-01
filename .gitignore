@@ -141,4 +141,4 @@ src/whitelist.ts
 
 # Goldsky deploy artifacts
 .goldsky-bundle.zip
-turbo.applied.yaml
+turbo.applied.yamlpackage-lock.json
