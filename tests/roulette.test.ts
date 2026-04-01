@@ -338,17 +338,20 @@ describe('handleVrfRequested', () => {
     clearStore();
   });
 
-  test('sets roundTransitionInProgress and moves previous round to VRF; next round appears on cleaning', () => {
+  test('sets roundTransitionInProgress and moves resolving round to VRF; next round appears on cleaning', () => {
     seedRoundOne(1000000);
     const round1Id = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_BETTING);
 
-    const ev2 = createVrfRequestedEvent(2, 200, 1000100);
-    handleVrfRequested(ev2);
+    // Contract emits the RESOLVING round (1) as the first param (named "newRoundId" in ABI)
+    const ev1 = createVrfRequestedEvent(1, 200, 1000100);
+    handleVrfRequested(ev1);
 
+    // VRF metadata applied directly to the resolving round (round 1)
     assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_VRF);
     assert.fieldEquals('RouletteRound', round1Id, 'requestId', '200');
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '2');
+    // globalState.currentRoundNumber is NOT updated by handleVrfRequested
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '1');
     assert.entityCount('RouletteRound', 1);
 
     const cleanEv = createRoundCleaningCompletedEvent(1, '0', '0', '0', 1000200);
@@ -366,7 +369,7 @@ describe('handleVRFResult', () => {
     clearStore();
   });
 
-  test('sets winning number, jackpot number, and status to PAYOUT', () => {
+  test('sets winning number, jackpot number, and vrfResultAt (status unchanged)', () => {
     seedRoundOne(1000000);
 
     // Emit VRFResult for round 1
@@ -376,7 +379,8 @@ describe('handleVRFResult', () => {
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.fieldEquals('RouletteRound', roundId, 'winningNumber', '17');
     assert.fieldEquals('RouletteRound', roundId, 'jackpotNumber', '5');
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_PAYOUT);
+    // handleVRFResult does NOT change status — status advances via ComputedPayouts or RoundResolved
+    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
     assert.fieldEquals('RouletteRound', roundId, 'vrfResultAt', '1000100');
   });
 });
