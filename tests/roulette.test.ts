@@ -350,8 +350,8 @@ describe('handleVrfRequested', () => {
     // VRF metadata applied directly to the resolving round (round 1)
     assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_VRF);
     assert.fieldEquals('RouletteRound', round1Id, 'requestId', '200');
-    // globalState.currentRoundNumber is NOT updated by handleVrfRequested
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '1');
+    // globalState.currentRoundNumber advances to resolvingRound + 1 = 2
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '2');
     assert.entityCount('RouletteRound', 1);
 
     const cleanEv = createRoundCleaningCompletedEvent(1, '0', '0', '0', 1000200);
