@@ -72,6 +72,8 @@ dataSources:
           handler: handleVrfRequested
         - event: RoundResolved(uint256)
           handler: handleRoundResolved
+        - event: RoundForceResolved(indexed uint256,uint256)
+          handler: handleRoundForceResolved
         - event: VRFResult(uint256,uint256,uint256)
           handler: handleVRFResult
         - event: BatchProcessed(uint256,uint256,uint256)

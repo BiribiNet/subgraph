@@ -217,6 +217,8 @@ type RouletteRound @entity(immutable: false) {
   resolvedAt: BigInt
   "Cleaning completion timestamp"
   cleaningCompletedAt: BigInt
+  "Whether this round was force-resolved by admin (VRF timeout recovery)"
+  forceResolved: Boolean
   "Stakers revenue share (95% of house edge)"
   stakersRevenue: BigInt
   "Jackpot revenue share (2.5%)"

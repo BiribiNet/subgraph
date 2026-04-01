@@ -2,6 +2,7 @@ import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import {
   VrfRequested,
   RoundResolved,
+  RoundForceResolved,
   VRFResult,
   BatchProcessed,
   JackpotResultEvent,
@@ -79,11 +80,14 @@ export function handleVRFResult(event: VRFResult): void {
     return
   }
 
-  // Update round with VRF result
+  // Update round with VRF result data only — do NOT advance status here.
+  // Status stays VRF until ComputedPayouts (normal case) or RoundResolved (no winners).
+  // This prevents the backwards status transition: PAYOUT → COMPUTING_PAYOUT
+  // that occurred because VRFResult and ComputedPayouts are emitted in the same tx
+  // with VRFResult first (log order).
   round.jackpotNumber = event.params.jackpotNumber;
   round.winningNumber = event.params.winningNumber
   round.vrfResultAt = event.block.timestamp
-  round.status = ROUND_STATUS_PAYOUT
   round.save()
 
   // Note: Bet winning/losing is now determined by actual payout transfers
@@ -115,6 +119,21 @@ export function handleRoundResolved(event: RoundResolved): void {
 
   round.status = ROUND_STATUS_CLEAN
   round.resolvedAt = event.block.timestamp
+  round.save()
+}
+
+export function handleRoundForceResolved(event: RoundForceResolved): void {
+  const roundId = event.params.roundId
+  const round = RouletteRound.load(bigintToBytes(roundId))
+  if (!round) {
+    log.error("Round not found for force resolution: {}", [roundId.toString()])
+    return
+  }
+
+  round.status = ROUND_STATUS_CLEAN
+  round.winningNumber = BigInt.fromI32(37) // void marker — no valid bet can match
+  round.resolvedAt = event.block.timestamp
+  round.forceResolved = true
   round.save()
 }
 
