@@ -36,6 +36,8 @@ export function createNewRouletteRound(roundNumber: BigInt, startedAt: BigInt): 
   round.totalPayouts = BigInt.fromI32(0)
   round.uniqueBettors = BigInt.fromI32(0)
   round.betCount = BigInt.fromI32(0)
+  round.failedPayoutBatches = BigInt.fromI32(0)
+  round.failedJackpotBatches = BigInt.fromI32(0)
   round.startedAt = startedAt
   return round
 }

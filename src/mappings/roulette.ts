@@ -8,6 +8,8 @@ import {
   JackpotResultEvent,
   ComputedPayouts,
   MinJackpotConditionUpdated,
+  JackpotPayoutFailed,
+  PayoutBatchFailed,
   RoleGranted,
   RoleRevoked,
   RoleAdminChanged,
@@ -17,7 +19,8 @@ import {
 import {
   RouletteRound,
   AdminRoleChange,
-  ContractUpgrade
+  ContractUpgrade,
+  PayoutFailure
 } from "../../generated/schema"
 import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -216,4 +219,40 @@ export function handleGameUpgraded(event: Upgraded): void {
   entity.timestamp = event.block.timestamp
   entity.transactionHash = event.transaction.hash
   entity.save()
+}
+
+export function handleJackpotPayoutFailed(event: JackpotPayoutFailed): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const failure = new PayoutFailure(id)
+  failure.round = bigintToBytes(event.params.roundId)
+  failure.batchIndex = event.params.batchIndex
+  failure.failureType = "JACKPOT"
+  failure.timestamp = event.block.timestamp
+  failure.blockNumber = event.block.number
+  failure.transactionHash = event.transaction.hash
+  failure.save()
+
+  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
+  if (round) {
+    round.failedJackpotBatches = round.failedJackpotBatches.plus(BigInt.fromI32(1))
+    round.save()
+  }
+}
+
+export function handlePayoutBatchFailed(event: PayoutBatchFailed): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const failure = new PayoutFailure(id)
+  failure.round = bigintToBytes(event.params.roundId)
+  failure.batchIndex = event.params.batchIndex
+  failure.failureType = "REGULAR"
+  failure.timestamp = event.block.timestamp
+  failure.blockNumber = event.block.number
+  failure.transactionHash = event.transaction.hash
+  failure.save()
+
+  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
+  if (round) {
+    round.failedPayoutBatches = round.failedPayoutBatches.plus(BigInt.fromI32(1))
+    round.save()
+  }
 }
