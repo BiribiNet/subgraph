@@ -1,4 +1,4 @@
-import { BigInt } from "@graphprotocol/graph-ts"
+import { BigInt, log } from "@graphprotocol/graph-ts"
 import { Transfer, Approval } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction, TokenApproval } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats, updateUserLastActive } from "../helpers/user"
@@ -165,6 +165,17 @@ export function handleTransfer(event: Transfer): void {
             hourlyRegularPayout.totalPayouts = hourlyRegularPayout.totalPayouts.plus(event.params.value)
             hourlyRegularPayout.save()
           }
+        }
+
+        // Sanity check: warn if actualPayout exceeds theoretical max (36x straight bet)
+        const maxTheoreticalPayout = bet.totalAmount.times(BigInt.fromI32(36))
+        if (bet.actualPayout.gt(maxTheoreticalPayout)) {
+          log.warning("Bet {} payout {} exceeds 36x max ({}) for wager {}", [
+            bet.id.toHexString(),
+            bet.actualPayout.toString(),
+            maxTheoreticalPayout.toString(),
+            bet.totalAmount.toString()
+          ])
         }
 
         bet.save()
