@@ -79,11 +79,14 @@ export function handleVRFResult(event: VRFResult): void {
     return
   }
 
-  // Update round with VRF result
+  // Update round with VRF result data only — do NOT advance status here.
+  // Status stays VRF until ComputedPayouts (normal case) or RoundResolved (no winners).
+  // This prevents the backwards status transition: PAYOUT → COMPUTING_PAYOUT
+  // that occurred because VRFResult and ComputedPayouts are emitted in the same tx
+  // with VRFResult first (log order).
   round.jackpotNumber = event.params.jackpotNumber;
   round.winningNumber = event.params.winningNumber
   round.vrfResultAt = event.block.timestamp
-  round.status = ROUND_STATUS_PAYOUT
   round.save()
 
   // Note: Bet winning/losing is now determined by actual payout transfers
