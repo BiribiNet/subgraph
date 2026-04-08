@@ -142,3 +142,6 @@ src/whitelist.ts
 # Goldsky deploy artifacts
 .goldsky-bundle.zip
 turbo.applied.yaml
+
+# npm lockfile (project uses yarn)
+package-lock.json
