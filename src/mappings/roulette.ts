@@ -233,6 +233,7 @@ export function handleJackpotPayoutFailed(event: JackpotPayoutFailed): void {
   failure.round = bigintToBytes(event.params.roundId)
   failure.batchIndex = event.params.batchIndex
   failure.failureType = "JACKPOT"
+  failure.reason = event.params.reason
   failure.timestamp = event.block.timestamp
   failure.blockNumber = event.block.number
   failure.transactionHash = event.transaction.hash
@@ -251,6 +252,7 @@ export function handlePayoutBatchFailed(event: PayoutBatchFailed): void {
   failure.round = bigintToBytes(event.params.roundId)
   failure.batchIndex = event.params.batchIndex
   failure.failureType = "REGULAR"
+  failure.reason = event.params.reason
   failure.timestamp = event.block.timestamp
   failure.blockNumber = event.block.number
   failure.transactionHash = event.transaction.hash

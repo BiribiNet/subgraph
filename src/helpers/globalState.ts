@@ -1,7 +1,10 @@
 import { Bytes, BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { GlobalState, APYSnapshot, VaultState, ProtocolStats } from "../../generated/schema"
+import { GlobalState, APYSnapshot, VaultState, ProtocolStats, VaultConfig, ChainlinkConfig } from "../../generated/schema"
 import { ZERO } from "./number"
 import { bigintToBytes } from "./bigintToBytes"
+
+const VAULT_CONFIG_ID = Bytes.fromHexString("0x01")
+const CHAINLINK_CONFIG_ID = Bytes.fromHexString("0x02")
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
 
@@ -356,4 +359,106 @@ export function getOrCreateProtocolStats(): ProtocolStats {
   return stats
 }
 
-export { GLOBAL_STATE_ID }
+/**
+ * Sync VaultConfig and ChainlinkConfig from GlobalState.
+ * Call after GlobalState is updated and saved to keep the new entities in sync.
+ * This enables a gradual migration: handlers still write to GlobalState,
+ * and this function mirrors relevant fields to the split entities.
+ */
+export function syncSplitEntitiesFromGlobalState(globalState: GlobalState): void {
+  const vc = getOrCreateVaultConfig()
+  vc.protocolFeeBasisPoints = globalState.protocolFeeBasisPoints
+  vc.jackpotFeeBasisPoints = globalState.jackpotFeeBasisPoints
+  vc.burnFeeBasisPoints = globalState.burnFeeBasisPoints
+  vc.feeRecipient = globalState.feeRecipient
+  vc.totalBurned = globalState.totalBurned
+  vc.currentJackpot = globalState.currentJackpot
+  vc.totalFees = globalState.totalFees
+  vc.minJackpotCondition = globalState.minJackpotCondition
+  vc.largeWithdrawalBatchSize = globalState.largeWithdrawalBatchSize
+  vc.maxQueueLength = globalState.maxQueueLength
+  vc.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals
+  vc.withdrawalQueueCounter = globalState.withdrawalQueueCounter
+  vc.liquidityEscrow = globalState.liquidityEscrow
+  vc.liquidityOpsPerCleaningUpkeep = globalState.liquidityOpsPerCleaningUpkeep
+  vc.totalAssets = globalState.totalAssets
+  vc.totalShares = globalState.totalShares
+  vc.sharePrice = globalState.sharePrice
+  vc.apy7Day = globalState.apy7Day
+  vc.apy30Day = globalState.apy30Day
+  vc.apy365Day = globalState.apy365Day
+  vc.apyLifetime = globalState.apyLifetime
+  vc.apyLifetimeBaselineTimestamp = globalState.apyLifetimeBaselineTimestamp
+  vc.apyLifetimeBaselineTotalAssets = globalState.apyLifetimeBaselineTotalAssets
+  vc.apyLifetimeBaselineTotalShares = globalState.apyLifetimeBaselineTotalShares
+  vc.lastApySnapshotTimestamp = globalState.lastApySnapshotTimestamp
+  vc.totalDeposits = globalState.totalDeposits
+  vc.totalTransfersToPool = globalState.totalTransfersToPool
+  vc.totalTransfersToPoolAtLastClean = globalState.totalTransfersToPoolAtLastClean
+  vc.totalDepositsAtLastClean = globalState.totalDepositsAtLastClean
+  vc.totalStakerRevenue = globalState.totalStakerRevenue
+  vc.brbPrice = globalState.brbPrice
+  vc.brbPriceUpdatedAt = globalState.brbPriceUpdatedAt
+  vc.stakersCount = globalState.stakersCount
+  vc.save()
+
+  const cc = getOrCreateChainlinkConfig()
+  cc.chainlinkKeeperRegistry = globalState.chainlinkKeeperRegistry
+  cc.chainlinkKeeperRegistrar = globalState.chainlinkKeeperRegistrar
+  cc.subscriptionId = globalState.subscriptionId
+  cc.save()
+}
+
+export function getOrCreateVaultConfig(): VaultConfig {
+  let config = VaultConfig.load(VAULT_CONFIG_ID)
+  if (!config) {
+    config = new VaultConfig(VAULT_CONFIG_ID)
+    config.protocolFeeBasisPoints = BigInt.fromI32(200)
+    config.jackpotFeeBasisPoints = BigInt.fromI32(250)
+    config.burnFeeBasisPoints = BigInt.fromI32(50)
+    config.feeRecipient = Bytes.fromHexString("0x0000000000000000000000000000000000000000")
+    config.totalBurned = ZERO
+    config.currentJackpot = ZERO
+    config.totalFees = ZERO
+    config.minJackpotCondition = ZERO
+    config.largeWithdrawalBatchSize = BigInt.fromI32(5)
+    config.maxQueueLength = BigInt.fromI32(100)
+    config.totalPendingLargeWithdrawals = ZERO
+    config.withdrawalQueueCounter = ZERO
+    config.liquidityEscrow = Bytes.fromHexString("0x0000000000000000000000000000000000000000")
+    config.liquidityOpsPerCleaningUpkeep = BigInt.fromI32(40)
+    config.totalAssets = ZERO
+    config.totalShares = ZERO
+    config.sharePrice = BigDecimal.fromString("1")
+    config.apy7Day = BigDecimal.fromString("0")
+    config.apy30Day = BigDecimal.fromString("0")
+    config.apy365Day = BigDecimal.fromString("0")
+    config.apyLifetime = BigDecimal.fromString("0")
+    config.apyLifetimeBaselineTimestamp = ZERO
+    config.apyLifetimeBaselineTotalAssets = ZERO
+    config.apyLifetimeBaselineTotalShares = ZERO
+    config.lastApySnapshotTimestamp = ZERO
+    config.totalDeposits = ZERO
+    config.totalTransfersToPool = ZERO
+    config.totalTransfersToPoolAtLastClean = ZERO
+    config.totalDepositsAtLastClean = ZERO
+    config.totalStakerRevenue = ZERO
+    config.brbPrice = BigDecimal.fromString("0")
+    config.brbPriceUpdatedAt = ZERO
+    config.stakersCount = ZERO
+  }
+  return config
+}
+
+export function getOrCreateChainlinkConfig(): ChainlinkConfig {
+  let config = ChainlinkConfig.load(CHAINLINK_CONFIG_ID)
+  if (!config) {
+    config = new ChainlinkConfig(CHAINLINK_CONFIG_ID)
+    config.chainlinkKeeperRegistry = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
+    config.chainlinkKeeperRegistrar = Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000000")
+    config.subscriptionId = ZERO
+  }
+  return config
+}
+
+export { GLOBAL_STATE_ID, VAULT_CONFIG_ID, CHAINLINK_CONFIG_ID }

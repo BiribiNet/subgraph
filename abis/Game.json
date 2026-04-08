@@ -457,6 +457,12 @@
         "internalType": "uint256",
         "name": "batchIndex",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "reason",
+        "type": "bytes"
       }
     ],
     "name": "JackpotPayoutFailed",
@@ -476,6 +482,12 @@
         "internalType": "uint256",
         "name": "batchIndex",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "reason",
+        "type": "bytes"
       }
     ],
     "name": "PayoutBatchFailed",

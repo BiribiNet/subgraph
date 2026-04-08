@@ -306,6 +306,8 @@ type PayoutFailure @entity(immutable: true) {
   batchIndex: BigInt!
   "Failure type: JACKPOT or REGULAR"
   failureType: String!
+  "Revert reason bytes from the failed call (ABI-encoded error selector + data)"
+  reason: Bytes
   "Block timestamp"
   timestamp: BigInt!
   "Block number"
@@ -420,6 +422,96 @@ type GlobalState @entity(immutable: false) {
   lastBettingWindowClosedRoundId: BigInt!
   "Block timestamp of last BettingWindowClosed event"
   lastBettingWindowClosedAt: BigInt!
+}
+
+"""
+Vault-specific configuration and metrics (extracted from GlobalState for cleaner separation).
+Singleton entity with id = Bytes(0x01).
+"""
+type VaultConfig @entity(immutable: false) {
+  "Singleton ID"
+  id: Bytes!
+  "Protocol fee basis points"
+  protocolFeeBasisPoints: BigInt!
+  "Jackpot fee basis points"
+  jackpotFeeBasisPoints: BigInt!
+  "Burn fee basis points"
+  burnFeeBasisPoints: BigInt!
+  "Fee recipient address"
+  feeRecipient: Bytes!
+  "Total burned"
+  totalBurned: BigInt!
+  "Current jackpot pool"
+  currentJackpot: BigInt!
+  "Total protocol fees collected"
+  totalFees: BigInt!
+  "Minimum jackpot condition"
+  minJackpotCondition: BigInt!
+  "Large withdrawal batch size"
+  largeWithdrawalBatchSize: BigInt!
+  "Max queue length"
+  maxQueueLength: BigInt!
+  "Total pending large withdrawals"
+  totalPendingLargeWithdrawals: BigInt!
+  "Counter for withdrawal queue position"
+  withdrawalQueueCounter: BigInt!
+  "Liquidity escrow address"
+  liquidityEscrow: Bytes!
+  "Max deposit/mint queue ops per cleaning upkeep"
+  liquidityOpsPerCleaningUpkeep: BigInt!
+  "Total assets under management in StakedBRB"
+  totalAssets: BigInt!
+  "Total shares issued by StakedBRB"
+  totalShares: BigInt!
+  "Current sBRB share price (BRB per sBRB)"
+  sharePrice: BigDecimal!
+  "APY - 7 day rolling window"
+  apy7Day: BigDecimal!
+  "APY - 30 day rolling window"
+  apy30Day: BigDecimal!
+  "APY - 365 day rolling window"
+  apy365Day: BigDecimal!
+  "APY - Lifetime since inception"
+  apyLifetime: BigDecimal!
+  "APY lifetime baseline timestamp"
+  apyLifetimeBaselineTimestamp: BigInt!
+  "APY lifetime baseline total assets"
+  apyLifetimeBaselineTotalAssets: BigInt!
+  "APY lifetime baseline total shares"
+  apyLifetimeBaselineTotalShares: BigInt!
+  "Last APY snapshot timestamp"
+  lastApySnapshotTimestamp: BigInt!
+  "Cumulative total BRB deposited via ERC-4626 Deposit events"
+  totalDeposits: BigInt!
+  "Cumulative total BRB transfers TO StakedBRB contract"
+  totalTransfersToPool: BigInt!
+  "totalTransfersToPool snapshot at last round cleanup"
+  totalTransfersToPoolAtLastClean: BigInt!
+  "totalDeposits snapshot at last round cleanup"
+  totalDepositsAtLastClean: BigInt!
+  "Cumulative total staker revenue"
+  totalStakerRevenue: BigInt!
+  "Current BRB price from DEX"
+  brbPrice: BigDecimal!
+  "BRB price last updated at"
+  brbPriceUpdatedAt: BigInt!
+  "Stakers count"
+  stakersCount: BigInt!
+}
+
+"""
+Chainlink-specific configuration (extracted from GlobalState).
+Singleton entity with id = Bytes(0x02).
+"""
+type ChainlinkConfig @entity(immutable: false) {
+  "Singleton ID"
+  id: Bytes!
+  "Chainlink keeper registry address"
+  chainlinkKeeperRegistry: Bytes!
+  "Chainlink keeper registrar address"
+  chainlinkKeeperRegistrar: Bytes!
+  "Chainlink VRF subscription ID"
+  subscriptionId: BigInt!
 }
 
 # Daily snapshot for APY calculations

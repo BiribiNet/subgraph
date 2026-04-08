@@ -50,7 +50,7 @@ import { ROUND_STATUS_BETTING, ROUND_STATUS_NO_MORE_BETS } from "../helpers/cons
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice, getOrCreateProtocolStats, calculateSharePrice, syncVaultState } from "../helpers/globalState"
+import { getOrCreateGlobalState, calculateAllAPYs, updateSharePrice, getOrCreateProtocolStats, calculateSharePrice, syncVaultState, syncSplitEntitiesFromGlobalState } from "../helpers/globalState"
 import { ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot, trackHourlyUniquePlayer } from "../helpers/aggregation"
 import { processRouletteBet, calculateMaxPayoutFromRoundComponents } from "../helpers/betting"
@@ -109,6 +109,7 @@ export function handleDeposit(event: Deposit): void {
   protocolStatsDeposit.save()
 
   globalState.save()
+  syncSplitEntitiesFromGlobalState(globalState)
 
   // Update VaultState singleton
   const vault = syncVaultState(globalState, event.block.timestamp)
@@ -271,6 +272,7 @@ export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): voi
   globalState.currentRoundNumber = newRoundId
   globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
   globalState.save()
+  syncSplitEntitiesFromGlobalState(globalState)
 }
 
 export function handleWithdraw(event: Withdraw): void {
@@ -337,6 +339,7 @@ export function handleWithdraw(event: Withdraw): void {
   protocolStatsWithdraw.save()
 
   globalState.save()
+  syncSplitEntitiesFromGlobalState(globalState)
 
   // Update VaultState singleton
   const vaultW = syncVaultState(globalState, event.block.timestamp)
@@ -517,7 +520,13 @@ export function handleBetPlaced(event: BetPlaced): void {
 
   // Decode the bytes parameter to get multiple bets
   const decoded = decodeWrapper(event.params.data, "(uint256[],uint256[],uint256[])");
-  
+  if (!decoded) {
+    log.error("Failed to decode bet data for tx {} logIndex {}. Round/bet detail entities will be incomplete.", [
+      event.transaction.hash.toHexString(),
+      event.logIndex.toString()
+    ])
+  }
+
   globalState.pendingBets = globalState.pendingBets.plus(event.params.amount);
   // Update total play all time
   globalState.totalPlayAllTime = globalState.totalPlayAllTime.plus(event.params.amount)

@@ -1,3 +1,7 @@
+// NETWORK: arbitrum-sepolia
+// These addresses MUST match the StakedBRB and Jackpot contract addresses in subgraph.yaml / networks.json.
+// Used in brb.ts to detect payout transfers (BRBToken handler cannot use dataSource.address() for cross-contract lookups).
+// Run `node scripts/validate-addresses.mjs` to verify consistency.
 export const STAKED_BRB_CONTRACT_ADDRESS = "0x522f98efd29cd9350f5c96961a418953fdf1039b"
 export const JACKPOT_CONTRACT_ADDRESS = "0x10c573dbd4436639cb1c936758720c72d5506042"
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"

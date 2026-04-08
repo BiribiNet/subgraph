@@ -79,9 +79,9 @@ dataSources:
           handler: handleVRFResult
         - event: BatchProcessed(uint256,uint256,uint256)
           handler: handleBatchProcessed
-        - event: JackpotPayoutFailed(indexed uint256,uint256)
+        - event: JackpotPayoutFailed(indexed uint256,uint256,bytes)
           handler: handleJackpotPayoutFailed
-        - event: PayoutBatchFailed(indexed uint256,uint256)
+        - event: PayoutBatchFailed(indexed uint256,uint256,bytes)
           handler: handlePayoutBatchFailed
         - event: RoleGranted(indexed bytes32,indexed address,indexed address)
           handler: handleGameRoleGranted
