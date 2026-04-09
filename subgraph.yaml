@@ -26,7 +26,7 @@ dataSources:
         - PayoutTransaction
         - RouletteRound
         - RouletteBet
-        - DailyStats
+        - DailyStat
         - TokenApproval
         - ProtocolStats
       abis:
@@ -117,7 +117,7 @@ dataSources:
         - RouletteRound
         - RouletteBet
         - WithdrawTransaction
-        - DailyStats
+        - DailyStat
         - DailyPlayer
         - HourlyVolumeSnapshot
         - HourlyPlayer

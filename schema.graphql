@@ -512,7 +512,7 @@ type LargeWithdrawalRequest @entity(immutable: false) {
   transactionHash: Bytes!
 }
 
-type DailyStats @entity(immutable: false) {
+type DailyStat @entity(immutable: false) {
   "Day number since epoch (timestamp / 86400)"
   id: ID!
   "Unix day number"

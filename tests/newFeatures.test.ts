@@ -258,9 +258,9 @@ describe('Betting Statistics Tests', () => {
     assert.fieldEquals('User', USER_ADDRESS_2, 'netProfit', '-20000000000000000000');
     // DailyStats should track all bets (all in same day since timestamps are close)
     const dayNumber = (1000000 / 86400).toString();
-    assert.fieldEquals('DailyStats', dayNumber, 'volume', '35000000000000000000');
-    assert.fieldEquals('DailyStats', dayNumber, 'betCount', '3');
-    assert.fieldEquals('DailyStats', dayNumber, 'uniquePlayers', '2');
+    assert.fieldEquals('DailyStat', dayNumber, 'volume', '35000000000000000000');
+    assert.fieldEquals('DailyStat', dayNumber, 'betCount', '3');
+    assert.fieldEquals('DailyStat', dayNumber, 'uniquePlayers', '2');
     // HourlyVolumeSnapshot should also track (all in same hour)
     const hourNumber = (1000000 / 3600).toString();
     assert.fieldEquals('HourlyVolumeSnapshot', hourNumber, 'volume', '35000000000000000000');
