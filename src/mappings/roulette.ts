@@ -159,6 +159,11 @@ export function handleBatchProcessed(event: BatchProcessed): void {
   // Update round payout totals
   round.currentPayoutsCount = round.currentPayoutsCount.plus(event.params.payoutsCount)
 
+  // Transition status to PAYOUT on the first batch
+  if (round.status == ROUND_STATUS_COMPUTING_PAYOUT) {
+    round.status = ROUND_STATUS_PAYOUT
+  }
+
   // Set payoutCompletedAt when all expected payouts have been processed
   if (round.computedPayoutsCount !== null) {
     const computed = round.computedPayoutsCount as BigInt
