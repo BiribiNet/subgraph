@@ -1,16 +1,16 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { DailyStats, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer } from "../../generated/schema"
+import { DailyStat, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer } from "../../generated/schema"
 import { ZERO } from "./number"
 
 const SECONDS_PER_DAY = BigInt.fromI32(86400)
 const SECONDS_PER_HOUR = BigInt.fromI32(3600)
 
-export function getOrCreateDailyStats(timestamp: BigInt): DailyStats {
+export function getOrCreateDailyStats(timestamp: BigInt): DailyStat {
   const dayNumber = timestamp.div(SECONDS_PER_DAY)
   const id = dayNumber.toString()
-  let stats = DailyStats.load(id)
+  let stats = DailyStat.load(id)
   if (stats == null) {
-    stats = new DailyStats(id)
+    stats = new DailyStat(id)
     stats.date = dayNumber.toI32()
     stats.volume = ZERO
     stats.betCount = ZERO
