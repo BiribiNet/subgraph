@@ -160,7 +160,7 @@ export function handleBatchProcessed(event: BatchProcessed): void {
   round.currentPayoutsCount = round.currentPayoutsCount.plus(event.params.payoutsCount)
 
   // Transition status to PAYOUT on the first batch
-  if (round.status == ROUND_STATUS_COMPUTING_PAYOUT) {
+  if (round.status !== ROUND_STATUS_PAYOUT) {
     round.status = ROUND_STATUS_PAYOUT
   }
 
