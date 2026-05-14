@@ -1,0 +1,233 @@
+# Subgraph AUDIT — drift vs `contracts @ markets`
+
+Audit pass on `subgraph @ master @ 2d083424`. Static review only —
+`graph codegen` / `graph build` / `graph test` were not executed in this
+pass; the local pipeline (`yarn codegen && yarn build && yarn test`)
+should be run before any deploy.
+
+The headline finding is that the subgraph and the production contracts
+have diverged structurally. This audit documents the gap precisely so
+prompt 2 / prompt 4 can land the rewrite cleanly.
+
+---
+
+## Critical
+
+### C-1 — Subgraph indexes the wrong network and wrong contracts
+- **Where**: `subgraph.yaml`.
+- **Issue**: `network: arbitrum-sepolia` for all four data sources, with
+  legacy testnet addresses
+  (`0x2b68…0654`, `0x21de…080d`, `0x522f…039b`, `0x48e8…e831b`). None of
+  these match the production deployment on `arbitrum-one` (see
+  `INVENTORY.md`). The subgraph produces zero useful data for the
+  production frontend.
+- **Recommendation**: Repoint to `arbitrum-one` with the seven new
+  addresses. Because the ABIs of the new contracts are not yet present in
+  `abis/` and the mappings index event signatures that no longer exist,
+  this **cannot** be done piecemeal without breaking the build — it
+  must be paired with the ABI imports and a full mapping rewrite (see
+  C-2). This audit pass deliberately leaves `subgraph.yaml` untouched to
+  keep `graph build` green.
+
+### C-2 — Event signatures used by mappings do not exist on the new
+        contracts
+- **Where**: every handler under `src/mappings/`.
+- **Issue**: All four data sources subscribe to events that the new
+  contracts do not emit. Examples of incompatibilities:
+  - `BetPlaced(address,uint256,bytes,uint256)` → still emitted by
+    `BankVault4626` ✅ but only for that market, not the engine.
+  - `RouletteClean.ComputedPayouts(uint256,uint256)`,
+    `JackpotResultEvent(uint256,uint256)`,
+    `RoundForceResolved(indexed uint256,uint256)`,
+    `BatchProcessed(uint256,uint256,uint256)` → ❌ removed. The new engine
+    emits `BetRecorded`, `RoundLocked`, `GlobalRoundSealed`,
+    `PayoutProgress`, `JackpotFunded`, `VRFResult` (signature changed
+    from `(uint256,uint256,uint256)` to `(uint256 roundId, uint256
+    winningNumber, uint256 jackpotNumber)`), `RoundResolved(uint256)`.
+  - `StakedBRB.RoundCleaningCompleted(uint256,uint256,uint256,(uint256,
+    uint256,uint256))`,
+    `WithdrawalRequested(address,uint256)`,
+    `WithdrawalProcessed(address,uint256)`,
+    `BettingWindowClosed`, `LiquidityEscrowSet`,
+    `QueuedLiquidityRejected`, `ProtocolFeeRateUpdated`,
+    `BurnFeeRateUpdated`, `JackpotFeeRateUpdated`,
+    `FirstBetPlaced(uint256,uint256)`,
+    `WithdrawalEjected(address,uint8)`, `CleaningUpkeepRegistered`,
+    `UpkeepRegistered(indexed uint256,…,string)`,
+    `MaxSupportedBetsUpdated`, `WithdrawalSettingsUpdated`,
+    `AntiSpamSettingsUpdated` → ❌ removed. `BankVault4626` emits a
+    different set: `BetPlaced`, `MinBetUpdated`, `BetsReleased`,
+    `PayoutBatchProcessed`, `FundsTransferred`,
+    `WithdrawalRequested(address,uint8,address,uint256,uint256)`,
+    `WithdrawalProcessed(address,uint8,address,uint256,uint256)`,
+    `WithdrawalEjected(address,uint8)` plus standard ERC-4626 events.
+  - `BRBReferal.*` → ❌ no equivalent on `markets` (no referral token).
+- **Recommendation**: A schema and mapping rewrite is required (tracked
+  in prompt 2 and prompt 4). Keep the legacy mappings as a regression
+  baseline; do not delete them in this pass.
+
+### C-3 — Schema is mono-asset; new protocol is multi-asset
+- **Where**: `schema.graphql`.
+- **Issue**: `User`, `RouletteRound`, `RouletteBet`, `GlobalState`,
+  `VaultState`, etc. all encode a single-asset world (one BRB balance,
+  one staked BRB balance, one share price, one vault). The new protocol
+  has `N` markets, each with its own `BankVault4626` and bet flow.
+  Cardinality / keying of entities needs to change.
+- **Recommendation**: Introduce `Market`, `MarketRoundState`,
+  per-market `VaultState`. Re-key `RouletteBet` as
+  `(marketId, roundId, player, betIndex)`. See `INVENTORY.md` for the
+  proposed entity additions.
+
+---
+
+## High
+
+### H-1 — `BRBReferal` data source is dead but still wired
+- **Where**: `subgraph.yaml` — `dataSources.[3] BRBReferal`.
+- **Issue**: The new architecture has no referral contract. Indexing
+  `0x48e8…e831b` produces nothing on `arbitrum-one`.
+- **Recommendation**: Remove the data source when repointing. Prompt 4
+  reintroduces `BRBreferral` (different symbol / name) which will need a
+  fresh data source.
+
+### H-2 — `MergedEvents` ABI conflates two contracts
+- **Where**: `abis/MergedEvents.json`.
+- **Issue**: This ABI was created to merge `StakedBRB` + auxiliary
+  contracts into a single source. The new architecture splits state
+  back into distinct contracts (`BankVault4626`, `RouletteEngine`,
+  `BRBJackpotFunder`, `JackpotTreasury`). Indexing strategy should mirror
+  that split.
+- **Recommendation**: Replace `MergedEvents.json` with per-contract ABIs
+  generated by `scripts/update-subgraph-abis.mjs` in the contracts repo
+  (script already exists and runs `wagmi generate` outputs through a
+  reformatter).
+
+### H-3 — `BankVault4626` proxies must be indexed via dataSource templates
+- **Where**: `subgraph.yaml`.
+- **Issue**: Each market gets its own beacon-proxy `BankVault4626`. A
+  hard-coded data source per address does not scale; templates triggered
+  on `MarketRegistry.MarketCreated(uint32, address asset, address bank)`
+  are required.
+- **Recommendation**: Add a `templates:` section. Bind the template's
+  source `address` parameter from the `bank` field of the
+  `MarketCreated` event. The template's mapping handles per-vault
+  events.
+
+### H-4 — Schema fields will be silently stale (no rollover plan)
+- **Where**: `schema.graphql` — `GlobalState`, `VaultState`,
+  `ProtocolStats`.
+- **Issue**: Many singleton fields (`brbPrice`, `currentJackpot`,
+  `protocolFeeBasisPoints`, `jackpotFeeBasisPoints`, `burnFeeBasisPoints`,
+  `liquidityEscrow`, `feeRecipient`, `subscriptionId`, etc.) currently
+  point at concepts that no longer apply (the new fee config lives in
+  `BRBJackpotFunder` and `RouletteEngine` constants). After repointing
+  these will never be written and queries will return stale defaults.
+- **Recommendation**: When rewriting the schema, drop or rename these
+  fields to reflect the new architecture (per-market fee splits, jackpot
+  funder bps history, no separate liquidity escrow).
+
+### H-5 — `startBlock` values are unknown for production
+- **Where**: `subgraph.yaml`.
+- **Issue**: The new contracts on `arbitrum-one` have deployment blocks
+  we have not pinned. Using `0` would force a full chain rescan; using
+  a wrong value would miss historical events.
+- **Recommendation**: Query each address on Arbiscan
+  (`getContractCreation` API) and bake the exact block into the new
+  manifest. Optional: capture this in a `scripts/sync-startblocks.mjs`
+  utility.
+
+---
+
+## Medium
+
+### M-1 — `WithdrawalEjected(address,uint8)` partially survives
+- **Where**: `subgraph.yaml` line referencing the StakedBRB data source
+  + `schema.graphql` `WithdrawalEjectedLog`.
+- **Issue**: Same signature exists on the new `BankVault4626`. After
+  schema rewrite, the same entity type can be reused, just keyed by
+  `(market, user, tx)` instead of `(user, tx)`.
+
+### M-2 — `BRB` ERC-20 standard Transfer / Approval handlers carry over
+- **Where**: `src/mappings/brb.ts`, `abis/BRB.json`.
+- **Issue**: `BRBToken` is a vanilla `ERC20Burnable + ERC20Permit`. Its
+  Transfer + Approval events match the legacy `BRB` ABI shape exactly.
+  The mapping logic that updates `User.brbBalance` can be kept; only
+  the data source address + ABI file name must change.
+- **Recommendation**: First step of the migration is to repoint
+  **only** the BRB data source to the new address on `arbitrum-one`.
+  This restores at least balance / supply tracking quickly.
+
+### M-3 — `apy*` fields and `APYSnapshot` model assume one vault
+- **Where**: `schema.graphql`.
+- **Issue**: With per-market vaults, "APY" must be per-vault, not global.
+- **Recommendation**: Move APY fields into `VaultState` and produce one
+  `APYSnapshot` per market per day.
+
+### M-4 — `RouletteBet.betTypes / numbers / amounts` arrays are
+        aggregated by `(user, round)`
+- **Where**: `schema.graphql`.
+- **Issue**: New engine emits one `BetRecorded` per individual
+  (`betType`, `number`, `amount`) tuple, plus a separate `BetPlaced` on
+  the vault for the whole transaction. Re-aggregating into per-user
+  arrays is a mapping choice — but at multi-market scale, prefer one
+  entity per bet tuple.
+- **Recommendation**: Introduce `RouletteBetItem { id, market, round,
+  player, betType, number, amount, won, payout }` and treat the legacy
+  `RouletteBet` arrays as a derived view if useful.
+
+### M-5 — `tests/` will fail after the rewrite
+- **Where**: `tests/*.test.ts` (matchstick).
+- **Issue**: Existing matchstick tests are written against the legacy
+  schema and events. They will not compile after the rewrite.
+- **Recommendation**: Move them under `tests/legacy/` as a regression
+  reference; write new suites covering: `MarketCreated` →
+  template instantiation, multi-market `BetRecorded`, jackpot funder
+  events, fee invariants.
+
+---
+
+## Low / Info
+
+### L-1 — `package.json` references Goldsky CLI; ensure access keys
+- `yarn deploy:subgraph` uses `goldsky`. Document credentials in
+  `.env.example`.
+
+### L-2 — `specVersion: 1.3.0` is supported by modern graph-node
+- No change required, but verify Goldsky's runtime supports `1.3.0`
+  features used (immutable entities, `indexerHints.prune: auto`).
+
+### L-3 — `sync-pipeline-build-id` comment at the bottom of
+        `schema.graphql`
+- Cosmetic; remove before the schema rewrite to avoid stale build-id
+  drift.
+
+### L-4 — `User.brbpPoints: BigInt!` field exists in `schema.graphql`
+- Pre-empts prompt 4 (BRBpoints). Currently zero everywhere. Either
+  remove until prompt 4 lands, or leave with documentation.
+
+---
+
+## What this commit does NOT change
+
+To keep `graph codegen` and `graph build` passing, this commit only adds
+documentation (`INVENTORY.md`, `AUDIT.md`, `MIGRATION.md`). It does not:
+- Repoint `subgraph.yaml` to `arbitrum-one` (would break the build
+  because ABIs and mappings would still reference deleted events).
+- Add new ABI files in `abis/` — they require either a `yarn compile`
+  + `update-subgraph-abis.mjs` run in the contracts repo, or
+  hand-authored copies.
+- Modify the schema (changes are intrusive; will land with prompt 2 /
+  prompt 4).
+
+## Suggested next action
+
+1. In the **contracts** repo, run
+   `yarn compile && node scripts/update-subgraph-abis.mjs` against the
+   `markets` branch. That populates `subgraph/abis/` with the new ABIs.
+2. Bring those ABI files into this repo (`abis/`).
+3. Author the new `subgraph.yaml` with seven data sources + a
+   `BankVault4626` template. Use `startBlock` values fetched from
+   Arbiscan.
+4. Rewrite `schema.graphql` and `src/mappings/*` accordingly.
+
+Track progress against the items in `MIGRATION.md`.
