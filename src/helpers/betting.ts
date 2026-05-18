@@ -134,13 +134,20 @@ export function calculateMaxPayoutFromRoundComponents(round: RouletteRound): Big
   return raw.times(BigInt.fromI32(11000)).div(BigInt.fromI32(10000))
 }
 
-export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, round: RouletteRound, event: BetPlaced): void {
-  // Create or update bet entity (user + round ID)
+export function recordRouletteBetEntry(
+  user: Bytes,
+  amount: BigInt,
+  betType: BigInt,
+  number: BigInt,
+  round: RouletteRound,
+  blockNumber: BigInt,
+  timestamp: BigInt,
+  transactionHash: Bytes
+): void {
   const betId = user.concat(round.id)
   let bet = RouletteBet.load(betId)
 
-  if (!bet) {
-    // Create new bet entity
+  if (bet == null) {
     bet = new RouletteBet(betId)
     bet.user = user
     bet.round = round.id
@@ -149,15 +156,14 @@ export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt,
     bet.numbers = [number]
     bet.totalAmount = amount
     bet.betCount = BigInt.fromI32(1)
-    bet.firstBetBlockNumber = event.block.number
-    bet.firstBetTimestamp = event.block.timestamp
-    bet.latestBetBlockNumber = event.block.number
-    bet.latestBetTimestamp = event.block.timestamp
-    bet.latestTransactionHash = event.transaction.hash
+    bet.firstBetBlockNumber = blockNumber
+    bet.firstBetTimestamp = timestamp
+    bet.latestBetBlockNumber = blockNumber
+    bet.latestBetTimestamp = timestamp
+    bet.latestTransactionHash = transactionHash
     bet.won = false
     bet.actualPayout = BigInt.fromI32(0)
   } else {
-    // Update existing bet entity
     const currentAmounts = bet.amounts
     const currentBetTypes = bet.betTypes
     const currentNumbers = bet.numbers
@@ -171,14 +177,25 @@ export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt,
     bet.numbers = currentNumbers
     bet.totalAmount = bet.totalAmount.plus(amount)
     bet.betCount = bet.betCount.plus(BigInt.fromI32(1))
-    bet.latestBetBlockNumber = event.block.number
-    bet.latestBetTimestamp = event.block.timestamp
-    bet.latestTransactionHash = event.transaction.hash
+    bet.latestBetBlockNumber = blockNumber
+    bet.latestBetTimestamp = timestamp
+    bet.latestTransactionHash = transactionHash
   }
 
   bet.save()
-
-  // Update round totals
   round.totalBets = round.totalBets.plus(amount)
   updateRoundMaxPayoutComponents(round, amount, betType, number)
+}
+
+export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, round: RouletteRound, event: BetPlaced): void {
+  recordRouletteBetEntry(
+    user,
+    amount,
+    betType,
+    number,
+    round,
+    event.block.number,
+    event.block.timestamp,
+    event.transaction.hash
+  )
 }

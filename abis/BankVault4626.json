@@ -1,41 +1,5 @@
 [
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "brbToken",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "rouletteContract",
-        "type": "address"
-      },
-      {
-        "internalType": "contract IERC20Mintable",
-        "name": "brbReferal",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "jackpotContract",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "upkeepManager",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "secondsPerRound",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
     "inputs": [],
     "name": "AccessControlBadConfirmation",
     "type": "error"
@@ -57,19 +21,8 @@
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "target",
-        "type": "address"
-      }
-    ],
-    "name": "AddressEmptyCode",
-    "type": "error"
-  },
-  {
     "inputs": [],
-    "name": "BettingClosed",
+    "name": "BetTooSmall",
     "type": "error"
   },
   {
@@ -80,37 +33,6 @@
   {
     "inputs": [],
     "name": "DepositBlockedDuringResolution",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DepositIntentAlreadyQueued",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DepositOutsideGamePeriod",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "DepositTooSmall",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "implementation",
-        "type": "address"
-      }
-    ],
-    "name": "ERC1967InvalidImplementation",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ERC1967NonPayable",
     "type": "error"
   },
   {
@@ -285,57 +207,12 @@
   },
   {
     "inputs": [],
-    "name": "FailedCall",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "IndexOutOfBounds",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InsufficientBalanceForMaxPayout",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidFeeRate",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidInitialization",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "InvalidLiquidityEscrow",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidLiquidityOpsPerUpkeep",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidMaxQueueLength",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "InvalidReceiver",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidWithdrawalBatchSize",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "LiquidityEscrowAlreadySet",
     "type": "error"
   },
   {
@@ -350,17 +227,7 @@
   },
   {
     "inputs": [],
-    "name": "OnlyBRB",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "OnlyRoulette",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "OnlyStakedBrbForwarders",
+    "name": "OnlyEngine",
     "type": "error"
   },
   {
@@ -370,7 +237,7 @@
   },
   {
     "inputs": [],
-    "name": "QueueIsEmpty",
+    "name": "ReentrancyGuardReentrantCall",
     "type": "error"
   },
   {
@@ -386,28 +253,7 @@
   },
   {
     "inputs": [],
-    "name": "UUPSUnauthorizedCallContext",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bytes32",
-        "name": "slot",
-        "type": "bytes32"
-      }
-    ],
-    "name": "UUPSUnsupportedProxiableUUID",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "UnauthorizedCaller",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "UserNotInQueue",
     "type": "error"
   },
   {
@@ -422,26 +268,8 @@
   },
   {
     "inputs": [],
-    "name": "WithdrawalTooLarge",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ZeroAmount",
     "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "maxQueueLength",
-        "type": "uint256"
-      }
-    ],
-    "name": "AntiSpamSettingsUpdated",
-    "type": "event"
   },
   {
     "anonymous": false,
@@ -505,24 +333,17 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "roundId",
+        "name": "amount",
         "type": "uint256"
-      }
-    ],
-    "name": "BettingWindowClosed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
+      },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "newFee",
+        "name": "newLockedTotal",
         "type": "uint256"
       }
     ],
-    "name": "BurnFeeRateUpdated",
+    "name": "BetsReleased",
     "type": "event"
   },
   {
@@ -561,18 +382,18 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "roundId",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "timestamp",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "FirstBetPlaced",
+    "name": "FundsTransferred",
     "type": "event"
   },
   {
@@ -594,24 +415,17 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "newFee",
+        "name": "previousMinBet",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newMinBet",
         "type": "uint256"
       }
     ],
-    "name": "JackpotFeeRateUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "escrow",
-        "type": "address"
-      }
-    ],
-    "name": "LiquidityEscrowSet",
+    "name": "MinBetUpdated",
     "type": "event"
   },
   {
@@ -620,49 +434,17 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "newFee",
+        "name": "payoutCount",
         "type": "uint256"
-      }
-    ],
-    "name": "ProtocolFeeRateUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "newRecipient",
-        "type": "address"
-      }
-    ],
-    "name": "ProtocolFeeRecipientUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "payer",
-        "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "assets",
+        "name": "totalPaid",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "reason",
-        "type": "uint8"
       }
     ],
-    "name": "QueuedLiquidityRejected",
+    "name": "PayoutBatchProcessed",
     "type": "event"
   },
   {
@@ -744,54 +526,6 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "cleanedRoundId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "newRoundId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "boundaryTimestamp",
-        "type": "uint256"
-      },
-      {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "protocolFees",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "burnAmount",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "jackpotAmount",
-            "type": "uint256"
-          }
-        ],
-        "indexed": false,
-        "internalType": "struct StakedBRB.Fees",
-        "name": "fees",
-        "type": "tuple"
-      }
-    ],
-    "name": "RoundCleaningCompleted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": true,
         "internalType": "address",
         "name": "from",
@@ -811,19 +545,6 @@
       }
     ],
     "name": "Transfer",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "implementation",
-        "type": "address"
-      }
-    ],
-    "name": "Upgraded",
     "type": "event"
   },
   {
@@ -869,7 +590,7 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "user",
+        "name": "owner",
         "type": "address"
       },
       {
@@ -888,13 +609,31 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "user",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "kind",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "receiver",
         "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "amount",
+        "name": "assets",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "shares",
         "type": "uint256"
       }
     ],
@@ -907,13 +646,31 @@
       {
         "indexed": false,
         "internalType": "address",
-        "name": "user",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "kind",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "receiver",
         "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "amount",
+        "name": "assets",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "shares",
         "type": "uint256"
       }
     ],
@@ -921,26 +678,13 @@
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "batchSize",
-        "type": "uint256"
-      }
-    ],
-    "name": "WithdrawalSettingsUpdated",
-    "type": "event"
-  },
-  {
     "inputs": [],
-    "name": "CLEANING_UPKEEP_GAS_LIMIT",
+    "name": "BANK_ADMIN_ROLE",
     "outputs": [
       {
-        "internalType": "uint32",
+        "internalType": "bytes32",
         "name": "",
-        "type": "uint32"
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -961,129 +705,12 @@
   },
   {
     "inputs": [],
-    "name": "DEFAULT_LIQUIDITY_OPS_PER_UPKEEP",
+    "name": "ENGINE",
     "outputs": [
       {
-        "internalType": "uint32",
+        "internalType": "contract IRouletteEngine",
         "name": "",
-        "type": "uint32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "DEFAULT_MAX_QUEUE_LENGTH",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "DEFAULT_WITHDRAWAL_BATCH_SIZE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "GAME_PERIOD",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_LIQUIDITY_OPS_PER_UPKEEP",
-    "outputs": [
-      {
-        "internalType": "uint32",
-        "name": "",
-        "type": "uint32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_MAX_QUEUE_LENGTH",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_PROTOCOL_FEE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_WITHDRAWAL_BATCH_SIZE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MINIMUM_FIRST_DEPOSIT",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "UPGRADE_INTERFACE_VERSION",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -1179,30 +806,6 @@
   {
     "inputs": [
       {
-        "internalType": "bytes",
-        "name": "checkData",
-        "type": "bytes"
-      }
-    ],
-    "name": "checkUpkeep",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "upkeepNeeded",
-        "type": "bool"
-      },
-      {
-        "internalType": "bytes",
-        "name": "performData",
-        "type": "bytes"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "uint256",
         "name": "shares",
         "type": "uint256"
@@ -1268,94 +871,11 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "shares",
+        "name": "",
         "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "receiver",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "deadline",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint8",
-        "name": "v",
-        "type": "uint8"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "r",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "s",
-        "type": "bytes32"
-      }
-    ],
-    "name": "depositWithPermit",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "shares",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "firstBetTimestamp",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "gamePeriod",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getMaxPayout",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1372,99 +892,6 @@
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getSecondsFromNextUpkeepWindow",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "getUserPendingWithdrawal",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "pendingAmount",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getVaultConfig",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "protocolFeeBasisPoints",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "burnBasisPoints",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "jackpotBasisPoints",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "feeRecipient",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "pendingBets",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getWithdrawalSettings",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "withdrawalBatchSize",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "queueLength",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "maxQueueLength",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint32",
-        "name": "liquidityOpsPerCleaningUpkeep",
-        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -1516,27 +943,32 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "admin",
+        "name": "assetToken_",
         "type": "address"
       },
       {
-        "internalType": "uint256",
-        "name": "protocolFeeBasisPoints",
-        "type": "uint256"
+        "internalType": "string",
+        "name": "name_",
+        "type": "string"
       },
       {
-        "internalType": "uint256",
-        "name": "burnBasisPoints",
-        "type": "uint256"
+        "internalType": "string",
+        "name": "symbol_",
+        "type": "string"
       },
       {
-        "internalType": "uint256",
-        "name": "jackpotBasisPoints",
-        "type": "uint256"
+        "internalType": "uint32",
+        "name": "marketId_",
+        "type": "uint32"
       },
       {
         "internalType": "address",
-        "name": "feeRecipient",
+        "name": "engine_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "admin",
         "type": "address"
       }
     ],
@@ -1547,12 +979,12 @@
   },
   {
     "inputs": [],
-    "name": "isBettingOpen",
+    "name": "lockedBetLiquidity",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint256",
         "name": "",
-        "type": "bool"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1560,12 +992,12 @@
   },
   {
     "inputs": [],
-    "name": "isVrfUpkeepNeeded",
+    "name": "marketId",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint32",
         "name": "",
-        "type": "bool"
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -1648,6 +1080,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "minBet",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1664,7 +1109,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "assets",
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -1685,19 +1130,38 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "onRoundTransition",
-    "outputs": [],
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "player",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IBankVault.Payout[]",
+        "name": "payouts",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "payoutBatch",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "totalPaid",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
-      {
-        "internalType": "address",
-        "name": "from",
-        "type": "address"
-      },
       {
         "internalType": "uint256",
         "name": "amount",
@@ -1705,16 +1169,11 @@
       },
       {
         "internalType": "bytes",
-        "name": "data",
+        "name": "betData",
         "type": "bytes"
-      },
-      {
-        "internalType": "address",
-        "name": "referral",
-        "type": "address"
       }
     ],
-    "name": "onTokenTransfer",
+    "name": "placeBet",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1722,12 +1181,37 @@
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
         "internalType": "bytes",
-        "name": "performData",
+        "name": "betData",
         "type": "bytes"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "v",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "r",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "s",
+        "type": "bytes32"
       }
     ],
-    "name": "performUpkeep",
+    "name": "placeBetWithPermit",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1812,53 +1296,19 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "roundId",
+        "name": "maxCount",
         "type": "uint256"
-      },
-      {
-        "components": [
-          {
-            "internalType": "address",
-            "name": "player",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "payout",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct IRoulette.PayoutInfo[]",
-        "name": "payouts",
-        "type": "tuple[]"
-      },
-      {
-        "internalType": "uint256",
-        "name": "totalPayouts",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isLastBatch",
-        "type": "bool"
       }
     ],
-    "name": "processRouletteResult",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "proxiableUUID",
+    "name": "processWithdrawalQueue",
     "outputs": [
       {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
+        "internalType": "uint256",
+        "name": "processed",
+        "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1887,6 +1337,19 @@
         "type": "uint256"
       }
     ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "releaseBets",
+    "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
@@ -1927,144 +1390,14 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "roundPhase",
-    "outputs": [
-      {
-        "internalType": "enum RoundPhase",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "roundResolutionLocked",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "roundTransitionInProgress",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "newBurnBasisPoints",
+        "name": "newMinBet",
         "type": "uint256"
       }
     ],
-    "name": "setBurnFeeRate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "newRecipient",
-        "type": "address"
-      }
-    ],
-    "name": "setFeeRecipient",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newJackpotBasisPoints",
-        "type": "uint256"
-      }
-    ],
-    "name": "setJackpotFeeRate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "escrow",
-        "type": "address"
-      }
-    ],
-    "name": "setLiquidityEscrow",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint32",
-        "name": "newOps",
-        "type": "uint32"
-      }
-    ],
-    "name": "setLiquidityOpsPerCleaningUpkeep",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newMaxQueueLength",
-        "type": "uint256"
-      }
-    ],
-    "name": "setMaxQueueLength",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newFeeBasisPoints",
-        "type": "uint256"
-      }
-    ],
-    "name": "setProtocolFeeRate",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newBatchSize",
-        "type": "uint256"
-      }
-    ],
-    "name": "setWithdrawalBatchSize",
+    "name": "setMinBet",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -2184,18 +1517,18 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "newImplementation",
+        "name": "recipient",
         "type": "address"
       },
       {
-        "internalType": "bytes",
-        "name": "data",
-        "type": "bytes"
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       }
     ],
-    "name": "upgradeToAndCall",
+    "name": "transferOut",
     "outputs": [],
-    "stateMutability": "payable",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

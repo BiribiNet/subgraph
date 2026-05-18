@@ -5,31 +5,14 @@ import {
   Transfer as StakedBRBTransfer,
   WithdrawalRequested,
   WithdrawalProcessed,
-  ProtocolFeeRateUpdated,
   BetPlaced,
-  FirstBetPlaced,
-  WithdrawalSettingsUpdated,
-  AntiSpamSettingsUpdated,
-  BurnFeeRateUpdated,
-  JackpotFeeRateUpdated,
-  ProtocolFeeRecipientUpdated,
-  RoundCleaningCompleted,
-  BettingWindowClosed,
-  LiquidityEscrowSet,
-  QueuedLiquidityRejected,
-  WithdrawalEjected
-} from "../../generated/StakedBRB/StakedBRB"
-import {
+  WithdrawalEjected,
   Approval,
   RoleGranted,
   RoleRevoked,
-  RoleAdminChanged,
-  Initialized,
-  Upgraded,
-  CleaningUpkeepRegistered,
-  UpkeepRegistered,
-  MaxSupportedBetsUpdated
-} from "../../generated/StakedBRB/MergedEvents"
+  RoleAdminChanged
+} from "../../generated/StakedBRB/StakedBRB"
+import { UpkeepRegistered } from "../../generated/StakedBRB/MergedEvents"
 import {
   RouletteRound,
   RouletteBet,
@@ -37,16 +20,13 @@ import {
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   WithdrawTransaction,
-  BettingWindowClosedLog,
-  QueuedLiquidityRejectedLog,
   WithdrawalEjectedLog,
   TokenApproval,
   AdminRoleChange,
   ContractUpgrade,
   UpkeepRegistration,
-  MaxBetsUpdate
 } from "../../generated/schema"
-import { ROUND_STATUS_BETTING, ROUND_STATUS_NO_MORE_BETS } from "../helpers/constant"
+import { ROUND_STATUS_BETTING } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
 import { decodeWrapper } from "../helpers/decodeWrapper"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -113,164 +93,6 @@ export function handleDeposit(event: Deposit): void {
   // Update VaultState singleton
   const vault = syncVaultState(globalState, event.block.timestamp)
   vault.save()
-}
-
-export function handleRoundCleaningCompleted(event: RoundCleaningCompleted): void {
-  const globalState = getOrCreateGlobalState()
-  const cleanedId = event.params.cleanedRoundId
-  const newRoundId = event.params.newRoundId
-  const boundaryTs = event.params.boundaryTimestamp
-
-  globalState.lastRoundResolved = cleanedId
-  globalState.lastRoundStartTime = boundaryTs
-  globalState.roundTransitionInProgress = false
-
-  const isGenesis = cleanedId.equals(BigInt.fromI32(0))
-
-  if (!isGenesis) {
-    const round = RouletteRound.load(bigintToBytes(cleanedId))
-    if (!round) {
-      log.error("Round not found for RoundCleaningCompleted: {}", [cleanedId.toString()])
-      return
-    }
-
-    // StakedBRB reduces global $.maxPayout by maxPayoutPerRound[roundId].
-    // The per-round value itself is NOT cleared in the contract, so we keep it as historical data.
-    const roundMaxPayoutPerRound = round.maxBetAmount
-    if (roundMaxPayoutPerRound.gt(BigInt.fromI32(0))) {
-      if (roundMaxPayoutPerRound.ge(globalState.maxBetAmount)) {
-        globalState.maxBetAmount = BigInt.fromI32(0)
-      } else {
-        globalState.maxBetAmount = globalState.maxBetAmount.minus(roundMaxPayoutPerRound)
-      }
-    }
-
-    globalState.totalFees = globalState.totalFees.plus(event.params.fees.protocolFees)
-
-    // Revenue breakdown per round
-    round.infraRevenue = event.params.fees.protocolFees
-    round.roundBurnAmount = event.params.fees.burnAmount
-    round.jackpotRevenue = event.params.fees.jackpotAmount
-
-    if (round.totalBets.gt(round.totalPayouts)) {
-      const totalFeesAmount = event.params.fees.protocolFees
-        .plus(event.params.fees.burnAmount)
-        .plus(event.params.fees.jackpotAmount)
-      round.stakersRevenue = round.totalBets.minus(round.totalPayouts).minus(totalFeesAmount)
-    } else {
-      round.stakersRevenue = ZERO
-    }
-
-    // Update cumulative staker revenue (stakersRevenue is always set above)
-    const sr = round.stakersRevenue as BigInt
-    if (sr.gt(ZERO)) {
-      globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(sr)
-    }
-
-    // Update DailyStats with round completion data
-    // Note: totalPayouts is tracked in real-time in brb.ts handleTransfer
-    const dailyStats = getOrCreateDailyStats(event.block.timestamp)
-    dailyStats.roundsCompleted = dailyStats.roundsCompleted.plus(BigInt.fromI32(1))
-    if (round.totalBets.gt(round.totalPayouts)) {
-      dailyStats.revenue = dailyStats.revenue.plus(round.totalBets.minus(round.totalPayouts))
-    }
-    dailyStats.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
-    dailyStats.jackpotPool = globalState.currentJackpot
-    if (round.stakersRevenue !== null) {
-      const srDaily = round.stakersRevenue as BigInt
-      if (srDaily.gt(ZERO)) {
-        dailyStats.stakersRevenue = dailyStats.stakersRevenue.plus(srDaily)
-      }
-    }
-    dailyStats.save()
-
-    // Update HourlyVolumeSnapshot with round completion data
-    const hourlyRound = getOrCreateHourlySnapshot(event.block.timestamp)
-    if (round.stakersRevenue !== null) {
-      const srHourly = round.stakersRevenue as BigInt
-      if (srHourly.gt(ZERO)) {
-        hourlyRound.stakersRevenue = hourlyRound.stakersRevenue.plus(srHourly)
-      }
-    }
-    hourlyRound.save()
-
-    // Calculate donations for this round: (current transfers - last clean transfers) - (current deposits - last clean deposits) - bets
-    const transfersThisRound = globalState.totalTransfersToPool.minus(globalState.totalTransfersToPoolAtLastClean)
-    const depositsThisRound = globalState.totalDeposits.minus(globalState.totalDepositsAtLastClean)
-    const donations = transfersThisRound.minus(depositsThisRound).minus(round.totalBets)
-
-    // Add donations to totalAssets (direct donations that weren't tracked via Deposit events)
-    if (donations.lt(BigInt.fromI32(0))) {
-      log.warning("Negative donation for round {}: amount={}, transfers={}, deposits={}, bets={}", [
-        cleanedId.toString(),
-        donations.toString(),
-        transfersThisRound.toString(),
-        depositsThisRound.toString(),
-        round.totalBets.toString()
-      ])
-    }
-    if (donations.gt(BigInt.fromI32(0))) {
-      globalState.totalAssets = globalState.totalAssets.plus(donations)
-    }
-
-    // Update "at last clean" values for next round's calculation
-    globalState.totalTransfersToPoolAtLastClean = globalState.totalTransfersToPool
-    globalState.totalDepositsAtLastClean = globalState.totalDeposits
-
-    if (round.totalBets.gt(round.totalPayouts)) { // pool won money
-      globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts).minus(event.params.fees.protocolFees.plus(event.params.fees.burnAmount).plus(event.params.fees.jackpotAmount)))
-    } else { // pool lost money
-      globalState.totalAssets = globalState.totalAssets.plus(round.totalBets.minus(round.totalPayouts))
-    }
-
-    // Update share price and APYs after revenue distribution
-    updateSharePrice(globalState)
-    calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
-
-    // Update VaultState singleton
-    const vault = syncVaultState(globalState, event.block.timestamp)
-    if (round.stakersRevenue !== null) {
-      const srVault = round.stakersRevenue as BigInt
-      if (srVault.gt(ZERO)) {
-        vault.allTimeRevenue = vault.allTimeRevenue.plus(srVault)
-      }
-    }
-    vault.save()
-
-    // Update ProtocolStats
-    const protocolStats = getOrCreateProtocolStats()
-    protocolStats.totalRounds = protocolStats.totalRounds.plus(ONE)
-    if (round.stakersRevenue !== null) {
-      const sr2 = round.stakersRevenue as BigInt
-      if (sr2.gt(ZERO)) {
-        protocolStats.totalStakerRevenue = protocolStats.totalStakerRevenue.plus(sr2)
-      }
-    }
-    protocolStats.totalBurned = globalState.totalBurned
-    protocolStats.save()
-
-    round.cleaningCompletedAt = event.block.timestamp
-    round.save()
-  }
-
-  const newRoundIdBytes = bigintToBytes(newRoundId)
-  let nextRound = RouletteRound.load(newRoundIdBytes)
-  if (nextRound == null) {
-    nextRound = createNewRouletteRound(newRoundId, boundaryTs)
-    nextRound.save()
-  } else {
-    nextRound.startedAt = boundaryTs
-    nextRound.save()
-    log.warning(
-      "RouletteRound {} already existed at RoundCleaningCompleted (bets indexed first); aligned startedAt to boundaryTimestamp",
-      [newRoundId.toString()]
-    )
-  }
-
-  globalState.currentRound = newRoundIdBytes
-  globalState.currentRoundNumber = newRoundId
-  globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
-  globalState.save()
 }
 
 export function handleWithdraw(event: Withdraw): void {
@@ -345,12 +167,12 @@ export function handleWithdraw(event: Withdraw): void {
 
 export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   const globalState = getOrCreateGlobalState()
-  const user = getOrCreateUser(event.params.user)
+  const user = getOrCreateUser(event.params.owner)
 
   const requestId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const request = new LargeWithdrawalRequest(requestId)
-  request.user = event.params.user
-  request.amount = event.params.amount
+  request.user = event.params.owner
+  request.amount = event.params.assets
   globalState.withdrawalQueueCounter = globalState.withdrawalQueueCounter.plus(ONE)
   request.queuePosition = globalState.withdrawalQueueCounter
   request.requestedAt = event.block.timestamp
@@ -362,13 +184,13 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   user.openWithdrawalRequestId = requestId
   user.save()
 
-  globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.plus(event.params.amount)
+  globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.plus(event.params.assets)
   globalState.save()
 }
 
 export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
   const globalState = getOrCreateGlobalState()
-  const user = getOrCreateUser(event.params.user)
+  const user = getOrCreateUser(event.params.owner)
 
   const openReqId = user.openWithdrawalRequestId
   if (openReqId) {
@@ -381,131 +203,28 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     user.save()
   }
 
-  if (globalState.totalPendingLargeWithdrawals.lt(event.params.amount)) {
+  if (globalState.totalPendingLargeWithdrawals.lt(event.params.assets)) {
     log.warning("totalPendingLargeWithdrawals underflow: {} < {}", [
       globalState.totalPendingLargeWithdrawals.toString(),
-      event.params.amount.toString()
+      event.params.assets.toString()
     ])
     globalState.totalPendingLargeWithdrawals = ZERO
   } else {
-    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.amount)
+    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.assets)
   }
   globalState.save()
-}
-
-export function handleBettingWindowClosed(event: BettingWindowClosed): void {
-  const globalState = getOrCreateGlobalState()
-  globalState.lastBettingWindowClosedRoundId = event.params.roundId
-  globalState.lastBettingWindowClosedAt = event.block.timestamp
-  globalState.save()
-
-  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
-  if (round) {
-    round.status = ROUND_STATUS_NO_MORE_BETS
-    round.save()
-  } else {
-    log.warning("RouletteRound not found for BettingWindowClosed: {}", [event.params.roundId.toString()])
-  }
-
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const row = new BettingWindowClosedLog(id)
-  row.roundId = event.params.roundId
-  row.blockNumber = event.block.number
-  row.timestamp = event.block.timestamp
-  row.transactionHash = event.transaction.hash
-  row.save()
-}
-
-export function handleLiquidityEscrowSet(event: LiquidityEscrowSet): void {
-  const globalState = getOrCreateGlobalState()
-  globalState.liquidityEscrow = changetype<Bytes>(event.params.escrow)
-  globalState.save()
-}
-
-export function handleQueuedLiquidityRejected(event: QueuedLiquidityRejected): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const row = new QueuedLiquidityRejectedLog(id)
-  row.payer = changetype<Bytes>(event.params.payer)
-  row.assets = event.params.assets
-  row.reason = event.params.reason
-  row.blockNumber = event.block.number
-  row.timestamp = event.block.timestamp
-  row.transactionHash = event.transaction.hash
-  row.save()
 }
 
 export function handleWithdrawalEjected(event: WithdrawalEjected): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const row = new WithdrawalEjectedLog(id)
-  row.user = changetype<Bytes>(event.params.user)
+  row.user = changetype<Bytes>(event.params.owner)
   row.reason = event.params.reason
   row.blockNumber = event.block.number
   row.timestamp = event.block.timestamp
   row.transactionHash = event.transaction.hash
   row.save()
 }
-
-export function handleBurnFeeRateUpdated(event: BurnFeeRateUpdated): void {
-  const globalState = getOrCreateGlobalState()
-  log.info("Burn fee updated: {} -> {} bps", [globalState.burnFeeBasisPoints.toString(), event.params.newFee.toString()])
-  globalState.burnFeeBasisPoints = event.params.newFee
-  globalState.save()
-}
-
-export function handleJackpotFeeRateUpdated(event: JackpotFeeRateUpdated): void {
-  const globalState = getOrCreateGlobalState()
-  log.info("Jackpot fee updated: {} -> {} bps", [globalState.jackpotFeeBasisPoints.toString(), event.params.newFee.toString()])
-  globalState.jackpotFeeBasisPoints = event.params.newFee
-  globalState.save()
-}
-
-export function handleProtocolFeeRateUpdated(event: ProtocolFeeRateUpdated): void {
-  const globalState = getOrCreateGlobalState()
-  log.info("Protocol fee updated: {} -> {} bps", [globalState.protocolFeeBasisPoints.toString(), event.params.newFee.toString()])
-  globalState.protocolFeeBasisPoints = event.params.newFee
-  globalState.save()
-}
-
-export function handleWithdrawalSettingsUpdated(event: WithdrawalSettingsUpdated): void {
-  // Get or create GlobalState entity
-  const globalState = getOrCreateGlobalState()
-
-  // Update large withdrawal batch size
-  globalState.largeWithdrawalBatchSize = event.params.batchSize
-  globalState.save()
-}
-
-export function handleAntiSpamSettingsUpdated(event: AntiSpamSettingsUpdated): void {
-  // Get or create GlobalState entity
-  const globalState = getOrCreateGlobalState()
-
-  // Update maximum queue length
-  globalState.maxQueueLength = event.params.maxQueueLength
-  globalState.save()
-}
-
-export function handleProtocolFeeRecipientUpdated(event: ProtocolFeeRecipientUpdated): void {
-  // Get or create GlobalState entity
-  const globalState = getOrCreateGlobalState()
-
-  // Update protocol fee recipient
-  globalState.feeRecipient = event.params.newRecipient
-  globalState.save()
-}
-
-/** Anchor the first-vault-bet timestamp per round from the new FirstBetPlaced event. */
-export function handleFirstBetPlaced(event: FirstBetPlaced): void {
-  const roundIdBytes = bigintToBytes(event.params.roundId)
-  const round = RouletteRound.load(roundIdBytes)
-  if (round == null) {
-    // Fallback: create round if it doesn't exist yet, using the provided timestamp.
-    return log.warning("RouletteRound not found for FirstBetPlaced: {}", [event.params.roundId.toString()])
-  } else {
-    round.firstBetAt = event.params.timestamp
-    round.save()
-  }
-}
-
 
 export function handleBetPlaced(event: BetPlaced): void {
   // Get or create GlobalState entity
@@ -679,59 +398,19 @@ export function handleVaultRoleAdminChanged(event: RoleAdminChanged): void {
   entity.save()
 }
 
-export function handleVaultInitialized(event: Initialized): void {
-  log.info("StakedBRB contract initialized with version {}", [event.params.version.toString()])
-}
-
-export function handleVaultUpgraded(event: Upgraded): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new ContractUpgrade(id)
-  entity.contract = "StakedBRB"
-  entity.implementation = event.params.implementation
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
-}
-
-export function handleCleaningUpkeepRegistered(event: CleaningUpkeepRegistered): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new UpkeepRegistration(id)
-  entity.registrationType = "CLEANING"
-  entity.upkeepId = event.params.upkeepId
-  entity.forwarder = event.params.forwarder
-  entity.gasLimit = event.params.gasLimit
-  entity.linkAmount = event.params.linkAmount
-  entity.upkeepType = event.params.upkeepType
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
-}
-
 export function handleUpkeepRegistered(event: UpkeepRegistered): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const entity = new UpkeepRegistration(id)
-  entity.registrationType = "STANDARD"
+  entity.registrationType = "LANE"
   entity.upkeepId = event.params.upkeepId
   entity.forwarder = event.params.forwarder
-  entity.gasLimit = event.params.gasLimit
-  entity.linkAmount = event.params.linkAmount
-  entity.checkDataLength = event.params.checkDataLength
-  entity.upkeepType = event.params.upkeepType
+  entity.gasLimit = BigInt.fromI32(0)
+  entity.linkAmount = event.params.amount
+  entity.checkDataLength = event.params.lane
+  entity.upkeepType = "payout"
   entity.blockNumber = event.block.number
   entity.timestamp = event.block.timestamp
   entity.transactionHash = event.transaction.hash
   entity.save()
 }
 
-export function handleMaxSupportedBetsUpdated(event: MaxSupportedBetsUpdated): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new MaxBetsUpdate(id)
-  entity.maxSupportedBets = event.params.maxSupportedBets
-  entity.totalPayoutUpkeeps = event.params.totalPayoutUpkeeps
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
-}

@@ -1,70 +1,89 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import {
+  BetRecorded,
   VrfRequested,
   RoundResolved,
-  RoundForceResolved,
   VRFResult,
-  BatchProcessed,
-  JackpotResultEvent,
-  ComputedPayouts,
+  GlobalRoundSealed,
+  PayoutProgress,
   MinJackpotConditionUpdated,
-  JackpotPayoutFailed,
-  PayoutBatchFailed,
-  RoleGranted,
-  RoleRevoked,
-  RoleAdminChanged,
   Initialized,
   Upgraded
 } from "../../generated/RouletteClean/Game"
 import {
   RouletteRound,
-  AdminRoleChange,
-  ContractUpgrade,
-  PayoutFailure
+  ContractUpgrade
 } from "../../generated/schema"
-import { ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT, ROUND_STATUS_CLEAN, ROUND_STATUS_COMPUTING_PAYOUT } from "../helpers/constant"
+import {
+  ROUND_STATUS_BETTING,
+  ROUND_STATUS_NO_MORE_BETS,
+  ROUND_STATUS_VRF,
+  ROUND_STATUS_PAYOUT,
+  ROUND_STATUS_CLEAN
+} from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
+import { createNewRouletteRound } from "../helpers/rouletteRound"
+import { calculateMaxPayoutFromRoundComponents, recordRouletteBetEntry } from "../helpers/betting"
+import { getOrCreateDailyStats, trackDailyUniquePlayer } from "../helpers/aggregation"
+import { updateUserLastActive } from "../helpers/user"
 
-export function handleJackpotResultEvent(event: JackpotResultEvent): void {
-  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
-  if (!round) {
-    log.error("Round not found for jackpot result event: {}", [event.params.roundId.toString()])
-    return
-  }
-  round.jackpotWinnerCount = event.params.jackpotWinnerCount
-
-  round.save()
-}
-
-export function handleComputedPayouts(event: ComputedPayouts): void {
-  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
-  if (!round) {
-    log.error("Round not found for computed payouts: {}", [event.params.roundId.toString()])
-    return
-  }
-  round.status = ROUND_STATUS_COMPUTING_PAYOUT;
-  round.computedPayoutsCount = event.params.totalWinningBets;
-  round.save()
-}
-
-export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdated): void {
+export function handleBetRecorded(event: BetRecorded): void {
+  const roundId = event.params.localRound
+  const roundKey = bigintToBytes(roundId)
+  let round = RouletteRound.load(roundKey)
   const globalState = getOrCreateGlobalState()
-  globalState.minJackpotCondition = event.params.newMinJackpotCondition
-  globalState.save()
+
+  if (round == null) {
+    round = createNewRouletteRound(roundId, event.block.timestamp)
+    globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
+  }
+
+  if (round.status == ROUND_STATUS_BETTING) {
+    const betType = BigInt.fromI32(i32(event.params.betType))
+    const number = BigInt.fromI32(i32(event.params.number))
+    recordRouletteBetEntry(
+      event.params.player,
+      event.params.amount,
+      betType,
+      number,
+      round,
+      event.block.number,
+      event.block.timestamp,
+      event.transaction.hash
+    )
+
+    round.betCount = round.betCount.plus(BigInt.fromI32(1))
+    round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
+    round.save()
+
+    globalState.pendingBets = globalState.pendingBets.plus(event.params.amount)
+    globalState.currentRound = roundKey
+    globalState.currentRoundNumber = roundId
+
+    const daily = getOrCreateDailyStats(event.block.timestamp)
+    daily.betCount = daily.betCount.plus(BigInt.fromI32(1))
+    daily.volume = daily.volume.plus(event.params.amount)
+    daily.save()
+
+    trackDailyUniquePlayer(event.block.timestamp, event.params.player.toHexString())
+    updateUserLastActive(event.params.player, event.block.timestamp)
+    globalState.save()
+  }
 }
 
-/** VRF requested for the round that just ended. The contract emits the
- *  **resolving** round as the first parameter (named `newRoundId` in the ABI
- *  due to a naming mismatch — it is actually the round being resolved, not the
- *  next round). We apply VRF metadata directly to that round and advance
- *  `globalState.currentRoundNumber` to `resolvingRoundId + 1` so that the
- *  payout detection logic in `brb.ts` (which uses `currentRoundNumber - 1`)
- *  can find the resolving round. `handleRoundCleaningCompleted` will set the
- *  authoritative value once cleaning finishes. */
+export function handleGlobalRoundSealed(event: GlobalRoundSealed): void {
+  const round = RouletteRound.load(bigintToBytes(event.params.globalRoundId))
+  if (round == null) {
+    log.error("Round not found for GlobalRoundSealed: {}", [event.params.globalRoundId.toString()])
+    return
+  }
+  round.status = ROUND_STATUS_NO_MORE_BETS
+  round.save()
+}
+
 export function handleVrfRequested(event: VrfRequested): void {
   const globalState = getOrCreateGlobalState()
-  // Contract emits the resolving round as "newRoundId" (naming mismatch)
   const resolvingRoundId = event.params.newRoundId
   const nextRoundId = resolvingRoundId.plus(BigInt.fromI32(1))
   globalState.currentRound = bigintToBytes(nextRoundId)
@@ -72,9 +91,8 @@ export function handleVrfRequested(event: VrfRequested): void {
   globalState.roundTransitionInProgress = true
   globalState.save()
 
-  // Apply VRF metadata to the actual resolving round (not N-1)
   const round = RouletteRound.load(bigintToBytes(resolvingRoundId))
-  if (round) {
+  if (round != null) {
     round.status = ROUND_STATUS_VRF
     round.requestId = event.params.requestId
     round.vrfTxHash = event.transaction.hash
@@ -86,29 +104,21 @@ export function handleVrfRequested(event: VrfRequested): void {
 export function handleVRFResult(event: VRFResult): void {
   const roundId = event.params.roundId
   const round = RouletteRound.load(bigintToBytes(roundId))
-  if (!round) {
+  if (round == null) {
     log.error("Round not found for VRF result: {}", [roundId.toString()])
     return
   }
 
-  // Update round with VRF result data only — do NOT advance status here.
-  // Status stays VRF until ComputedPayouts (normal case) or RoundResolved (no winners).
-  // This prevents the backwards status transition: PAYOUT → COMPUTING_PAYOUT
-  // that occurred because VRFResult and ComputedPayouts are emitted in the same tx
-  // with VRFResult first (log order).
-  round.jackpotNumber = event.params.jackpotNumber;
-  round.winningNumber = event.params.winningNumber
+  round.jackpotNumber = BigInt.fromI32(i32(event.params.jackpotNumber))
+  round.winningNumber = BigInt.fromI32(i32(event.params.winningNumber))
   round.vrfResultAt = event.block.timestamp
   round.save()
-
-  // Note: Bet winning/losing is now determined by actual payout transfers
-  // in the Transfer event handler in stakedBRB.ts
 }
 
 export function handleRoundResolved(event: RoundResolved): void {
   const roundId = event.params.roundId
   const round = RouletteRound.load(bigintToBytes(roundId))
-  if (!round) {
+  if (round == null) {
     log.error("Round not found for resolution: {}", [roundId.toString()])
     return
   }
@@ -125,96 +135,31 @@ export function handleRoundResolved(event: RoundResolved): void {
   } else {
     globalState.pendingBets = globalState.pendingBets.minus(round.totalBets)
   }
-  globalState.lastRoundPaid = event.params.roundId
-  globalState.save();
+  globalState.lastRoundPaid = roundId
+  globalState.roundTransitionInProgress = false
+  globalState.save()
 
   round.status = ROUND_STATUS_CLEAN
   round.resolvedAt = event.block.timestamp
   round.save()
 }
 
-export function handleRoundForceResolved(event: RoundForceResolved): void {
-  const roundId = event.params.roundId
-  const round = RouletteRound.load(bigintToBytes(roundId))
-  if (!round) {
-    log.error("Round not found for force resolution: {}", [roundId.toString()])
+export function handlePayoutProgress(event: PayoutProgress): void {
+  const round = RouletteRound.load(bigintToBytes(event.params.globalRoundId))
+  if (round == null) {
     return
   }
-
-  round.status = ROUND_STATUS_CLEAN
-  round.winningNumber = BigInt.fromI32(37) // void marker — no valid bet can match
-  round.resolvedAt = event.block.timestamp
-  round.forceResolved = true
-  round.save()
-}
-
-export function handleBatchProcessed(event: BatchProcessed): void {
-  const roundId = event.params.roundId
-  const round = RouletteRound.load(bigintToBytes(roundId))
-  if (!round) {
-    log.error("Round not found for batch processing: {}", [roundId.toString()])
-    return
-  }
-
-  // Update round payout totals
-  round.currentPayoutsCount = round.currentPayoutsCount.plus(event.params.payoutsCount)
-
-  // Transition status to PAYOUT on the first batch
-  if (round.status !== ROUND_STATUS_PAYOUT) {
+  if (round.status != ROUND_STATUS_PAYOUT) {
     round.status = ROUND_STATUS_PAYOUT
   }
-
-  // Set payoutCompletedAt when all expected payouts have been processed
-  if (round.computedPayoutsCount !== null) {
-    const computed = round.computedPayoutsCount as BigInt
-    if (round.currentPayoutsCount.ge(computed)) {
-      round.payoutCompletedAt = event.block.timestamp
-    }
-  }
-
+  round.totalPayouts = round.totalPayouts.plus(event.params.paidAmount)
   round.save()
 }
 
-export function handleGameRoleGranted(event: RoleGranted): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new AdminRoleChange(id)
-  entity.contract = "Game"
-  entity.eventType = "GRANTED"
-  entity.role = event.params.role
-  entity.account = event.params.account
-  entity.sender = event.params.sender
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
-}
-
-export function handleGameRoleRevoked(event: RoleRevoked): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new AdminRoleChange(id)
-  entity.contract = "Game"
-  entity.eventType = "REVOKED"
-  entity.role = event.params.role
-  entity.account = event.params.account
-  entity.sender = event.params.sender
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
-}
-
-export function handleGameRoleAdminChanged(event: RoleAdminChanged): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new AdminRoleChange(id)
-  entity.contract = "Game"
-  entity.eventType = "ADMIN_CHANGED"
-  entity.role = event.params.role
-  entity.previousAdminRole = event.params.previousAdminRole
-  entity.newAdminRole = event.params.newAdminRole
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
+export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdated): void {
+  const globalState = getOrCreateGlobalState()
+  globalState.minJackpotCondition = event.params.newMinJackpotCondition
+  globalState.save()
 }
 
 export function handleGameInitialized(event: Initialized): void {
@@ -230,40 +175,4 @@ export function handleGameUpgraded(event: Upgraded): void {
   entity.timestamp = event.block.timestamp
   entity.transactionHash = event.transaction.hash
   entity.save()
-}
-
-export function handleJackpotPayoutFailed(event: JackpotPayoutFailed): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const failure = new PayoutFailure(id)
-  failure.round = bigintToBytes(event.params.roundId)
-  failure.batchIndex = event.params.batchIndex
-  failure.failureType = "JACKPOT"
-  failure.timestamp = event.block.timestamp
-  failure.blockNumber = event.block.number
-  failure.transactionHash = event.transaction.hash
-  failure.save()
-
-  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
-  if (round) {
-    round.failedJackpotBatches = round.failedJackpotBatches.plus(BigInt.fromI32(1))
-    round.save()
-  }
-}
-
-export function handlePayoutBatchFailed(event: PayoutBatchFailed): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const failure = new PayoutFailure(id)
-  failure.round = bigintToBytes(event.params.roundId)
-  failure.batchIndex = event.params.batchIndex
-  failure.failureType = "REGULAR"
-  failure.timestamp = event.block.timestamp
-  failure.blockNumber = event.block.number
-  failure.transactionHash = event.transaction.hash
-  failure.save()
-
-  const round = RouletteRound.load(bigintToBytes(event.params.roundId))
-  if (round) {
-    round.failedPayoutBatches = round.failedPayoutBatches.plus(BigInt.fromI32(1))
-    round.save()
-  }
 }

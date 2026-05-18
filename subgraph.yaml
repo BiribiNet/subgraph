@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x2b6897a9e0d78c59a35564d93fd0a2ae745d0654"
-      startBlock: 255616597
+      address: "0x6499456948fa1409a753b8ef40dc18dccd563d01"
+      startBlock: 269389514
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -43,8 +43,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x21dec65fa9d516711004eda8d463c86db90e080d"
-      startBlock: 255616638
+      address: "0x0ba41d10c05e970ceeeef4f1d7f2fe2f45c1f888"
+      startBlock: 269389514
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -63,32 +63,20 @@ dataSources:
         - name: Game
           file: ./abis/Game.json
       eventHandlers:
-        - event: ComputedPayouts(uint256,uint256)
-          handler: handleComputedPayouts
+        - event: BetRecorded(uint32,uint64,address,uint256,uint8,uint16)
+          handler: handleBetRecorded
+        - event: GlobalRoundSealed(uint64,uint32)
+          handler: handleGlobalRoundSealed
+        - event: VrfRequested(uint64,uint256,uint256)
+          handler: handleVrfRequested
+        - event: VRFResult(uint64,uint8,uint8)
+          handler: handleVRFResult
+        - event: RoundResolved(uint64)
+          handler: handleRoundResolved
+        - event: PayoutProgress(uint64,uint32,uint256,uint256,uint256)
+          handler: handlePayoutProgress
         - event: MinJackpotConditionUpdated(uint256)
           handler: handleMinJackpotConditionUpdated
-        - event: JackpotResultEvent(uint256,uint256)
-          handler: handleJackpotResultEvent
-        - event: VrfRequested(uint256,uint256,uint256)
-          handler: handleVrfRequested
-        - event: RoundResolved(uint256)
-          handler: handleRoundResolved
-        - event: RoundForceResolved(indexed uint256,uint256)
-          handler: handleRoundForceResolved
-        - event: VRFResult(uint256,uint256,uint256)
-          handler: handleVRFResult
-        - event: BatchProcessed(uint256,uint256,uint256)
-          handler: handleBatchProcessed
-        - event: JackpotPayoutFailed(indexed uint256,uint256)
-          handler: handleJackpotPayoutFailed
-        - event: PayoutBatchFailed(indexed uint256,uint256)
-          handler: handlePayoutBatchFailed
-        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
-          handler: handleGameRoleGranted
-        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
-          handler: handleGameRoleRevoked
-        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
-          handler: handleGameRoleAdminChanged
         - event: Initialized(uint64)
           handler: handleGameInitialized
         - event: Upgraded(indexed address)
@@ -99,8 +87,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: MergedEvents
-      address: "0x522f98efd29cd9350f5c96961a418953fdf1039b"
-      startBlock: 255616633
+      address: "0x3861523245933a342debab87daa8298f3640c57c"
+      startBlock: 269389514
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -131,46 +119,24 @@ dataSources:
         - APYSnapshot
       abis:
         - name: StakedBRB
-          file: ./abis/StakedBRB.json
+          file: ./abis/BankVault4626.json
         - name: MergedEvents
           file: ./abis/MergedEvents.json
       eventHandlers:
-        - event: RoundCleaningCompleted(uint256,uint256,uint256,(uint256,uint256,uint256))
-          handler: handleRoundCleaningCompleted
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit
         - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
           handler: handleWithdraw
-        - event: WithdrawalRequested(address,uint256)
+        - event: WithdrawalRequested(address,uint8,address,uint256,uint256)
           handler: handleWithdrawalRequested
-        - event: WithdrawalProcessed(address,uint256)
+        - event: WithdrawalProcessed(address,uint8,address,uint256,uint256)
           handler: handleWithdrawalProcessed
-        - event: BettingWindowClosed(uint256)
-          handler: handleBettingWindowClosed
-        - event: LiquidityEscrowSet(address)
-          handler: handleLiquidityEscrowSet
-        - event: QueuedLiquidityRejected(address,uint256,uint8)
-          handler: handleQueuedLiquidityRejected
         - event: WithdrawalEjected(address,uint8)
           handler: handleWithdrawalEjected
-        - event: ProtocolFeeRecipientUpdated(address)
-          handler: handleProtocolFeeRecipientUpdated
-        - event: ProtocolFeeRateUpdated(uint256)
-          handler: handleProtocolFeeRateUpdated
-        - event: BurnFeeRateUpdated(uint256)
-          handler: handleBurnFeeRateUpdated
-        - event: JackpotFeeRateUpdated(uint256)
-          handler: handleJackpotFeeRateUpdated
-        - event: FirstBetPlaced(uint256,uint256)
-          handler: handleFirstBetPlaced
         - event: BetPlaced(address,uint256,bytes,uint256)
           handler: handleBetPlaced
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
-        - event: WithdrawalSettingsUpdated(uint256)
-          handler: handleWithdrawalSettingsUpdated
-        - event: AntiSpamSettingsUpdated(uint256)
-          handler: handleAntiSpamSettingsUpdated
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
         - event: RoleGranted(indexed bytes32,indexed address,indexed address)
@@ -179,16 +145,8 @@ dataSources:
           handler: handleVaultRoleRevoked
         - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
           handler: handleVaultRoleAdminChanged
-        - event: Initialized(uint64)
-          handler: handleVaultInitialized
-        - event: Upgraded(indexed address)
-          handler: handleVaultUpgraded
-        - event: CleaningUpkeepRegistered(indexed uint256,indexed address,uint32,uint96,string)
-          handler: handleCleaningUpkeepRegistered
-        - event: UpkeepRegistered(indexed uint256,indexed address,uint32,uint96,uint256,string)
+        - event: UpkeepRegistered(uint256,uint256,address,uint96)
           handler: handleUpkeepRegistered
-        - event: MaxSupportedBetsUpdated(uint256,uint256)
-          handler: handleMaxSupportedBetsUpdated
       file: ./src/mappings/stakedBRB.ts
   - name: BRBReferal
     kind: ethereum/contract
@@ -196,7 +154,7 @@ dataSources:
     source:
       abi: BRBReferal
       address: "0x48e85e0f774f0d0d44519b13a959d9faa78e831b"
-      startBlock: 255616592
+      startBlock: 269389514
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
