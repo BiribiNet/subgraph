@@ -1,6 +1,6 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { RouletteRound, RouletteBet, Market } from "../../generated/schema"
-import { BetPlaced } from "../../generated/StakedBRB/StakedBRB"
+import { BetPlaced } from "../../generated/templates/BankVault/StakedBRB"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
   BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN,

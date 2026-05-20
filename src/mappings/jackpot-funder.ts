@@ -1,23 +1,28 @@
 import { log } from "@graphprotocol/graph-ts"
 
 import {
-  BrbRatioUpdated,
-  FundedFromMarket,
   FundFromMarketSkipped,
+  FundedFromMarket,
   SlippageBpsUpdated,
   SwapAssetBpsUpdated,
   TreasuryBrbSplitUpdated
 } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
-import { JackpotBuy, JackpotFundingSkip, Market } from "../../generated/schema"
+import { JackpotBuy, JackpotFundingSkip } from "../../generated/schema"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateJackpotFunderConfig } from "../helpers/jackpot-funder"
+import { getMarketById } from "../helpers/market"
+
+// NOTE: BrbRatioUpdated handler is intentionally omitted. The event is per-market
+// (marketId + ratioPerAssetUnit) but Bastien's `Market` entity (origin/master)
+// does not carry a `brbRatio` field. A follow-up PR can either:
+//   (a) add `brbRatio: BigInt` to Market in schema.graphql + wire the handler, or
+//   (b) introduce a new MarketBrbRatio entity if per-market history is needed.
 
 export function handleFundedFromMarket(event: FundedFromMarket): void {
-  // uint32 marketId comes through as BigInt in the generated bindings (Phase 1C learning).
-  const marketIdBig = event.params.marketId
-  const market = Market.load(bigintToBytes(marketIdBig))
+  const marketIdInt32 = event.params.marketId.toI32()
+  const market = getMarketById(marketIdInt32)
   if (market == null) {
-    log.warning("FundedFromMarket: Market {} not found", [marketIdBig.toString()])
+    log.warning("FundedFromMarket: Market {} not found", [marketIdInt32.toString()])
     return
   }
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
@@ -35,10 +40,10 @@ export function handleFundedFromMarket(event: FundedFromMarket): void {
 }
 
 export function handleFundFromMarketSkipped(event: FundFromMarketSkipped): void {
-  const marketIdBig = event.params.marketId
-  const market = Market.load(bigintToBytes(marketIdBig))
+  const marketIdInt32 = event.params.marketId.toI32()
+  const market = getMarketById(marketIdInt32)
   if (market == null) {
-    log.warning("FundFromMarketSkipped: Market {} not found", [marketIdBig.toString()])
+    log.warning("FundFromMarketSkipped: Market {} not found", [marketIdInt32.toString()])
     return
   }
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
@@ -70,16 +75,4 @@ export function handleSlippageBpsUpdated(event: SlippageBpsUpdated): void {
   cfg.slippageBps = event.params.slippageBps
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
-}
-
-export function handleBrbRatioUpdated(event: BrbRatioUpdated): void {
-  // Per-market event — stored on Market.brbRatio rather than the global config.
-  const marketIdBig = event.params.marketId
-  const market = Market.load(bigintToBytes(marketIdBig))
-  if (market == null) {
-    log.warning("BrbRatioUpdated: Market {} not found", [marketIdBig.toString()])
-    return
-  }
-  market.brbRatio = event.params.ratioPerAssetUnit
-  market.save()
 }

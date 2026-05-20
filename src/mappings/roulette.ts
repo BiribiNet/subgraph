@@ -12,7 +12,7 @@ import {
   JackpotFunded,
   InfrastructureFeePaid,
   RoundLocked
-} from "../../generated/RouletteClean/Game"
+} from "../../generated/RouletteEngine/Game"
 import { log } from "@graphprotocol/graph-ts"
 import {
   processBetRecorded,

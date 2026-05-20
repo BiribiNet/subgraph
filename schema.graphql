@@ -326,10 +326,6 @@ type RouletteBet @entity(immutable: false) {
   market: Market!
   "Per-market round slice"
   round: RouletteRound!
-  "Per-market projection of this round (null for bets that pre-date multi-market indexing)"
-  marketRound: MarketRound
-  "Market this bet was placed in (null for bets that pre-date multi-market indexing)"
-  market: Market
   "Array of bet amounts"
   amounts: [BigInt!]!
   "Array of bet types"
@@ -535,8 +531,6 @@ type StakedBRBDeposit @entity(immutable: true) {
   market: Market!
   "User who deposited"
   user: User!
-  "Market this deposit belongs to (null for deposits indexed before multi-market migration)"
-  market: Market
   "Bank vault address (BankVault4626 proxy address). Derived from dataSource.address()."
   bank: Bytes
   "Assets deposited"
@@ -569,8 +563,6 @@ type StakedBRBWithdrawal @entity(immutable: true) {
   market: Market!
   "User who withdrew"
   user: User!
-  "Market this withdrawal belongs to (null for events indexed before multi-market migration)"
-  market: Market
   "Bank vault address (BankVault4626 proxy address). Derived from dataSource.address()."
   bank: Bytes
   "Assets withdrawn"
@@ -912,6 +904,120 @@ type ProtocolStats @entity(immutable: false) {
   totalDeposited: BigInt!
   "Total BRB withdrawn from sBRB vault all time"
   totalWithdrawn: BigInt!
+}
+
+# === Side Bet (Phase 3 — scaffold) ===
+# Forward-declared entities for the upcoming SideBet game. No data source or
+# mappings yet — contract not deployed. The frontend uses mock data via
+# components/features/side-bet/.
+
+enum SideBetType { COLOR_COUNT, NUMBER_HIT, CONSECUTIVE_STREAK, RED_RATIO }
+enum SideBetColor { RED, BLACK }
+enum SideBetStatus { ACTIVE, WON, LOST, EXPIRED, CANCELLED }
+
+type SideBet @entity(immutable: false) {
+  id: Bytes!
+  player: User!
+  market: Market!
+  bank: Bytes!
+  betType: SideBetType!
+  color: SideBetColor
+  targetNumber: Int
+  targetCount: Int
+  redRatioBps: Int
+  windowSpins: Int!
+  spinsResolved: Int!
+  multiplierBps: Int!
+  stake: BigInt!
+  potentialPayout: BigInt!
+  actualPayout: BigInt!
+  status: SideBetStatus!
+  placedAt: BigInt!
+  resolvedAt: BigInt
+  spinsObserved: [BigInt!]!
+  settlements: [SideBetSettlement!]! @derivedFrom(field: "sideBet")
+}
+
+type SideBetSettlement @entity(immutable: true) {
+  id: Bytes!
+  sideBet: SideBet!
+  outcome: SideBetStatus!
+  payout: BigInt!
+  settledAt: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+# === Bridge deposits (Phase 4 — scaffold) ===
+# Forward-declared. No data source — the relayer that calls deposit() after
+# bridge confirms is TBD. Will be populated by either a dedicated relayer
+# event or a server-side annotation joining BankVault4626.Deposit + Mayan /
+# Across status.
+
+enum BridgeSourceKind { EVM_ACROSS, SOLANA_MAYAN }
+
+type BridgeDeposit @entity(immutable: true) {
+  id: Bytes!
+  user: User!
+  market: Market!
+  bank: Bytes!
+  sourceKind: BridgeSourceKind!
+  sourceChain: String!
+  sourceToken: String!
+  sourceAmount: BigInt!
+  destinationAssets: BigInt!
+  bridgedAt: BigInt!
+  destinationTxHash: Bytes!
+}
+
+# === BRBJackpotFunder events (Phase 1C bis) ===
+# Per-swap snapshots: at the end of each profitable round, the funder swaps a
+# slice of the market profit (asset) into BRB on Uniswap V2, sends
+# `brbToTreasury` to JackpotTreasury, and burns `brbBurned`.
+
+type JackpotBuy @entity(immutable: true) {
+  id: Bytes!
+  market: Market!
+  asset: Bytes!
+  assetSwapped: BigInt!
+  brbOut: BigInt!
+  brbToTreasury: BigInt!
+  brbBurned: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type JackpotFundingSkip @entity(immutable: true) {
+  id: Bytes!
+  market: Market!
+  asset: Bytes!
+  reason: Int!
+  timestamp: BigInt!
+}
+
+# Singleton config for the BRBJackpotFunder. Each setter event updates one or
+# more fields and bumps `lastUpdatedAt`. Lazy-init: all fields default to 0
+# until the first config event fires.
+type JackpotFunderConfig @entity(immutable: false) {
+  id: Bytes!
+  swapAssetTotalBps: BigInt!
+  treasuryBrbNumerator: BigInt!
+  treasuryBrbDenominator: BigInt!
+  slippageBps: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+# === BRBpoints (Phase 2A) ===
+# Singleton config for the BRBpoints scoring formula. Defaults seeded at first
+# access in src/helpers/brb-points.ts. See User.brbpPoints + User.tier.
+type BRBPointsConfig @entity(immutable: false) {
+  id: Bytes!
+  wageredWeight: BigInt!
+  stakedWeight: BigInt!
+  referralWeight: BigInt!
+  divisor: BigInt!
+  lastUpdatedAt: BigInt!
 }
 
 # sync-pipeline-build-id: 1775000216171

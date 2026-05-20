@@ -123,6 +123,59 @@ dataSources:
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
       file: ./src/mappings/brbReferal.ts
+  - name: BRBJackpotFunder
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRBJackpotFunder
+      # TODO: replace with the funder address from Bastien's 2026-05-20 deploy.
+      # Resolve via `cast call <engine> "JACKPOT_FUNDER()(address)"`. Currently
+      # set to zero — this data source indexes nothing until the address lands.
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 269744493
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - JackpotBuy
+        - JackpotFundingSkip
+        - JackpotFunderConfig
+        - Market
+      abis:
+        - name: BRBJackpotFunder
+          file: ./abis/BRBJackpotFunder.json
+      eventHandlers:
+        - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
+          handler: handleFundedFromMarket
+        - event: FundFromMarketSkipped(indexed uint32,indexed address,uint8)
+          handler: handleFundFromMarketSkipped
+        - event: SwapAssetBpsUpdated(uint256)
+          handler: handleSwapAssetBpsUpdated
+        - event: TreasuryBrbSplitUpdated(uint256,uint256)
+          handler: handleTreasuryBrbSplitUpdated
+        - event: SlippageBpsUpdated(uint256)
+          handler: handleSlippageBpsUpdated
+      file: ./src/mappings/jackpot-funder.ts
+  - name: JackpotTreasury
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: JackpotTreasury
+      address: "0xc5221f91b2eca5230ef5cc24c794b7b5d1bcedff"
+      startBlock: 269744493
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities: []
+      abis:
+        - name: JackpotTreasury
+          file: ./abis/JackpotTreasury.json
+      eventHandlers:
+        - event: EngineSet(address)
+          handler: handleEngineSet
+      file: ./src/mappings/jackpot-treasury.ts
 templates:
   - name: BankVault
     kind: ethereum/contract
