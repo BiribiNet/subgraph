@@ -9,8 +9,9 @@
  *
  * Env:
  *   DEPLOY_JSON              — path to JSON (required) see deployments/example-arbitrum-sepolia.json
- *                            — optional startBlocks.{brb,roulette,stakedBRB,brbReferal} override startBlock per data source
- *                            — optional addresses.upkeepManager appends BRBUpkeepManager to turbo `WHERE address IN` (CleaningUpkeepRegistered, etc.)
+ *                            — optional startBlocks.{brb,roulette,brbReferal,stakedBRB} override startBlock per data source
+ *                            — addresses.banks[] (or addresses.markets.*.bank) appended to turbo `WHERE address IN` for vault events
+ *                            — optional addresses.upkeepManager appends UpkeepManager to turbo `WHERE address IN`
  *   GOLDSKY_SUBGRAPH_NAME    — default biribi
  *   GOLDSKY_SYNC_FILES_ONLY  — if 1, only patch YAML files (no goldsky CLI)
  *   WEBHOOK_SECRET           — required for full sync if turbo.yaml url contains ${WEBHOOK_SECRET}
@@ -58,9 +59,32 @@ function addr(key) {
   return v.toLowerCase();
 }
 
-const turboAddresses = [addr("brb"), addr("roulette"), addr("stakedBRB"), addr("brbReferal")];
-if (a.upkeepManager) {
-  turboAddresses.push(addr("upkeepManager"));
+function collectBankAddresses() {
+  const out = [];
+  const seen = new Set();
+  const add = (raw) => {
+    const x = String(raw).toLowerCase();
+    if (!x || seen.has(x)) return;
+    seen.add(x);
+    out.push(x);
+  };
+  if (Array.isArray(a.banks)) {
+    for (const bank of a.banks) add(bank);
+  }
+  if (a.markets && typeof a.markets === "object") {
+    for (const m of Object.values(a.markets)) {
+      if (m && typeof m === "object" && m.bank) add(m.bank);
+    }
+  }
+  if (out.length === 0 && a.stakedBRB) add(addr("stakedBRB"));
+  return out;
+}
+
+const bankAddresses = collectBankAddresses();
+const turboAddresses = [addr("brb"), addr("roulette"), addr("brbReferal"), ...bankAddresses];
+if (a.upkeepManager) turboAddresses.push(addr("upkeepManager"));
+if (bankAddresses.length > 0) {
+  console.log(`Turbo vault addresses: ${bankAddresses.length} bank(s)`);
 }
 
 const mergedAbiPath = join(root, "abis", "MergedEvents.json");
@@ -102,31 +126,42 @@ function injectMergedAbiIntoTurbo(turboContent, escapedAbi) {
   );
 }
 
-let turbo = readFileSync(join(root, "turbo.yaml"), "utf8");
-const hasFetchAbiCall = /_gs_fetch_abi\s*\(/.test(turbo);
+const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
+const turboTemplatePath = join(root, "turbo.yaml");
+const turboAppliedPath = join(root, "turbo.applied.yaml");
+
+let turboTemplate = readFileSync(turboTemplatePath, "utf8");
+const hasFetchAbiCall = /_gs_fetch_abi\s*\(/.test(turboTemplate);
 const hasInlineDecodeAbi =
-  /_gs_log_decode\(\s*[\r\n]+\s*'[\s\S]*?',\s*[\r\n]+\s*topics/.test(turbo);
-const turboAfterAbi = injectMergedAbiIntoTurbo(turbo, sqlAbiLiteral);
-if (turboAfterAbi === turbo && !hasFetchAbiCall && !hasInlineDecodeAbi) {
+  /_gs_log_decode\(\s*[\r\n]+\s*'[\s\S]*?',\s*[\r\n]+\s*topics/.test(turboTemplate);
+const turboAfterAbi = injectMergedAbiIntoTurbo(turboTemplate, sqlAbiLiteral);
+if (turboAfterAbi === turboTemplate && !hasFetchAbiCall && !hasInlineDecodeAbi) {
   throw new Error(
     "sync:pipeline: turbo.yaml: expected _gs_fetch_abi('…','raw') or _gs_log_decode('…', … topics — fix decoded_events SQL.",
   );
 }
-turbo = turboAfterAbi;
+let turbo = turboAfterAbi;
 
 const inList = turboAddresses.map((x) => `        '${x}'`).join(",\n");
-turbo = turbo.replace(
-  /FROM raw_logs\s*\n\s*WHERE address IN\s*\([\s\S]*?\)/,
-  `FROM raw_logs\n      WHERE address IN (\n${inList}\n      )`,
-);
-writeFileSync(join(root, "turbo.yaml"), turbo, "utf8");
-console.log("Wrote turbo.yaml");
+const usesAddressPlaceholder = turbo.includes(addressPlaceholder);
+if (usesAddressPlaceholder) {
+  turbo = turbo.replace(addressPlaceholder, inList);
+} else {
+  turbo = turbo.replace(
+    /FROM raw_logs\s*\n\s*WHERE address IN\s*\([\s\S]*?\)/,
+    `FROM raw_logs\n      WHERE address IN (\n${inList}\n      )`,
+  );
+}
+writeFileSync(turboTemplatePath, turbo, "utf8");
+console.log("Wrote turbo.yaml (ABI + addresses from DEPLOY_JSON)");
+writeFileSync(turboAppliedPath, turbo, "utf8");
+console.log("Wrote turbo.applied.yaml (resolved ABI + addresses from DEPLOY_JSON)");
 
 let subgraph = readFileSync(join(root, "subgraph.yaml"), "utf8");
+
 const dsMap = [
   ["BRBToken", "brb"],
   ["RouletteClean", "roulette"],
-  ["StakedBRB", "stakedBRB"],
   ["BRBReferal", "brbReferal"],
 ];
 for (const [name, key] of dsMap) {
@@ -295,7 +330,7 @@ try {
   execSync("yarn codegen", { cwd: root, stdio: "inherit" });
   execSync("yarn build", { cwd: root, stdio: "inherit" });
 
-  let turboPipelineFile = "turbo.yaml";
+  let turboPipelineFile = usesAddressPlaceholder ? "turbo.applied.yaml" : "turbo.yaml";
   if (turbo.includes("${WEBHOOK_SECRET}")) {
     const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
     if (!webhookSecret) {
@@ -303,7 +338,7 @@ try {
         "sync:pipeline: set WEBHOOK_SECRET in .env for turbo apply (or use GOLDSKY_SYNC_FILES_ONLY=1).",
       );
     }
-    const appliedPath = join(root, "turbo.applied.yaml");
+    const appliedPath = turboAppliedPath;
     const yamlDoubleQuotedSecret =
       /\$\{WEBHOOK_SECRET\}"/.test(turbo) || /\?secret=\$\{WEBHOOK_SECRET\}"/.test(turbo);
     const turboWithSecret = yamlDoubleQuotedSecret

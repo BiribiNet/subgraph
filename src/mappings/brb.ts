@@ -2,9 +2,10 @@ import { BigInt, log } from "@graphprotocol/graph-ts"
 import { Transfer, Approval } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction, TokenApproval } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserRouletteStats, updateUserLastActive } from "../helpers/user"
-import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
+import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
+import { marketRoundId, isKnownBank, findBetInGlobalRound, loadMarketByBank } from "../helpers/market"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 
 export function handleTransfer(event: Transfer): void {
@@ -78,23 +79,30 @@ export function handleTransfer(event: Transfer): void {
     dailyStatsBurn.save()
   }
 
-  // Track BRB transfers TO StakedBRB contract (for donation calculation)
-  if (toHex == STAKED_BRB_CONTRACT_ADDRESS) {
-    // Track cumulative transfers to pool in GlobalState
+  // Track BRB transfers TO any bank vault (donation / liquidity)
+  if (isKnownBank(event.params.to)) {
     globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
+    const market = loadMarketByBank(event.params.to)
+    if (market != null) {
+      market.totalAssets = market.totalAssets.plus(event.params.value)
+      market.save()
+    }
   }
 
-  // Payout detection: Transfer events from StakedBRB/Jackpot to users during payout phase.
-  // These are processed before RoundCleaningCompleted (sequential log index ordering),
-  // so round.totalPayouts is finalized by the time revenue is calculated in cleaning.
+  // Payout detection: transfers from bank vault or jackpot treasury during payout phase
   if (globalState.currentRoundNumber.gt(BigInt.fromI32(1))) {
-    const currentRound = RouletteRound.load(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1))))
+    const resolvingRoundId = globalState.currentRoundNumber.minus(BigInt.fromI32(1))
+    const bet = findBetInGlobalRound(event.params.to, resolvingRoundId)
+    let currentRound: RouletteRound | null = null
+    if (bet != null) {
+      currentRound = RouletteRound.load(bet.round)
+    }
 
-    if (currentRound != null && (currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT || currentRound.status == ROUND_STATUS_PAYOUT)) {
-      // Get the corresponding RouletteBet entity first
-      const bet = RouletteBet.load(event.params.to.concat(bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1)))))
-
-      if (bet != null) {
+    if (
+      currentRound != null &&
+      bet != null &&
+      (currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT || currentRound.status == ROUND_STATUS_PAYOUT)
+    ) {
         const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
         if (fromHex == JACKPOT_CONTRACT_ADDRESS) {
           // Jackpot payout transfer
@@ -128,7 +136,7 @@ export function handleTransfer(event: Transfer): void {
           const hourlyJackpotPayout = getOrCreateHourlySnapshot(event.block.timestamp)
           hourlyJackpotPayout.totalPayouts = hourlyJackpotPayout.totalPayouts.plus(event.params.value)
           hourlyJackpotPayout.save()
-        } else if (fromHex == STAKED_BRB_CONTRACT_ADDRESS) {
+        } else if (isKnownBank(event.params.from)) {
           const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
           if (withdrawTx == null) { // if we are in a withdraw scenario exit
             // Regular payout transfer
@@ -180,7 +188,6 @@ export function handleTransfer(event: Transfer): void {
 
         bet.save()
         currentRound.save()
-      }
     }
   }
   globalState.save()

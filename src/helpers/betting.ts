@@ -1,5 +1,5 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
-import { RouletteRound, RouletteBet } from "../../generated/schema"
+import { RouletteRound, RouletteBet, Market } from "../../generated/schema"
 import { BetPlaced } from "../../generated/StakedBRB/StakedBRB"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
@@ -140,6 +140,7 @@ export function recordRouletteBetEntry(
   betType: BigInt,
   number: BigInt,
   round: RouletteRound,
+  market: Market,
   blockNumber: BigInt,
   timestamp: BigInt,
   transactionHash: Bytes
@@ -150,6 +151,7 @@ export function recordRouletteBetEntry(
   if (bet == null) {
     bet = new RouletteBet(betId)
     bet.user = user
+    bet.market = market.id
     bet.round = round.id
     bet.amounts = [amount]
     bet.betTypes = [getBetTypeFromNumber(betType)]
@@ -187,13 +189,22 @@ export function recordRouletteBetEntry(
   updateRoundMaxPayoutComponents(round, amount, betType, number)
 }
 
-export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, round: RouletteRound, event: BetPlaced): void {
+export function processRouletteBet(
+  user: Bytes,
+  amount: BigInt,
+  betType: BigInt,
+  number: BigInt,
+  round: RouletteRound,
+  market: Market,
+  event: BetPlaced
+): void {
   recordRouletteBetEntry(
     user,
     amount,
     betType,
     number,
     round,
+    market,
     event.block.number,
     event.block.timestamp,
     event.transaction.hash
