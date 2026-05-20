@@ -1,6 +1,6 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { RouletteRound, RouletteBet } from "../../generated/schema"
-import { BetPlaced } from "../../generated/StakedBRB/StakedBRB"
+import { BetPlaced } from "../../generated/BankVault4626_USDC/StakedBRB"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
   BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN,
@@ -143,7 +143,7 @@ export function recordRouletteBetEntry(
   blockNumber: BigInt,
   timestamp: BigInt,
   transactionHash: Bytes
-): void {
+): RouletteBet {
   const betId = user.concat(round.id)
   let bet = RouletteBet.load(betId)
 
@@ -185,10 +185,11 @@ export function recordRouletteBetEntry(
   bet.save()
   round.totalBets = round.totalBets.plus(amount)
   updateRoundMaxPayoutComponents(round, amount, betType, number)
+  return bet
 }
 
-export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, round: RouletteRound, event: BetPlaced): void {
-  recordRouletteBetEntry(
+export function processRouletteBet(user: Bytes, amount: BigInt, betType: BigInt, number: BigInt, round: RouletteRound, event: BetPlaced): RouletteBet {
+  return recordRouletteBetEntry(
     user,
     amount,
     betType,

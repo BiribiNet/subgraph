@@ -8,7 +8,7 @@ import {
   test,
 } from 'matchstick-as';
 
-import { WithdrawalRequested, WithdrawalProcessed } from '../generated/StakedBRB/StakedBRB';
+import { WithdrawalRequested, WithdrawalProcessed } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleWithdrawalRequested, handleWithdrawalProcessed } from '../src/mappings/stakedBRB';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 

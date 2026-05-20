@@ -1,7 +1,9 @@
 import { BigInt } from "@graphprotocol/graph-ts"
-import { RouletteRound } from "../../generated/schema"
+import { Market, MarketRound, RouletteRound } from "../../generated/schema"
 import { ROUND_STATUS_BETTING } from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
+import { marketRoundKey } from "./market"
+import { ZERO } from "./number"
 
 function zerosArray(length: i32): Array<BigInt> {
   const arr = new Array<BigInt>(length)
@@ -45,4 +47,32 @@ export function createNewRouletteRound(roundNumber: BigInt, startedAt: BigInt): 
   round.infraRevenue = BigInt.fromI32(0)
   round.startedAt = startedAt
   return round
+}
+
+/** Per-market projection of a global round. Idempotent: returns the existing entity if already created. */
+export function createOrLoadMarketRound(
+  market: Market,
+  localRoundId: BigInt,
+  globalRoundId: BigInt,
+  round: RouletteRound,
+  timestamp: BigInt
+): MarketRound {
+  const id = marketRoundKey(market.marketId, globalRoundId)
+  let mr = MarketRound.load(id)
+  if (mr != null) {
+    return mr
+  }
+  mr = new MarketRound(id)
+  mr.market = market.id
+  mr.localRoundId = localRoundId
+  mr.globalRoundId = globalRoundId
+  mr.status = ROUND_STATUS_BETTING
+  mr.totalBets = ZERO
+  mr.betCount = ZERO
+  mr.totalPayouts = ZERO
+  mr.jackpotFunded = ZERO
+  mr.infraFee = ZERO
+  mr.startedAt = timestamp
+  mr.globalRound = round.id
+  return mr
 }

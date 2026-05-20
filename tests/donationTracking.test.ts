@@ -9,7 +9,7 @@ import {
 } from 'matchstick-as';
 
 import { Transfer } from '../generated/BRBToken/BRB';
-import { RoundCleaningCompleted, Deposit, BetPlaced } from '../generated/StakedBRB/StakedBRB';
+import { RoundCleaningCompleted, Deposit, BetPlaced } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleTransfer } from '../src/mappings/brb';
 import { handleRoundCleaningCompleted, handleDeposit, handleBetPlaced } from '../src/mappings/stakedBRB';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';

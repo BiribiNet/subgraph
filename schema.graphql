@@ -28,6 +28,81 @@ enum BetType {
 enum PlayerTier { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, LEGEND }
 enum StakingActionType { DEPOSIT, WITHDRAW }
 
+# Per-market entity. One per (marketId, bank) registered on the RouletteEngine.
+# Created by RouletteEngine.MarketRegistered handler (or lazily by the BankVault4626 template
+# handler on the first event for a known bank if the engine event hasn't been seen yet).
+type Market @entity(immutable: false) {
+  "Bytes encoding of marketId (uint32)"
+  id: Bytes!
+  "uint32 marketId from the engine, stored as BigInt for filtering"
+  marketId: BigInt!
+  "Underlying ERC-20 asset address (USDC, BRB, ...)"
+  asset: Bytes!
+  "BankVault4626 proxy address"
+  bank: Bytes!
+  "ERC-20 symbol of the asset (\"\" if the contract doesn't expose it)"
+  assetSymbol: String!
+  "ERC-20 decimals of the asset (18 default if the contract doesn't expose it)"
+  assetDecimals: Int!
+  "ERC-4626 share name (vault.name())"
+  shareName: String!
+  "ERC-4626 share symbol (vault.symbol())"
+  shareSymbol: String!
+  "Block timestamp of MarketRegistered (or the first observed event on the bank if lazily created)"
+  createdAt: BigInt!
+  "Per-market accumulated assets (BankVault4626 totalAssets at last observed event)"
+  totalAssets: BigInt!
+  "Per-market accumulated shares (BankVault4626 totalSupply at last observed event)"
+  totalShares: BigInt!
+  "Per-market reverse lookup"
+  marketRounds: [MarketRound!]! @derivedFrom(field: "market")
+  "Bets placed in this market"
+  bets: [RouletteBet!]! @derivedFrom(field: "market")
+  "Deposits into this market's bank"
+  deposits: [StakedBRBDeposit!]! @derivedFrom(field: "market")
+  "Withdrawals from this market's bank"
+  withdrawals: [StakedBRBWithdrawal!]! @derivedFrom(field: "market")
+}
+
+# Per-market projection of a global round.
+# id = marketId-globalRoundId
+type MarketRound @entity(immutable: false) {
+  "Composite key: bytes(marketId) || bytes(globalRoundId)"
+  id: Bytes!
+  market: Market!
+  "BetRecorded.localRound — per-market index"
+  localRoundId: BigInt!
+  "Cross-market RoundLocked.globalRoundId — matches RouletteRound.id"
+  globalRoundId: BigInt!
+  "Lifecycle: BETTING | LOCKED | VRF | PAYOUT | CLEAN"
+  status: RoundStatus!
+  "Sum of BetRecorded.amount in this market+round"
+  totalBets: BigInt!
+  "Number of BetRecorded events in this market+round"
+  betCount: BigInt!
+  "Sum of PayoutProgress.paidAmount for this market+round"
+  totalPayouts: BigInt!
+  "JackpotFunded.amount for this market+round (asset decimals)"
+  jackpotFunded: BigInt!
+  "InfrastructureFeePaid.amount for this market+round (asset decimals)"
+  infraFee: BigInt!
+  "Timestamp of first event"
+  startedAt: BigInt!
+  "Timestamp of RoundLocked"
+  lockedAt: BigInt
+  "Timestamp of RoundResolved (propagated from the global round)"
+  resolvedAt: BigInt
+  globalRound: RouletteRound!
+}
+
+# O(1) reverse lookup from bank vault address to its Market.
+# Populated either eagerly by handleMarketRegistered or lazily by the bank-vault template.
+type BankIndex @entity(immutable: false) {
+  "Bank vault address"
+  id: Bytes!
+  market: Market!
+}
+
 type User @entity(immutable: false) {
   "User address"
   id: Bytes!
@@ -248,6 +323,10 @@ type RouletteBet @entity(immutable: false) {
   user: User!
   "Round this bet belongs to"
   round: RouletteRound!
+  "Per-market projection of this round (null for bets that pre-date multi-market indexing)"
+  marketRound: MarketRound
+  "Market this bet was placed in (null for bets that pre-date multi-market indexing)"
+  market: Market
   "Array of bet amounts"
   amounts: [BigInt!]!
   "Array of bet types"
@@ -451,6 +530,10 @@ type StakedBRBDeposit @entity(immutable: true) {
   id: Bytes!
   "User who deposited"
   user: User!
+  "Market this deposit belongs to (null for deposits indexed before multi-market migration)"
+  market: Market
+  "Bank vault address (BankVault4626 proxy address). Derived from dataSource.address()."
+  bank: Bytes
   "Assets deposited"
   assets: BigInt!
   "Shares minted"
@@ -479,6 +562,10 @@ type StakedBRBWithdrawal @entity(immutable: true) {
   id: Bytes!
   "User who withdrew"
   user: User!
+  "Market this withdrawal belongs to (null for events indexed before multi-market migration)"
+  market: Market
+  "Bank vault address (BankVault4626 proxy address). Derived from dataSource.address()."
+  bank: Bytes
   "Assets withdrawn"
   assets: BigInt!
   "Shares burned"
@@ -496,6 +583,10 @@ type LargeWithdrawalRequest @entity(immutable: false) {
   id: Bytes!
   "User who requested withdrawal"
   user: User!
+  "Market this request belongs to (null for events indexed before multi-market migration)"
+  market: Market
+  "Bank vault address (BankVault4626 proxy address). Derived from dataSource.address()."
+  bank: Bytes
   "Requested amount (accounting assets)"
   amount: BigInt!
   "Queue position"
@@ -602,6 +693,8 @@ type BRBBurn @entity(immutable: true) {
 type BettingWindowClosedLog @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
+  "Bank vault that emitted the event (BankVault4626 proxy address)"
+  bank: Bytes
   "StakedBRB currentRound when the betting window closed (pre-VRF)"
   roundId: BigInt!
   "Block number"
@@ -615,6 +708,8 @@ type BettingWindowClosedLog @entity(immutable: true) {
 type QueuedLiquidityRejectedLog @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
+  "Bank vault that emitted the event (BankVault4626 proxy address)"
+  bank: Bytes
   "Payer whose queued deposit/mint was refunded"
   payer: Bytes!
   "Asset amount"
@@ -632,6 +727,8 @@ type QueuedLiquidityRejectedLog @entity(immutable: true) {
 type WithdrawalEjectedLog @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
+  "Bank vault that emitted the event (BankVault4626 proxy address)"
+  bank: Bytes
   "User whose queued withdrawal was ejected"
   user: Bytes!
   "Ejection reason code (contract-defined)"

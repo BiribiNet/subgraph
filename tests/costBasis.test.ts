@@ -8,7 +8,7 @@ import {
   test,
 } from 'matchstick-as';
 
-import { Deposit, Withdraw, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { Deposit, Withdraw, RoundCleaningCompleted } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleDeposit, handleWithdraw, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 

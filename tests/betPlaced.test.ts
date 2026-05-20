@@ -8,9 +8,9 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { BetPlaced, RoundCleaningCompleted } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleBetPlaced, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
-import { VRFResult } from '../generated/RouletteClean/Game';
+import { VRFResult } from '../generated/RouletteEngine/Game';
 import { handleVRFResult } from '../src/mappings/roulette';
 import { ROUND_STATUS_BETTING } from '../src/helpers/constant';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';

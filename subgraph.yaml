@@ -38,7 +38,7 @@ dataSources:
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
       file: ./src/mappings/brb.ts
-  - name: RouletteClean
+  - name: RouletteEngine
     kind: ethereum/contract
     network: arbitrum-sepolia
     source:
@@ -59,9 +59,16 @@ dataSources:
         - ContractUpgrade
         - ProtocolStats
         - PayoutFailure
+        - Market
+        - MarketRound
+        - BankIndex
       abis:
         - name: Game
           file: ./abis/Game.json
+        - name: BankVault4626
+          file: ./abis/BankVault4626.json
+        - name: ERC20
+          file: ./abis/ERC20.json
       eventHandlers:
         - event: BetRecorded(uint32,uint64,address,uint256,uint8,uint16)
           handler: handleBetRecorded
@@ -81,8 +88,16 @@ dataSources:
           handler: handleGameInitialized
         - event: Upgraded(indexed address)
           handler: handleGameUpgraded
-      file: ./src/mappings/roulette.ts
-  - name: StakedBRB
+        - event: MarketRegistered(uint32,address)
+          handler: handleMarketRegistered
+        - event: RoundLocked(uint32,uint64,uint64)
+          handler: handleRoundLocked
+        - event: JackpotFunded(uint64,uint32,uint256)
+          handler: handleJackpotFunded
+        - event: InfrastructureFeePaid(uint64,uint32,uint256)
+          handler: handleInfrastructureFeePaid
+      file: ./src/mappings/roulette-engine.ts
+  - name: BankVault4626_USDC
     kind: ethereum/contract
     network: arbitrum-sepolia
     source:
@@ -117,11 +132,15 @@ dataSources:
         - VaultState
         - ProtocolStats
         - APYSnapshot
+        - Market
+        - BankIndex
       abis:
         - name: StakedBRB
           file: ./abis/BankVault4626.json
         - name: MergedEvents
           file: ./abis/MergedEvents.json
+        - name: ERC20
+          file: ./abis/ERC20.json
       eventHandlers:
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit
@@ -147,7 +166,7 @@ dataSources:
           handler: handleVaultRoleAdminChanged
         - event: UpkeepRegistered(uint256,uint256,address,uint96)
           handler: handleUpkeepRegistered
-      file: ./src/mappings/stakedBRB.ts
+      file: ./src/mappings/bank-vault.ts
   - name: BRBReferal
     kind: ethereum/contract
     network: arbitrum-sepolia
@@ -172,3 +191,72 @@ dataSources:
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
       file: ./src/mappings/brbReferal.ts
+templates:
+  - name: BankVault4626
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: MergedEvents
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - GlobalState
+        - StakedBRBDeposit
+        - StakedBRBWithdrawal
+        - LargeWithdrawalRequest
+        - BettingWindowClosedLog
+        - QueuedLiquidityRejectedLog
+        - WithdrawalEjectedLog
+        - User
+        - RouletteRound
+        - RouletteBet
+        - WithdrawTransaction
+        - DailyStat
+        - DailyPlayer
+        - HourlyVolumeSnapshot
+        - HourlyPlayer
+        - TokenApproval
+        - AdminRoleChange
+        - ContractUpgrade
+        - UpkeepRegistration
+        - MaxBetsUpdate
+        - VaultState
+        - ProtocolStats
+        - APYSnapshot
+        - Market
+        - BankIndex
+      abis:
+        - name: StakedBRB
+          file: ./abis/BankVault4626.json
+        - name: MergedEvents
+          file: ./abis/MergedEvents.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Deposit(indexed address,indexed address,uint256,uint256)
+          handler: handleDeposit
+        - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
+          handler: handleWithdraw
+        - event: WithdrawalRequested(address,uint8,address,uint256,uint256)
+          handler: handleWithdrawalRequested
+        - event: WithdrawalProcessed(address,uint8,address,uint256,uint256)
+          handler: handleWithdrawalProcessed
+        - event: WithdrawalEjected(address,uint8)
+          handler: handleWithdrawalEjected
+        - event: BetPlaced(address,uint256,bytes,uint256)
+          handler: handleBetPlaced
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleVaultRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleVaultRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleVaultRoleAdminChanged
+        - event: UpkeepRegistered(uint256,uint256,address,uint96)
+          handler: handleUpkeepRegistered
+      file: ./src/mappings/bank-vault.ts

@@ -26,17 +26,27 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - The **referral tracking** (BRBR earnings, conversion history)
 - The **BRBP points & tier system** (leaderboard, tier progression)
 
-### Protocol Smart Contracts (Arbitrum)
+### Protocol Smart Contracts (Arbitrum Sepolia, 2026-05-19 redeploy — multi-market)
 
-| Contract | Key Events to Index |
-|---|---|
-| **Game Contract** | `BetPlaced`, `RoundStarted`, `RoundResolved`, `PayoutExecuted`, `RevenueDistributed` |
-| **BRB Token (ERC-20)** | `Transfer`, `Approval`, `Burn` (deflationary: 0.5% burned per round) |
-| **StakedBRB Vault (sBRB, ERC-4626)** | `Deposit`, `Withdraw`, `Transfer` (sBRB shares), vault asset changes |
-| **BRBReferral** | `ReferralRegistered`, `BRBRRewarded`, `BRBRConverted` |
-| **Chainlink VRF** | `RandomWordsRequested`, `RandomWordsFulfilled` |
-| **Jackpot** | `JackpotFunded`, `JackpotTriggered`, `JackpotPaidOut` |
-| **Uniswap V2 (BRB pair)** | `Swap`, `Sync` (for price tracking) |
+| Contract | Address | Key Events to Index |
+|---|---|---|
+| **RouletteEngine** (hub) | `0x0ba41d10c05e970ceeeef4f1d7f2fe2f45c1f888` | `BetRecorded`, `RoundLocked`, `GlobalRoundSealed`, `VrfRequested`, `VRFResult`, `RoundResolved`, `PayoutProgress`, `JackpotFunded`, `InfrastructureFeePaid`, `MarketRegistered`, `MinJackpotConditionUpdated`, `Initialized`, `Upgraded` |
+| **BRB Token (ERC-20)** | `0x6499456948fa1409a753b8ef40dc18dccd563d01` | `Transfer`, `Approval` (deflationary: 0.5% burned per round) |
+| **BankVault4626 (USDC bank)** | `0x3861523245933a342debab87daa8298f3640c57c` | `Deposit`, `Withdraw`, `WithdrawalRequested/Processed/Ejected`, `BetPlaced`, `Transfer`, `Approval`, `Role*`, `UpkeepRegistered` |
+| **BankVault4626** (template, future markets) | dynamic — spawned by `MarketRegistered` | same as the USDC bank |
+| **BRBReferral** (legacy, deprecated) | `0x48e85e0f774f0d0d44519b13a959d9faa78e831b` | `Transfer`, `Approval` |
+| **MarketRegistry / BRBJackpotFunder / JackpotTreasury** | not yet indexed | — addresses pending ops confirmation, follow-up PR `1C bis` will add them |
+| **UpkeepManager** | `0x924b24ca118fa0fbe1ace279d9af2821952015d3` | not indexed (out of scope) |
+| **UpkeepScheduler** | `0x59558e58429d3e77e9f8bdaa888d30c8f2af4a05` | not indexed (out of scope) |
+
+### Multi-market data model (Phase 1C)
+
+- `Market { marketId, asset, bank, assetSymbol, assetDecimals, shareName, shareSymbol, totalAssets, totalShares }` — one per registered market.
+- `MarketRound { market, localRoundId, globalRoundId, status, totalBets, betCount, totalPayouts, jackpotFunded, infraFee }` — per-market projection of a global round.
+- `BankIndex { id: bank, market }` — O(1) reverse lookup from a vault address to its `Market`.
+- `RouletteBet.market` / `RouletteBet.marketRound` (nullable) — attributed at `BetRecorded` time.
+- `StakedBRBDeposit.market`, `StakedBRBWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
+- `RouletteRound` keeps cross-market global aggregates ; `GlobalState` / `VaultState` / `ProtocolStats` singletons keep cross-market lifetime aggregates (mixed-unit during Phase 1, normalized in Phase 2 BRBpoints).
 
 ### Revenue Distribution (hardcoded per round)
 ```

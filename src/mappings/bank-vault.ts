@@ -1,4 +1,4 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes, dataSource, log } from "@graphprotocol/graph-ts"
 import {
   Deposit,
   Withdraw,
@@ -11,8 +11,8 @@ import {
   RoleGranted,
   RoleRevoked,
   RoleAdminChanged
-} from "../../generated/StakedBRB/StakedBRB"
-import { UpkeepRegistered } from "../../generated/StakedBRB/MergedEvents"
+} from "../../generated/BankVault4626_USDC/StakedBRB"
+import { UpkeepRegistered } from "../../generated/BankVault4626_USDC/MergedEvents"
 import {
   RouletteRound,
   RouletteBet,
@@ -25,6 +25,7 @@ import {
   AdminRoleChange,
   ContractUpgrade,
   UpkeepRegistration,
+  Market
 } from "../../generated/schema"
 import { ROUND_STATUS_BETTING } from "../helpers/constant"
 import { updateUserStakingStats, updateUserRouletteStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
@@ -35,15 +36,29 @@ import { ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, trackDailyUniquePlayer, getOrCreateHourlySnapshot, trackHourlyUniquePlayer } from "../helpers/aggregation"
 import { processRouletteBet, calculateMaxPayoutFromRoundComponents } from "../helpers/betting"
 import { createNewRouletteRound } from "../helpers/rouletteRound"
+import { getOrCreateMarketByBank, loadMarketByBank } from "../helpers/market"
+
+function currentBank(): Address {
+  return dataSource.address()
+}
+
+function bankBytes(): Bytes {
+  return changetype<Bytes>(dataSource.address())
+}
+
+function ensureMarketForBank(timestamp: BigInt): Market {
+  return getOrCreateMarketByBank(currentBank(), timestamp)
+}
 
 export function handleDeposit(event: Deposit): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
+  const market = ensureMarketForBank(event.block.timestamp)
 
-  // Create deposit entity
   const depositId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const deposit = new StakedBRBDeposit(depositId)
   deposit.user = event.params.owner
+  deposit.market = market.id
+  deposit.bank = bankBytes()
   deposit.assets = event.params.assets
   deposit.shares = event.params.shares
   deposit.blockNumber = event.block.number
@@ -51,61 +66,50 @@ export function handleDeposit(event: Deposit): void {
   deposit.transactionHash = event.transaction.hash
   deposit.save()
 
-  // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, true)
   updateUserLastActive(event.params.owner, event.block.timestamp)
-
-  // Update cumulative deposit cost basis
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
 
-  // Track cumulative deposits in GlobalState for donation calculation
   globalState.totalDeposits = globalState.totalDeposits.plus(event.params.assets)
-
-  // Update global totals
   globalState.totalAssets = globalState.totalAssets.plus(event.params.assets)
   globalState.totalShares = globalState.totalShares.plus(event.params.shares)
-  
-  // Update share price
   updateSharePrice(globalState)
-
-  // Recalculate all APYs after deposit (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
-  // Update DailyStats with deposit volume
+  market.totalAssets = market.totalAssets.plus(event.params.assets)
+  market.totalShares = market.totalShares.plus(event.params.shares)
+  market.save()
+
   const dailyStatsDeposit = getOrCreateDailyStats(event.block.timestamp)
   dailyStatsDeposit.depositVolume = dailyStatsDeposit.depositVolume.plus(event.params.assets)
-  dailyStatsDeposit.depositCount = dailyStatsDeposit.depositCount.plus(BigInt.fromI32(1))
+  dailyStatsDeposit.depositCount = dailyStatsDeposit.depositCount.plus(ONE)
   dailyStatsDeposit.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStatsDeposit.save()
 
-  // Update HourlyVolumeSnapshot with deposit volume
   const hourlyDeposit = getOrCreateHourlySnapshot(event.block.timestamp)
   hourlyDeposit.depositVolume = hourlyDeposit.depositVolume.plus(event.params.assets)
   hourlyDeposit.save()
 
-  // Update ProtocolStats cumulative deposit volume
   const protocolStatsDeposit = getOrCreateProtocolStats()
   protocolStatsDeposit.totalDeposited = protocolStatsDeposit.totalDeposited.plus(event.params.assets)
   protocolStatsDeposit.save()
 
   globalState.save()
 
-  // Update VaultState singleton
   const vault = syncVaultState(globalState, event.block.timestamp)
   vault.save()
 }
 
 export function handleWithdraw(event: Withdraw): void {
-  // Get or create GlobalState entity
   const globalState = getOrCreateGlobalState()
-  
-  // Get user to check if they'll have zero balance after withdrawal
+  const market = ensureMarketForBank(event.block.timestamp)
   const user = getOrCreateUser(event.params.owner)
 
-  // Create withdrawal entity
   const withdrawalId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const withdrawal = new StakedBRBWithdrawal(withdrawalId)
   withdrawal.user = event.params.owner
+  withdrawal.market = market.id
+  withdrawal.bank = bankBytes()
   withdrawal.assets = event.params.assets
   withdrawal.shares = event.params.shares
   withdrawal.blockNumber = event.block.number
@@ -113,11 +117,8 @@ export function handleWithdraw(event: Withdraw): void {
   withdrawal.transactionHash = event.transaction.hash
   withdrawal.save()
 
-  // Update user stats
   updateUserStakingStats(event.params.owner, event.params.assets, false)
   updateUserLastActive(event.params.owner, event.block.timestamp)
-
-  // Update cumulative deposit cost basis (remove cost basis of withdrawn shares)
   updateUserWithdrawalCostBasis(event.params.owner, event.params.shares)
 
   const withdrawTransaction = WithdrawTransaction.load(event.transaction.hash)
@@ -129,49 +130,45 @@ export function handleWithdraw(event: Withdraw): void {
     wt.save()
   }
 
-  // Update global totals
-  // Note: stakersCount is decremented in updateUserSBRBBalance (via handleTransfer)
-  // when the sBRB Transfer event fires and balance reaches zero
   globalState.totalAssets = globalState.totalAssets.minus(event.params.assets)
   globalState.totalShares = globalState.totalShares.minus(event.params.shares)
-
-  // Update share price
   updateSharePrice(globalState)
-
-  // Recalculate all APYs after withdrawal (handles baseline setting and snapshots)
   calculateAllAPYs(globalState, event.block.timestamp, event.block.number)
 
-  // Update DailyStats with withdrawal volume
+  market.totalAssets = market.totalAssets.minus(event.params.assets)
+  market.totalShares = market.totalShares.minus(event.params.shares)
+  market.save()
+
   const dailyStatsWithdraw = getOrCreateDailyStats(event.block.timestamp)
   dailyStatsWithdraw.withdrawalVolume = dailyStatsWithdraw.withdrawalVolume.plus(event.params.assets)
-  dailyStatsWithdraw.withdrawalCount = dailyStatsWithdraw.withdrawalCount.plus(BigInt.fromI32(1))
+  dailyStatsWithdraw.withdrawalCount = dailyStatsWithdraw.withdrawalCount.plus(ONE)
   dailyStatsWithdraw.vaultSharePrice = calculateSharePrice(globalState.totalAssets, globalState.totalShares)
   dailyStatsWithdraw.save()
 
-  // Update HourlyVolumeSnapshot with withdrawal volume
   const hourlyWithdraw = getOrCreateHourlySnapshot(event.block.timestamp)
   hourlyWithdraw.withdrawalVolume = hourlyWithdraw.withdrawalVolume.plus(event.params.assets)
   hourlyWithdraw.save()
 
-  // Update ProtocolStats cumulative withdrawal volume
   const protocolStatsWithdraw = getOrCreateProtocolStats()
   protocolStatsWithdraw.totalWithdrawn = protocolStatsWithdraw.totalWithdrawn.plus(event.params.assets)
   protocolStatsWithdraw.save()
 
   globalState.save()
 
-  // Update VaultState singleton
   const vaultW = syncVaultState(globalState, event.block.timestamp)
   vaultW.save()
 }
 
 export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   const globalState = getOrCreateGlobalState()
+  const market = ensureMarketForBank(event.block.timestamp)
   const user = getOrCreateUser(event.params.owner)
 
   const requestId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.owner
+  request.market = market.id
+  request.bank = bankBytes()
   request.amount = event.params.assets
   globalState.withdrawalQueueCounter = globalState.withdrawalQueueCounter.plus(ONE)
   request.queuePosition = globalState.withdrawalQueueCounter
@@ -219,6 +216,7 @@ export function handleWithdrawalEjected(event: WithdrawalEjected): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const row = new WithdrawalEjectedLog(id)
   row.user = changetype<Bytes>(event.params.owner)
+  row.bank = bankBytes()
   row.reason = event.params.reason
   row.blockNumber = event.block.number
   row.timestamp = event.block.timestamp
@@ -227,39 +225,35 @@ export function handleWithdrawalEjected(event: WithdrawalEjected): void {
 }
 
 export function handleBetPlaced(event: BetPlaced): void {
-  // Get or create GlobalState entity
-  const globalState = getOrCreateGlobalState();
-  
-  // Get or create user to track unique players
+  const globalState = getOrCreateGlobalState()
   const user = getOrCreateUser(event.params.user)
-  const isFirstBet = user.totalRouletteBets.equals(BigInt.fromI32(0))
+  const isFirstBet = user.totalRouletteBets.equals(ZERO)
 
-  // Decode the bytes parameter to get multiple bets
-  const decoded = decodeWrapper(event.params.data, "(uint256[],uint256[],uint256[])");
-  
-  globalState.pendingBets = globalState.pendingBets.plus(event.params.amount);
-  // Update total play all time
+  // Ensure the Market exists for this bank — bets placed via the bank reference the market.
+  const market = ensureMarketForBank(event.block.timestamp)
+
+  const decoded = decodeWrapper(event.params.data, "(uint256[],uint256[],uint256[])")
+
+  globalState.pendingBets = globalState.pendingBets.plus(event.params.amount)
   globalState.totalPlayAllTime = globalState.totalPlayAllTime.plus(event.params.amount)
-  
-  // Increment unique players count if this is user's first bet
+
   if (isFirstBet) {
-    globalState.uniquePlayersCount = globalState.uniquePlayersCount.plus(BigInt.fromI32(1))
+    globalState.uniquePlayersCount = globalState.uniquePlayersCount.plus(ONE)
   }
-  
-  updateUserRouletteStats(event.params.user, event.params.amount, false, false);
-  updateUserLastActive(event.params.user, event.block.timestamp);
+
+  updateUserRouletteStats(event.params.user, event.params.amount, false, false)
+  updateUserLastActive(event.params.user, event.block.timestamp)
+
   if (decoded) {
     const s = decoded.toTuple()
     const amounts = s[0].toBigIntArray()
     const betTypes = s[1].toBigIntArray()
     const numbers = s[2].toBigIntArray()
-    const amountsLength = amounts.length;
+    const amountsLength = amounts.length
 
     const roundId = bigintToBytes(event.params.roundId)
     let round = RouletteRound.load(roundId)
     if (round == null) {
-      // Same block can index BetPlaced before RoundCleaningCompleted (lower log index).
-      // Create the round here; RCC will set authoritative `startedAt` from `boundaryTimestamp` when it runs.
       log.warning(
         "RouletteRound not yet present for bet; creating provisional round {} (BetPlaced before RoundCleaningCompleted)",
         [event.params.roundId.toString()]
@@ -268,23 +262,19 @@ export function handleBetPlaced(event: BetPlaced): void {
       round.save()
     }
 
-    // Check if this is the user's first bet in this round (for betCount tracking)
     const betEntityId = event.params.user.concat(roundId)
     const isNewBetForRound = RouletteBet.load(betEntityId) == null
 
-    // Capture max payout BEFORE processing bets (for delta calculation)
     const previousMaxPayout = calculateMaxPayoutFromRoundComponents(round)
 
-    // Process each bet
     for (let i = 0; i < amountsLength; i++) {
-      // Process the individual bet (create/update RouletteBet entity + update maxPayout components)
-      processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
+      const bet = processRouletteBet(event.params.user, amounts[i], betTypes[i], numbers[i], round, event)
+      bet.market = market.id
+      bet.save()
     }
 
-    // Increment round's total individual bet count
     round.betCount = round.betCount.plus(BigInt.fromI32(amountsLength))
 
-    // Increment user's betCount and round's uniqueBettors if first bet in round
     if (isNewBetForRound) {
       round.uniqueBettors = round.uniqueBettors.plus(ONE)
       const betUser = getOrCreateUser(event.params.user)
@@ -292,40 +282,33 @@ export function handleBetPlaced(event: BetPlaced): void {
       betUser.save()
     }
 
-    // Compute max payout AFTER processing bets and use the delta
     const currentMaxPayout = calculateMaxPayoutFromRoundComponents(round)
     const delta = currentMaxPayout.minus(previousMaxPayout)
 
-    // StakedBRB increases both:
-    // - per-round maxPayoutPerRound[roundId] += delta
-    // - global maxPayout (i.e., $.maxPayout) += delta
     round.maxBetAmount = round.maxBetAmount.plus(delta)
     globalState.maxBetAmount = globalState.maxBetAmount.plus(delta)
 
     round.save()
   }
 
-  // Update DailyStats aggregation
   const dailyStats = getOrCreateDailyStats(event.block.timestamp)
   dailyStats.volume = dailyStats.volume.plus(event.params.amount)
-  dailyStats.betCount = dailyStats.betCount.plus(BigInt.fromI32(1))
+  dailyStats.betCount = dailyStats.betCount.plus(ONE)
   const isNewDaily = trackDailyUniquePlayer(event.block.timestamp, event.params.user.toHexString())
   if (isNewDaily) {
-    dailyStats.uniquePlayers = dailyStats.uniquePlayers.plus(BigInt.fromI32(1))
+    dailyStats.uniquePlayers = dailyStats.uniquePlayers.plus(ONE)
   }
   dailyStats.save()
 
-  // Update HourlyVolumeSnapshot
   const hourly = getOrCreateHourlySnapshot(event.block.timestamp)
   hourly.volume = hourly.volume.plus(event.params.amount)
-  hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
+  hourly.betCount = hourly.betCount.plus(ONE)
   const isNewHourly = trackHourlyUniquePlayer(event.block.timestamp, event.params.user.toHexString())
   if (isNewHourly) {
-    hourly.uniquePlayers = hourly.uniquePlayers.plus(BigInt.fromI32(1))
+    hourly.uniquePlayers = hourly.uniquePlayers.plus(ONE)
   }
   hourly.save()
 
-  // Update ProtocolStats
   const protocolStats = getOrCreateProtocolStats()
   protocolStats.totalWagered = protocolStats.totalWagered.plus(event.params.amount)
   protocolStats.totalBets = protocolStats.totalBets.plus(ONE)
@@ -338,9 +321,8 @@ export function handleBetPlaced(event: BetPlaced): void {
 }
 
 export function handleTransfer(event: StakedBRBTransfer): void {
-  // Update sBRB balances for users (including mint/burn from zero address)
-  updateUserSBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
-  updateUserSBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
+  updateUserSBRBBalance(event.params.from, event.params.value, false)
+  updateUserSBRBBalance(event.params.to, event.params.value, true)
 }
 
 export function handleApproval(event: Approval): void {
@@ -404,7 +386,7 @@ export function handleUpkeepRegistered(event: UpkeepRegistered): void {
   entity.registrationType = "LANE"
   entity.upkeepId = event.params.upkeepId
   entity.forwarder = event.params.forwarder
-  entity.gasLimit = BigInt.fromI32(0)
+  entity.gasLimit = ZERO
   entity.linkAmount = event.params.amount
   entity.checkDataLength = event.params.lane
   entity.upkeepType = "payout"
@@ -413,4 +395,3 @@ export function handleUpkeepRegistered(event: UpkeepRegistered): void {
   entity.transactionHash = event.transaction.hash
   entity.save()
 }
-

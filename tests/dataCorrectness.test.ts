@@ -8,13 +8,13 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { BetPlaced, Deposit, RoundCleaningCompleted } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleBetPlaced, handleDeposit, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
 import { Transfer } from '../generated/BRBToken/BRB';
 import { handleTransfer } from '../src/mappings/brb';
 import { Transfer as BRBRTransfer } from '../generated/BRBReferal/BRBReferal';
 import { handleTransfer as handleBrbrTransfer } from '../src/mappings/brbReferal';
-import { VrfRequested, VRFResult, ComputedPayouts } from '../generated/RouletteClean/Game';
+import { VrfRequested, VRFResult, ComputedPayouts } from '../generated/RouletteEngine/Game';
 import { handleVrfRequested, handleVRFResult, handleComputedPayouts } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { STAKED_BRB_CONTRACT_ADDRESS } from '../src/helpers/constant';

@@ -8,9 +8,9 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit, Withdraw, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
+import { BetPlaced, Deposit, Withdraw, RoundCleaningCompleted } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleBetPlaced, handleDeposit, handleWithdraw, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
-import { MinJackpotConditionUpdated } from '../generated/RouletteClean/Game';
+import { MinJackpotConditionUpdated } from '../generated/RouletteEngine/Game';
 import { handleMinJackpotConditionUpdated } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 

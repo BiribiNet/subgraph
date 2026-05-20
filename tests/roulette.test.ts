@@ -16,7 +16,7 @@ import {
   ComputedPayouts,
   JackpotResultEvent,
   MinJackpotConditionUpdated,
-} from '../generated/RouletteClean/Game';
+} from '../generated/RouletteEngine/Game';
 import {
   handleVrfRequested,
   handleVRFResult,
@@ -26,7 +26,7 @@ import {
   handleJackpotResultEvent,
   handleMinJackpotConditionUpdated,
 } from '../src/mappings/roulette';
-import { RoundCleaningCompleted, BettingWindowClosed } from '../generated/StakedBRB/StakedBRB';
+import { RoundCleaningCompleted, BettingWindowClosed } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleRoundCleaningCompleted, handleBettingWindowClosed } from '../src/mappings/stakedBRB';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import {
