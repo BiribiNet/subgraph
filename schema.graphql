@@ -28,6 +28,76 @@ enum BetType {
 enum PlayerTier { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, LEGEND }
 enum StakingActionType { DEPOSIT, WITHDRAW }
 
+# === Side Bet (Phase 3 — scaffold) ===
+# Entities below describe the Side Bet game shape that the eventual on-chain
+# contract will emit. No data source / mappings are wired yet; the frontend
+# uses mock data until the contract ships. A follow-up PR will add the
+# `SideBet` data source + `src/mappings/side-bet.ts` once the contract is
+# deployed and the canonical event signatures are published.
+
+enum SideBetType { COLOR_COUNT, NUMBER_HIT, CONSECUTIVE_STREAK, RED_RATIO }
+enum SideBetColor { RED, BLACK }
+enum SideBetStatus { ACTIVE, WON, LOST, EXPIRED, CANCELLED }
+
+type SideBet @entity(immutable: false) {
+  "tx hash + log index of SideBetPlaced"
+  id: Bytes!
+  "User who placed the side bet"
+  player: User!
+  "Market the side bet was placed on"
+  market: Market!
+  "BankVault4626 escrowing the stake (denormalized for query convenience)"
+  bank: Bytes!
+  "Side bet variant"
+  betType: SideBetType!
+  "Color for COLOR_COUNT and CONSECUTIVE_STREAK; null otherwise"
+  color: SideBetColor
+  "Target number for NUMBER_HIT (0-36); null otherwise"
+  targetNumber: Int
+  "k in '>= k hits' (COLOR_COUNT) or '>= k consecutive' (CONSECUTIVE_STREAK); null otherwise"
+  targetCount: Int
+  "Threshold ratio in basis points for RED_RATIO (e.g. 6000 = 60%); null otherwise"
+  redRatioBps: Int
+  "Window length in upcoming spins (1..10)"
+  windowSpins: Int!
+  "Number of spins observed so far during the window"
+  spinsResolved: Int!
+  "Payout multiplier locked at placement time, in basis points (10000 = 1x)"
+  multiplierBps: Int!
+  "Stake amount in asset decimals"
+  stake: BigInt!
+  "Potential payout if the side bet wins (stake * multiplierBps / 10000)"
+  potentialPayout: BigInt!
+  "Actual payout received (set when status transitions to WON)"
+  actualPayout: BigInt!
+  "Lifecycle status"
+  status: SideBetStatus!
+  "Block timestamp of SideBetPlaced"
+  placedAt: BigInt!
+  "Block timestamp of the settlement event (WON / LOST / EXPIRED)"
+  resolvedAt: BigInt
+  "Winning numbers observed during the window (chronological)"
+  spinsObserved: [BigInt!]!
+  "Settlement events linked to this side bet"
+  settlements: [SideBetSettlement!]! @derivedFrom(field: "sideBet")
+}
+
+type SideBetSettlement @entity(immutable: true) {
+  "tx hash + log index of SideBetSettled / SideBetExpired"
+  id: Bytes!
+  sideBet: SideBet!
+  "Final outcome — WON / LOST / EXPIRED / CANCELLED"
+  outcome: SideBetStatus!
+  "Payout amount in asset decimals (0 for LOST / EXPIRED)"
+  payout: BigInt!
+  "Block timestamp of the settlement"
+  settledAt: BigInt!
+  "Block number"
+  blockNumber: BigInt!
+  "Transaction hash"
+  transactionHash: Bytes!
+}
+
 # Per-market entity. One per (marketId, bank) registered on the RouletteEngine.
 # Created by RouletteEngine.MarketRegistered handler (or lazily by the BankVault4626 template
 # handler on the first event for a known bank if the engine event hasn't been seen yet).
