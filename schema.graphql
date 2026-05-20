@@ -98,6 +98,41 @@ type SideBetSettlement @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+# === Bridge (Phase 4 — scaffold) ===
+# Track cross-chain deposits that bridge into a BankVault4626. Two source paths
+# are anticipated: EVM (via Across) and Solana (via Mayan Swift). The on-chain
+# relayer that calls BankVault4626.deposit after the bridge confirms is TBD;
+# this entity will be filled by either (a) a dedicated relayer event or
+# (b) a heuristic that joins BankVault4626.Deposit with off-chain bridge data
+# via a server-side annotation. No data source / mappings yet.
+
+enum BridgeSourceKind { EVM_ACROSS, SOLANA_MAYAN }
+
+type BridgeDeposit @entity(immutable: true) {
+  "Destination tx hash + log index"
+  id: Bytes!
+  "User receiving the deposit on Arbitrum"
+  user: User!
+  "Market the deposit landed in"
+  market: Market!
+  "BankVault4626 proxy address (denormalized)"
+  bank: Bytes!
+  "Which bridge routed the deposit"
+  sourceKind: BridgeSourceKind!
+  "Human-readable source chain identifier (e.g. \"solana\", \"ethereum\", \"base\")"
+  sourceChain: String!
+  "Source token address as a string (SPL mint for Solana, ERC-20 address otherwise)"
+  sourceToken: String!
+  "Source amount in source-token decimals"
+  sourceAmount: BigInt!
+  "Post-bridge assets that hit BankVault4626.deposit (in asset decimals)"
+  destinationAssets: BigInt!
+  "Block timestamp of the destination tx"
+  bridgedAt: BigInt!
+  "Destination tx hash on Arbitrum"
+  destinationTxHash: Bytes!
+}
+
 # Per-market entity. One per (marketId, bank) registered on the RouletteEngine.
 # Created by RouletteEngine.MarketRegistered handler (or lazily by the BankVault4626 template
 # handler on the first event for a known bank if the engine event hasn't been seen yet).
