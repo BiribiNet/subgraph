@@ -8,36 +8,17 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, RoundCleaningCompleted } from '../generated/BankVault4626_USDC/StakedBRB';
-import { handleBetPlaced, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
+import { BetPlaced } from '../generated/BankVault4626_USDC/StakedBRB';
+import { handleBetPlaced } from '../src/mappings/bank-vault';
 import { VRFResult } from '../generated/RouletteEngine/Game';
-import { handleVRFResult } from '../src/mappings/roulette';
+import { handleVRFResult } from '../src/mappings/roulette-engine';
 import { ROUND_STATUS_BETTING } from '../src/helpers/constant';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
+import { createRoundForTests } from './helpers';
 
-// Tests structure (matchstick-as >=0.5.0)
-// https://thegraph.com/docs/en/developer/matchstick/#tests-structure-0-5-0
+// Phase 1C removed the legacy `RoundCleaningCompleted` event. These tests now
+// use `createRoundForTests` to bootstrap a RouletteRound entity directly.
 
-const emitRoundCleaningCompleted = (cleanedRoundId: i32, newRoundId: i32, boundaryTs: i32): void => {
-    const ev = changetype<RoundCleaningCompleted>(newMockEvent());
-    ev.parameters = new Array<ethereum.EventParam>();
-    ev.parameters.push(new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId))));
-    ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(newRoundId))));
-    ev.parameters.push(new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(boundaryTs))));
-    const feesTuple = new ethereum.Tuple();
-    feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
-    feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
-    feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(0)));
-    ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
-    ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-    ev.block.timestamp = BigInt.fromI32(boundaryTs);
-    ev.block.number = BigInt.fromI32(10000);
-    handleRoundCleaningCompleted(ev);
-}
-
-const initializeRound = (): void => {
-  emitRoundCleaningCompleted(0, 1, 1_000_000);
-}
 const initializeBet = (): void => {
   const betPlacedEvent = changetype<BetPlaced>(newMockEvent());
   betPlacedEvent.parameters = new Array<ethereum.EventParam>();
@@ -64,30 +45,26 @@ const vrfResult = (): void => {
   vrfResultEvent.block.number = BigInt.fromI32(10001);
   handleVRFResult(vrfResultEvent);
 };
+
 describe('RouletteBet tests', () => {
   beforeEach(() => {
     clearStore();
   });
 
   test('RouletteBet initialized', () => {
-    initializeRound()
+    createRoundForTests(1, 1_000_000);
     initializeBet();
-    vrfResult()
+    vrfResult();
     assert.entityCount('RouletteBet', 1);
-    // Round ID is bytes, not string
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING)
-    // assert.fieldEquals('RouletteBet', '0xbbbbedc42dc53842141be8f70df9efe4d08538a41', 'user', '0xbbbbedc42dc53842141be8f70df9efe4d08538a4');
+    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
   });
 
-  test('BetPlaced before RoundCleaningCompleted lazily creates round (log order)', () => {
+  test('BetPlaced without a pre-seeded round lazily creates one (handleBetPlaced provisional path)', () => {
     initializeBet();
     const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
     assert.entityCount('RouletteRound', 1);
     assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
     assert.fieldEquals('RouletteRound', roundId, 'startedAt', '1000000');
-
-    emitRoundCleaningCompleted(0, 1, 950_000);
-    assert.fieldEquals('RouletteRound', roundId, 'startedAt', '950000');
   });
 });

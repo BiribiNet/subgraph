@@ -9,7 +9,7 @@ import {
 } from 'matchstick-as';
 
 import { WithdrawalRequested, WithdrawalProcessed } from '../generated/BankVault4626_USDC/StakedBRB';
-import { handleWithdrawalRequested, handleWithdrawalProcessed } from '../src/mappings/stakedBRB';
+import { handleWithdrawalRequested, handleWithdrawalProcessed } from '../src/mappings/bank-vault';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';

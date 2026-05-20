@@ -8,53 +8,22 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit, RoundCleaningCompleted } from '../generated/BankVault4626_USDC/StakedBRB';
-import { handleBetPlaced, handleDeposit, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
-import { Transfer } from '../generated/BRBToken/BRB';
-import { handleTransfer } from '../src/mappings/brb';
+import { BetPlaced, Deposit } from '../generated/BankVault4626_USDC/StakedBRB';
+import { handleBetPlaced, handleDeposit } from '../src/mappings/bank-vault';
 import { Transfer as BRBRTransfer } from '../generated/BRBReferal/BRBReferal';
 import { handleTransfer as handleBrbrTransfer } from '../src/mappings/brbReferal';
-import { VrfRequested, VRFResult, ComputedPayouts } from '../generated/RouletteEngine/Game';
-import { handleVrfRequested, handleVRFResult, handleComputedPayouts } from '../src/mappings/roulette';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
-import { STAKED_BRB_CONTRACT_ADDRESS } from '../src/helpers/constant';
+import { createRoundForTests } from './helpers';
 
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
 const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
 
-function createRoundCleaningCompleted(
-  cleanedRoundId: i32,
-  protocolFees: string,
-  burnAmount: string,
-  jackpotAmount: string,
-  timestamp: i32
-): void {
-  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(
-    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
-  );
-  const feesTuple = new ethereum.Tuple();
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
-  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundCleaningCompleted(ev);
-}
-
+// Shim — Phase 1C removed `RoundCleaningCompleted`. Tests only need a fresh
+// round entity to exist; see tests/helpers.ts for the rationale.
 function initializeRound(timestamp: i32 = 1000000): void {
-  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
+  createRoundForTests(1, timestamp);
 }
 
 // BetPlaced with specific bet type
@@ -82,32 +51,6 @@ function placeBet(user: string, amount: string, betType: i32, number: i32, round
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   handleBetPlaced(ev);
-}
-
-function createPayoutTransfer(from: string, to: string, amount: string, timestamp: i32 = 1000200): void {
-  const ev = changetype<Transfer>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString(from))));
-  ev.parameters.push(new ethereum.EventParam('to', ethereum.Value.fromAddress(Address.fromString(to))));
-  ev.parameters.push(new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount))));
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
-  ev.logIndex = BigInt.fromI32(1);
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleTransfer(ev);
-}
-
-function fireVrfResult(roundId: i32 = 1, winningNumber: i32 = 7): void {
-  const ev = changetype<VRFResult>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  // ABI order: roundId, winningNumber, jackpotNumber
-  ev.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId))));
-  ev.parameters.push(new ethereum.EventParam('winningNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(winningNumber))));
-  ev.parameters.push(new ethereum.EventParam('jackpotNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(5))));
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
-  ev.block.timestamp = BigInt.fromI32(1000100);
-  ev.block.number = BigInt.fromI32(10001);
-  handleVRFResult(ev);
 }
 
 function createBrbrTransfer(from: string, to: string, amount: string, timestamp: i32 = 1000000): void {
@@ -141,46 +84,11 @@ describe('totalLost derived calculation', () => {
     assert.fieldEquals('User', USER_ADDRESS, 'netProfit', '-10000000000000000000');
   });
 
-  test('After winning payout, totalLost decreases correctly', () => {
-    initializeRound(1000000);
-    const vrfEv = changetype<VrfRequested>(newMockEvent());
-    vrfEv.parameters = new Array<ethereum.EventParam>();
-    // Contract emits resolving round (1) as "newRoundId" (ABI naming mismatch)
-    vrfEv.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    vrfEv.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    vrfEv.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1000050))));
-    vrfEv.address = Address.fromString(CONTRACT_ADDRESS);
-    vrfEv.block.timestamp = BigInt.fromI32(1000050);
-    handleVrfRequested(vrfEv); // Sets round 1 to VRF
-
-    // Place bet on round 1
-    placeBet(USER_ADDRESS, '10000000000000000000', 1, 4, 1);
-
-    // VRF result — sets winningNumber/jackpotNumber but does NOT change status
-    fireVrfResult(1, 4); // winning number = 4 (matches our bet)
-
-    // ComputedPayouts advances status to COMPUTING_PAYOUT (required for payout detection)
-    const computedEv = changetype<ComputedPayouts>(newMockEvent());
-    computedEv.parameters = new Array<ethereum.EventParam>();
-    computedEv.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    computedEv.parameters.push(new ethereum.EventParam('totalWinningBets', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    computedEv.address = Address.fromString(CONTRACT_ADDRESS);
-    computedEv.block.timestamp = BigInt.fromI32(1000110);
-    handleComputedPayouts(computedEv);
-
-    // Payout from StakedBRB to user (must match STAKED_BRB_CONTRACT_ADDRESS in mappings)
-    createPayoutTransfer(STAKED_BRB_CONTRACT_ADDRESS, USER_ADDRESS, '360000000000000000000');
-
-    // totalLost should be totalRouletteBets - totalWon = 10 - 360 = 0 (clamped by actual logic)
-    // Actually: totalRouletteBets = 10, totalWon = 360
-    // totalLost = totalRouletteBets - totalWon = 10 - 360 = negative -> but stored as BigInt
-    // The derive formula: user.totalLost = user.totalRouletteBets.minus(user.totalWon)
-    // This will be negative (-350), which is fine for BigInt (signed in AssemblyScript store)
-    assert.fieldEquals('User', USER_ADDRESS, 'totalRouletteBets', '10000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalWon', '360000000000000000000');
-    // netProfit = -10 + 360 = 350
-    assert.fieldEquals('User', USER_ADDRESS, 'netProfit', '350000000000000000000');
-  });
+  // Removed: `After winning payout, totalLost decreases correctly` — depended
+  // on the `ComputedPayouts` event + handler that Phase 1C deleted from the
+  // engine ABI. Payout detection now flows through PayoutProgress (per
+  // market) and BRB Transfer (jackpot/burn). A replacement test belongs in
+  // the new rouletteEngineMultiMarket suite (referenced in the Phase 1C plan).
 
   test('Multiple bets without wins: totalLost accumulates correctly', () => {
     initializeRound();

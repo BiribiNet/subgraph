@@ -142,3 +142,7 @@ src/whitelist.ts
 # Goldsky deploy artifacts
 .goldsky-bundle.zip
 turbo.applied.yaml
+
+# Matchstick runtime artifacts
+tests/.latest.json
+tests/.docker/

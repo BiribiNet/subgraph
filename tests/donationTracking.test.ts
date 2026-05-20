@@ -9,11 +9,12 @@ import {
 } from 'matchstick-as';
 
 import { Transfer } from '../generated/BRBToken/BRB';
-import { RoundCleaningCompleted, Deposit, BetPlaced } from '../generated/BankVault4626_USDC/StakedBRB';
+import { Deposit, BetPlaced } from '../generated/BankVault4626_USDC/StakedBRB';
 import { handleTransfer } from '../src/mappings/brb';
-import { handleRoundCleaningCompleted, handleDeposit, handleBetPlaced } from '../src/mappings/stakedBRB';
+import { handleDeposit, handleBetPlaced } from '../src/mappings/bank-vault';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { STAKED_BRB_CONTRACT_ADDRESS, ZERO_ADDRESS } from '../src/helpers/constant';
+import { createRoundForTests } from './helpers';
 
 // Helper constants
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
@@ -93,41 +94,24 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
   handleBetPlaced(betPlacedEvent);
 };
 
-// Helper: StakedBRB emits RoundCleaningCompleted after cleaning (replaces former RoundCleaned + RoundStarted)
+// Cross-round bootstrap helper. Phase 1C removed the `RoundCleaningCompleted`
+// event that used to trigger round transitions; for the donation-tracking
+// tests we only need a fresh round entity to exist at the given timestamp.
+// The protocolFees / burnAmount / jackpotAmount snapshots maintained by the
+// removed handler are out of scope here — donation routing is now derived
+// from the BRB Transfer / Deposit / BetPlaced event stream directly.
 const createRoundCleaningCompleted = (
-  cleanedRoundId: i32,
-  protocolFees: string,
-  burnAmount: string,
-  jackpotAmount: string,
+  _cleanedRoundId: i32,
+  _protocolFees: string,
+  _burnAmount: string,
+  _jackpotAmount: string,
   timestamp: i32
 ): void => {
-  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(
-    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
-  );
-
-  const feesTuple = new ethereum.Tuple();
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
-  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
-
-  ev.address = Address.fromString(STAKED_BRB_CONTRACT_ADDRESS);
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundCleaningCompleted(ev);
+  createRoundForTests(_cleanedRoundId + 1, timestamp);
 };
 
-/** Seeds round 1 via genesis `RoundCleaningCompleted` (cleanedRoundId 0 → newRoundId 1). */
 const initializeRound = (timestamp: i32 = 1000000): void => {
-  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
+  createRoundForTests(1, timestamp);
 };
 
 // Test Suite 1: Transfer Tracking
