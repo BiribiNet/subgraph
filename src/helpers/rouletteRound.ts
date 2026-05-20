@@ -1,8 +1,7 @@
 import { BigInt } from "@graphprotocol/graph-ts"
-import { Market, MarketRound, RouletteRound } from "../../generated/schema"
+import { RouletteRound, Market, GlobalRound } from "../../generated/schema"
 import { ROUND_STATUS_BETTING } from "./constant"
-import { bigintToBytes } from "./bigintToBytes"
-import { marketRoundKey } from "./market"
+import { marketRoundId } from "./market"
 import { ZERO } from "./number"
 
 function zerosArray(length: i32): Array<BigInt> {
@@ -13,11 +12,17 @@ function zerosArray(length: i32): Array<BigInt> {
   return arr
 }
 
-/** New betting round entity; caller must `.save()` after any extra mutations. */
-export function createNewRouletteRound(roundNumber: BigInt, startedAt: BigInt): RouletteRound {
-  const roundId = bigintToBytes(roundNumber)
+/** New per-market round slice; caller must `.save()` after any extra mutations. */
+export function createNewRouletteRound(
+  globalRound: GlobalRound,
+  market: Market,
+  startedAt: BigInt
+): RouletteRound {
+  const roundId = marketRoundId(globalRound.roundNumber, market.marketId)
   const round = new RouletteRound(roundId)
-  round.roundNumber = roundNumber
+  round.globalRound = globalRound.id
+  round.market = market.id
+  round.roundNumber = globalRound.roundNumber
   round.status = ROUND_STATUS_BETTING
   round.totalBets = BigInt.fromI32(0)
   round.maxBetAmount = BigInt.fromI32(0)
@@ -40,11 +45,11 @@ export function createNewRouletteRound(roundNumber: BigInt, startedAt: BigInt): 
   round.betCount = BigInt.fromI32(0)
   round.failedPayoutBatches = BigInt.fromI32(0)
   round.failedJackpotBatches = BigInt.fromI32(0)
-  round.forceResolved = false
-  round.stakersRevenue = BigInt.fromI32(0)
-  round.jackpotRevenue = BigInt.fromI32(0)
-  round.roundBurnAmount = BigInt.fromI32(0)
-  round.infraRevenue = BigInt.fromI32(0)
+  round.stakersRevenue = ZERO
+  round.jackpotRevenue = ZERO
+  round.roundBurnAmount = ZERO
+  round.infraRevenue = ZERO
+  round.firstBetAt = ZERO
   round.startedAt = startedAt
   return round
 }

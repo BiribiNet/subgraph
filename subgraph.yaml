@@ -1,5 +1,5 @@
 specVersion: 1.3.0
-description: BRB
+description: BRB multi-market
 schema:
   file: ./schema.graphql
 indexerHints:
@@ -18,6 +18,8 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - GlobalState
+        - GlobalRound
+        - Market
         - BRBTransfer
         - BRBBurn
         - User
@@ -51,6 +53,9 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - GlobalState
+        - GlobalRound
+        - Market
+        - BankAddress
         - RouletteRound
         - RouletteBet
         - PayoutTransaction
@@ -58,10 +63,7 @@ dataSources:
         - AdminRoleChange
         - ContractUpgrade
         - ProtocolStats
-        - PayoutFailure
-        - Market
-        - MarketRound
-        - BankIndex
+        - DailyStat
       abis:
         - name: Game
           file: ./abis/Game.json
@@ -74,6 +76,8 @@ dataSources:
           handler: handleBetRecorded
         - event: GlobalRoundSealed(uint64,uint32)
           handler: handleGlobalRoundSealed
+        - event: RoundLocked(uint32,uint64,uint64)
+          handler: handleRoundLocked
         - event: VrfRequested(uint64,uint256,uint256)
           handler: handleVrfRequested
         - event: VRFResult(uint64,uint8,uint8)
@@ -82,91 +86,19 @@ dataSources:
           handler: handleRoundResolved
         - event: PayoutProgress(uint64,uint32,uint256,uint256,uint256)
           handler: handlePayoutProgress
+        - event: JackpotFunded(uint64,uint32,uint256)
+          handler: handleJackpotFunded
+        - event: InfrastructureFeePaid(uint64,uint32,uint256)
+          handler: handleInfrastructureFeePaid
+        - event: MarketRegistered(uint32,address,address)
+          handler: handleMarketRegistered
         - event: MinJackpotConditionUpdated(uint256)
           handler: handleMinJackpotConditionUpdated
         - event: Initialized(uint64)
           handler: handleGameInitialized
         - event: Upgraded(indexed address)
           handler: handleGameUpgraded
-        - event: MarketRegistered(uint32,address)
-          handler: handleMarketRegistered
-        - event: RoundLocked(uint32,uint64,uint64)
-          handler: handleRoundLocked
-        - event: JackpotFunded(uint64,uint32,uint256)
-          handler: handleJackpotFunded
-        - event: InfrastructureFeePaid(uint64,uint32,uint256)
-          handler: handleInfrastructureFeePaid
-      file: ./src/mappings/roulette-engine.ts
-  - name: BankVault4626_USDC
-    kind: ethereum/contract
-    network: arbitrum-sepolia
-    source:
-      abi: MergedEvents
-      address: "0xc1c96dfb2b494e775c3a4e848e6ba7a97acd86e5"
-      startBlock: 269744493
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.9
-      language: wasm/assemblyscript
-      entities:
-        - GlobalState
-        - StakedBRBDeposit
-        - StakedBRBWithdrawal
-        - LargeWithdrawalRequest
-        - BettingWindowClosedLog
-        - QueuedLiquidityRejectedLog
-        - WithdrawalEjectedLog
-        - User
-        - RouletteRound
-        - RouletteBet
-        - WithdrawTransaction
-        - DailyStat
-        - DailyPlayer
-        - HourlyVolumeSnapshot
-        - HourlyPlayer
-        - TokenApproval
-        - AdminRoleChange
-        - ContractUpgrade
-        - UpkeepRegistration
-        - MaxBetsUpdate
-        - VaultState
-        - ProtocolStats
-        - APYSnapshot
-        - Market
-        - BankIndex
-      abis:
-        - name: StakedBRB
-          file: ./abis/BankVault4626.json
-        - name: MergedEvents
-          file: ./abis/MergedEvents.json
-        - name: ERC20
-          file: ./abis/ERC20.json
-      eventHandlers:
-        - event: Deposit(indexed address,indexed address,uint256,uint256)
-          handler: handleDeposit
-        - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
-          handler: handleWithdraw
-        - event: WithdrawalRequested(address,uint8,address,uint256,uint256)
-          handler: handleWithdrawalRequested
-        - event: WithdrawalProcessed(address,uint8,address,uint256,uint256)
-          handler: handleWithdrawalProcessed
-        - event: WithdrawalEjected(address,uint8)
-          handler: handleWithdrawalEjected
-        - event: BetPlaced(address,uint256,bytes,uint256)
-          handler: handleBetPlaced
-        - event: Transfer(indexed address,indexed address,uint256)
-          handler: handleTransfer
-        - event: Approval(indexed address,indexed address,uint256)
-          handler: handleApproval
-        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
-          handler: handleVaultRoleGranted
-        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
-          handler: handleVaultRoleRevoked
-        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
-          handler: handleVaultRoleAdminChanged
-        - event: UpkeepRegistered(uint256,uint256,address,uint96)
-          handler: handleUpkeepRegistered
-      file: ./src/mappings/bank-vault.ts
+      file: ./src/mappings/roulette.ts
   - name: BRBReferal
     kind: ethereum/contract
     network: arbitrum-sepolia
@@ -191,63 +123,8 @@ dataSources:
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
       file: ./src/mappings/brbReferal.ts
-  - name: BRBJackpotFunder
-    kind: ethereum/contract
-    network: arbitrum-sepolia
-    source:
-      abi: BRBJackpotFunder
-      # TODO: replace with the funder address from Bastien's 2026-05-20 deploy.
-      # Resolve via `cast call <engine> "JACKPOT_FUNDER()(address)"`. Currently
-      # set to zero — this data source indexes nothing until the address lands.
-      address: "0x0000000000000000000000000000000000000000"
-      startBlock: 269744493
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.9
-      language: wasm/assemblyscript
-      entities:
-        - JackpotBuy
-        - JackpotFundingSkip
-        - JackpotFunderConfig
-        - Market
-      abis:
-        - name: BRBJackpotFunder
-          file: ./abis/BRBJackpotFunder.json
-      eventHandlers:
-        - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
-          handler: handleFundedFromMarket
-        - event: FundFromMarketSkipped(indexed uint32,indexed address,uint8)
-          handler: handleFundFromMarketSkipped
-        - event: SwapAssetBpsUpdated(uint256)
-          handler: handleSwapAssetBpsUpdated
-        - event: TreasuryBrbSplitUpdated(uint256,uint256)
-          handler: handleTreasuryBrbSplitUpdated
-        - event: BrbRatioUpdated(uint32,uint256)
-          handler: handleBrbRatioUpdated
-        - event: SlippageBpsUpdated(uint256)
-          handler: handleSlippageBpsUpdated
-      file: ./src/mappings/jackpot-funder.ts
-  - name: JackpotTreasury
-    kind: ethereum/contract
-    network: arbitrum-sepolia
-    source:
-      abi: JackpotTreasury
-      address: "0xc5221f91b2eca5230ef5cc24c794b7b5d1bcedff"
-      startBlock: 269744493
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.9
-      language: wasm/assemblyscript
-      entities: []
-      abis:
-        - name: JackpotTreasury
-          file: ./abis/JackpotTreasury.json
-      eventHandlers:
-        - event: EngineSet(address)
-          handler: handleEngineSet
-      file: ./src/mappings/jackpot-treasury.ts
 templates:
-  - name: BankVault4626
+  - name: BankVault
     kind: ethereum/contract
     network: arbitrum-sepolia
     source:
@@ -258,37 +135,25 @@ templates:
       language: wasm/assemblyscript
       entities:
         - GlobalState
+        - Market
         - StakedBRBDeposit
         - StakedBRBWithdrawal
         - LargeWithdrawalRequest
-        - BettingWindowClosedLog
-        - QueuedLiquidityRejectedLog
         - WithdrawalEjectedLog
         - User
-        - RouletteRound
-        - RouletteBet
-        - WithdrawTransaction
-        - DailyStat
-        - DailyPlayer
-        - HourlyVolumeSnapshot
-        - HourlyPlayer
         - TokenApproval
         - AdminRoleChange
-        - ContractUpgrade
         - UpkeepRegistration
-        - MaxBetsUpdate
         - VaultState
         - ProtocolStats
         - APYSnapshot
-        - Market
-        - BankIndex
+        - DailyStat
+        - HourlyVolumeSnapshot
       abis:
         - name: StakedBRB
           file: ./abis/BankVault4626.json
         - name: MergedEvents
           file: ./abis/MergedEvents.json
-        - name: ERC20
-          file: ./abis/ERC20.json
       eventHandlers:
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit
@@ -300,8 +165,6 @@ templates:
           handler: handleWithdrawalProcessed
         - event: WithdrawalEjected(address,uint8)
           handler: handleWithdrawalEjected
-        - event: BetPlaced(address,uint256,bytes,uint256)
-          handler: handleBetPlaced
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
         - event: Approval(indexed address,indexed address,uint256)
@@ -314,4 +177,4 @@ templates:
           handler: handleVaultRoleAdminChanged
         - event: UpkeepRegistered(uint256,uint256,address,uint96)
           handler: handleUpkeepRegistered
-      file: ./src/mappings/bank-vault.ts
+      file: ./src/mappings/stakedBRB.ts

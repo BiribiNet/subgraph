@@ -2,6 +2,7 @@ import { Bytes, BigInt, BigDecimal } from "@graphprotocol/graph-ts"
 import { GlobalState, APYSnapshot, VaultState, ProtocolStats } from "../../generated/schema"
 import { ZERO } from "./number"
 import { bigintToBytes } from "./bigintToBytes"
+import { getOrCreateGlobalRound } from "./globalRound"
 
 const GLOBAL_STATE_ID = Bytes.fromHexString("0x0000000000000000000000000000000000000001") // Singleton ID for global state
 
@@ -9,7 +10,9 @@ export function getOrCreateGlobalState(): GlobalState {
   let globalState = GlobalState.load(GLOBAL_STATE_ID)
   if (!globalState) {
     globalState = new GlobalState(GLOBAL_STATE_ID)
-    globalState.currentRound = bigintToBytes(BigInt.fromI32(1))
+    const initialRound = getOrCreateGlobalRound(BigInt.fromI32(1), ZERO)
+    initialRound.save()
+    globalState.currentGlobalRound = initialRound.id
     globalState.currentRoundNumber = BigInt.fromI32(1)
     globalState.lastRoundStartTime = ZERO
     globalState.lastRoundPaid = ZERO

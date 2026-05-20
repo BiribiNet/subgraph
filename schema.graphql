@@ -28,251 +28,96 @@ enum BetType {
 enum PlayerTier { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, LEGEND }
 enum StakingActionType { DEPOSIT, WITHDRAW }
 
-# === Side Bet (Phase 3 — scaffold) ===
-# Entities below describe the Side Bet game shape that the eventual on-chain
-# contract will emit. No data source / mappings are wired yet; the frontend
-# uses mock data until the contract ships. A follow-up PR will add the
-# `SideBet` data source + `src/mappings/side-bet.ts` once the contract is
-# deployed and the canonical event signatures are published.
-
-enum SideBetType { COLOR_COUNT, NUMBER_HIT, CONSECUTIVE_STREAK, RED_RATIO }
-enum SideBetColor { RED, BLACK }
-enum SideBetStatus { ACTIVE, WON, LOST, EXPIRED, CANCELLED }
-
-type SideBet @entity(immutable: false) {
-  "tx hash + log index of SideBetPlaced"
-  id: Bytes!
-  "User who placed the side bet"
-  player: User!
-  "Market the side bet was placed on"
-  market: Market!
-  "BankVault4626 escrowing the stake (denormalized for query convenience)"
-  bank: Bytes!
-  "Side bet variant"
-  betType: SideBetType!
-  "Color for COLOR_COUNT and CONSECUTIVE_STREAK; null otherwise"
-  color: SideBetColor
-  "Target number for NUMBER_HIT (0-36); null otherwise"
-  targetNumber: Int
-  "k in '>= k hits' (COLOR_COUNT) or '>= k consecutive' (CONSECUTIVE_STREAK); null otherwise"
-  targetCount: Int
-  "Threshold ratio in basis points for RED_RATIO (e.g. 6000 = 60%); null otherwise"
-  redRatioBps: Int
-  "Window length in upcoming spins (1..10)"
-  windowSpins: Int!
-  "Number of spins observed so far during the window"
-  spinsResolved: Int!
-  "Payout multiplier locked at placement time, in basis points (10000 = 1x)"
-  multiplierBps: Int!
-  "Stake amount in asset decimals"
-  stake: BigInt!
-  "Potential payout if the side bet wins (stake * multiplierBps / 10000)"
-  potentialPayout: BigInt!
-  "Actual payout received (set when status transitions to WON)"
-  actualPayout: BigInt!
-  "Lifecycle status"
-  status: SideBetStatus!
-  "Block timestamp of SideBetPlaced"
-  placedAt: BigInt!
-  "Block timestamp of the settlement event (WON / LOST / EXPIRED)"
-  resolvedAt: BigInt
-  "Winning numbers observed during the window (chronological)"
-  spinsObserved: [BigInt!]!
-  "Settlement events linked to this side bet"
-  settlements: [SideBetSettlement!]! @derivedFrom(field: "sideBet")
-}
-
-type SideBetSettlement @entity(immutable: true) {
-  "tx hash + log index of SideBetSettled / SideBetExpired"
-  id: Bytes!
-  sideBet: SideBet!
-  "Final outcome — WON / LOST / EXPIRED / CANCELLED"
-  outcome: SideBetStatus!
-  "Payout amount in asset decimals (0 for LOST / EXPIRED)"
-  payout: BigInt!
-  "Block timestamp of the settlement"
-  settledAt: BigInt!
-  "Block number"
-  blockNumber: BigInt!
-  "Transaction hash"
-  transactionHash: Bytes!
-}
-
-# === Bridge (Phase 4 — scaffold) ===
-# Track cross-chain deposits that bridge into a BankVault4626. Two source paths
-# are anticipated: EVM (via Across) and Solana (via Mayan Swift). The on-chain
-# relayer that calls BankVault4626.deposit after the bridge confirms is TBD;
-# this entity will be filled by either (a) a dedicated relayer event or
-# (b) a heuristic that joins BankVault4626.Deposit with off-chain bridge data
-# via a server-side annotation. No data source / mappings yet.
-
-enum BridgeSourceKind { EVM_ACROSS, SOLANA_MAYAN }
-
-type BridgeDeposit @entity(immutable: true) {
-  "Destination tx hash + log index"
-  id: Bytes!
-  "User receiving the deposit on Arbitrum"
-  user: User!
-  "Market the deposit landed in"
-  market: Market!
-  "BankVault4626 proxy address (denormalized)"
-  bank: Bytes!
-  "Which bridge routed the deposit"
-  sourceKind: BridgeSourceKind!
-  "Human-readable source chain identifier (e.g. \"solana\", \"ethereum\", \"base\")"
-  sourceChain: String!
-  "Source token address as a string (SPL mint for Solana, ERC-20 address otherwise)"
-  sourceToken: String!
-  "Source amount in source-token decimals"
-  sourceAmount: BigInt!
-  "Post-bridge assets that hit BankVault4626.deposit (in asset decimals)"
-  destinationAssets: BigInt!
-  "Block timestamp of the destination tx"
-  bridgedAt: BigInt!
-  "Destination tx hash on Arbitrum"
-  destinationTxHash: Bytes!
-}
-
-# === BRBJackpotFunder events (Phase 1C bis) ===
-# Granular per-swap snapshots: at the end of each profitable round, the funder
-# swaps a slice of the market profit (asset) into BRB on Uniswap V2, sends
-# `brbToTreasury` to JackpotTreasury, and burns `brbBurned`.
-
-type JackpotBuy @entity(immutable: true) {
-  "tx hash + log index"
-  id: Bytes!
-  market: Market!
-  "Asset address (market.asset duplicated for query convenience)"
-  asset: Bytes!
-  "Amount of `asset` swapped (in asset decimals)"
-  assetSwapped: BigInt!
-  "Total BRB received from the swap"
-  brbOut: BigInt!
-  "BRB routed to JackpotTreasury"
-  brbToTreasury: BigInt!
-  "BRB burned"
-  brbBurned: BigInt!
-  timestamp: BigInt!
-  blockNumber: BigInt!
-  transactionHash: Bytes!
-}
-
-# Emitted when a market profit is skipped by the funder (slippage, market paused, etc.).
-type JackpotFundingSkip @entity(immutable: true) {
-  "tx hash + log index"
-  id: Bytes!
-  market: Market!
-  asset: Bytes!
-  "uint8 reason code from FundFromMarketSkipped"
-  reason: Int!
-  timestamp: BigInt!
-}
-
-# Singleton config for the BRBJackpotFunder. Each setter event updates one or more
-# fields and bumps `lastUpdatedAt`. Lazy-init: all fields default to 0 until the
-# first config event fires.
-type JackpotFunderConfig @entity(immutable: false) {
-  id: Bytes!                          # constant singleton ("config")
-  swapAssetTotalBps: BigInt!
-  treasuryBrbNumerator: BigInt!
-  treasuryBrbDenominator: BigInt!
-  slippageBps: BigInt!
-  lastUpdatedAt: BigInt!
-}
-
-# Per-market entity. One per (marketId, bank) registered on the RouletteEngine.
-# Created by RouletteEngine.MarketRegistered handler (or lazily by the BankVault4626 template
-# handler on the first event for a known bank if the engine event hasn't been seen yet).
+"Per-asset market (bank vault + engine marketId)"
 type Market @entity(immutable: false) {
-  "Bytes encoding of marketId (uint32)"
-  id: Bytes!
-  "uint32 marketId from the engine, stored as BigInt for filtering"
-  marketId: BigInt!
-  "Underlying ERC-20 asset address (USDC, BRB, ...)"
+  "marketId as decimal string (1, 2, 3, …)"
+  id: ID!
+  "On-chain market id (uint32)"
+  marketId: Int!
+  "Underlying ERC-20 asset"
   asset: Bytes!
   "BankVault4626 proxy address"
   bank: Bytes!
-  "ERC-20 symbol of the asset (\"\" if the contract doesn't expose it)"
-  assetSymbol: String!
-  "ERC-20 decimals of the asset (18 default if the contract doesn't expose it)"
-  assetDecimals: Int!
-  "ERC-4626 share name (vault.name())"
-  shareName: String!
-  "ERC-4626 share symbol (vault.symbol())"
-  shareSymbol: String!
-  "Block timestamp of MarketRegistered (or the first observed event on the bank if lazily created)"
-  createdAt: BigInt!
-  "Per-market accumulated assets (BankVault4626 totalAssets at last observed event)"
+  "RouletteEngine address"
+  engine: Bytes!
+  "ERC-4626 total assets in this vault"
   totalAssets: BigInt!
-  "Per-market accumulated shares (BankVault4626 totalSupply at last observed event)"
+  "ERC-4626 total shares"
   totalShares: BigInt!
-  "BRB ratio per asset unit set by BRBJackpotFunder.BrbRatioUpdated. 0 until the first ratio update for this market."
-  brbRatio: BigInt!
-  "Per-market reverse lookup"
-  marketRounds: [MarketRound!]! @derivedFrom(field: "market")
-  "Bets placed in this market"
-  bets: [RouletteBet!]! @derivedFrom(field: "market")
-  "Deposits into this market's bank"
+  "Asset per share"
+  sharePrice: BigDecimal!
+  "Distinct depositors with shares > 0"
+  stakerCount: BigInt!
+  "Cumulative deposit volume (assets)"
+  totalDepositVolume: BigInt!
+  "Cumulative withdraw volume (assets)"
+  totalWithdrawVolume: BigInt!
+  "Wagered in open global rounds (this market's asset)"
+  pendingBets: BigInt!
+  "Max payout liability buffer for active rounds (this vault)"
+  maxBetAmount: BigInt!
+  "Current min bet (asset units)"
+  minBet: BigInt!
+  "Registry-registered and engine-linked"
+  active: Boolean!
+  "First MarketRegistered (engine) timestamp"
+  createdAt: BigInt!
+  "First MarketRegistered block"
+  createdAtBlock: BigInt!
+  "Per-market rounds in global rounds"
+  marketRounds: [RouletteRound!]! @derivedFrom(field: "market")
+  "Vault deposits"
   deposits: [StakedBRBDeposit!]! @derivedFrom(field: "market")
-  "Withdrawals from this market's bank"
+  "Vault withdrawals"
   withdrawals: [StakedBRBWithdrawal!]! @derivedFrom(field: "market")
 }
 
-# Per-market projection of a global round.
-# id = marketId-globalRoundId
-type MarketRound @entity(immutable: false) {
-  "Composite key: bytes(marketId) || bytes(globalRoundId)"
+"Lookup: bank proxy address → Market (for vault event handlers)"
+type BankAddress @entity(immutable: false) {
   id: Bytes!
   market: Market!
-  "BetRecorded.localRound — per-market index"
-  localRoundId: BigInt!
-  "Cross-market RoundLocked.globalRoundId — matches RouletteRound.id"
-  globalRoundId: BigInt!
-  "Lifecycle: BETTING | LOCKED | VRF | PAYOUT | CLEAN"
+}
+
+"Shared roulette round across all markets (VRF, winning numbers)"
+type GlobalRound @entity(immutable: false) {
+  "globalRoundId"
+  id: Bytes!
+  "Same as id (global round counter)"
+  roundNumber: BigInt!
+  "Lifecycle across all markets"
   status: RoundStatus!
-  "Sum of BetRecorded.amount in this market+round"
-  totalBets: BigInt!
-  "Number of BetRecorded events in this market+round"
-  betCount: BigInt!
-  "Sum of PayoutProgress.paidAmount for this market+round"
-  totalPayouts: BigInt!
-  "JackpotFunded.amount for this market+round (asset decimals)"
-  jackpotFunded: BigInt!
-  "InfrastructureFeePaid.amount for this market+round (asset decimals)"
-  infraFee: BigInt!
-  "Timestamp of first event"
+  "Market whose first bet started the betting window"
+  triggerMarket: Market
+  "Winning number (0-36)"
+  winningNumber: BigInt
+  "Jackpot number (0-36)"
+  jackpotNumber: BigInt
+  "Cross-market jackpot winner count"
+  jackpotWinnerCount: BigInt
+  "VRF request id"
+  requestId: BigInt
+  "VRF request tx"
+  vrfTxHash: Bytes
+  "First bet timestamp (any market); 0 = none yet"
+  firstBetAt: BigInt!
+  "Round start"
   startedAt: BigInt!
-  "Timestamp of RoundLocked"
-  lockedAt: BigInt
-  "Timestamp of RoundResolved (propagated from the global round)"
+  "Betting closed"
+  endedAt: BigInt
+  "VRF fulfilled"
+  vrfResultAt: BigInt
+  "RoundResolved"
   resolvedAt: BigInt
-  globalRound: RouletteRound!
-}
-
-# O(1) reverse lookup from bank vault address to its Market.
-# Populated either eagerly by handleMarketRegistered or lazily by the bank-vault template.
-type BankIndex @entity(immutable: false) {
-  "Bank vault address"
-  id: Bytes!
-  market: Market!
-}
-
-# Singleton config for the BRBpoints formula. id = bytes("config").
-# Default values are seeded at first access by getOrCreateBrbPointsConfig() in
-# src/helpers/brb-points.ts. Weights and divisor can be migrated later via a
-# config-update handler once an on-chain config contract ships.
-type BRBPointsConfig @entity(immutable: false) {
-  id: Bytes!
-  "Weight applied to totalRouletteBets (BRB wagered). Default: 3."
-  wageredWeight: BigInt!
-  "Weight applied to totalStaked (BRB staked). Default: 1."
-  stakedWeight: BigInt!
-  "Weight applied to totalBrbrEarned (BRBR referral credits). Default: 2."
-  referralWeight: BigInt!
-  "Divisor applied to the weighted sum. Default: 1e18 (so points are denominated in BRB-equivalent units)."
-  divisor: BigInt!
-  "Block timestamp of the last config update."
-  lastUpdatedAt: BigInt!
+  "All markets settled"
+  payoutCompletedAt: BigInt
+  "Admin force-resolve"
+  forceResolved: Boolean!
+  "Markets with bets this round"
+  participantMarketCount: BigInt!
+  "Markets finished settlement"
+  settledMarketCount: BigInt!
+  "Per-market slices"
+  marketRounds: [RouletteRound!]! @derivedFrom(field: "globalRound")
 }
 
 type User @entity(immutable: false) {
@@ -394,24 +239,18 @@ type JackpotPayout @entity(immutable: true) {
 }
 
 type RouletteRound @entity(immutable: false) {
-  "Round ID"
+  "Composite id: globalRoundId || marketId"
   id: Bytes!
-  "Round number"
+  "Parent global round"
+  globalRound: GlobalRound!
+  "Market this exposure belongs to"
+  market: Market!
+  "Global round number (denormalized)"
   roundNumber: BigInt!
-  "Round status"
+  "Per-market status (mirrors global phase; payout/settle may lag)"
   status: RoundStatus!
-  "Timestamp of the first StakedBRB bet for this round (FirstBetPlaced event)"
-  firstBetAt: BigInt
-  "Winning number (0-36)"
-  winningNumber: BigInt
-  "Jackpot number"
-  jackpotNumber: BigInt
-  "Jackpot winner count"
-  jackpotWinnerCount: BigInt
-  "VRF request ID"
-  requestId: BigInt
-  "VRF transaction hash"
-  vrfTxHash: Bytes
+  "First bet in this market for this global round (0 = none yet)"
+  firstBetAt: BigInt!
   "Number of unique users who placed bets in this round"
   uniqueBettors: BigInt!
   "Total individual bet placements in this round (sum across all users)"
@@ -452,28 +291,18 @@ type RouletteRound @entity(immutable: false) {
   currentPayoutsCount: BigInt!
   "Total BRB paid out to winners in this round"
   totalPayouts: BigInt!
-  "Round start timestamp"
+  "First bet / round start for this market"
   startedAt: BigInt!
-  "Round end timestamp"
-  endedAt: BigInt
-  "VRF result timestamp"
-  vrfResultAt: BigInt
-  "Payout completion timestamp"
-  payoutCompletedAt: BigInt
-  "Round resolved timestamp (Game contract RoundResolved event)"
-  resolvedAt: BigInt
-  "Cleaning completion timestamp"
-  cleaningCompletedAt: BigInt
-  "Whether this round was force-resolved by admin (VRF timeout recovery)"
-  forceResolved: Boolean
+  "Market settlement completed"
+  settledAt: BigInt
   "Stakers revenue share (95% of house edge)"
-  stakersRevenue: BigInt
+  stakersRevenue: BigInt!
   "Jackpot revenue share (2.5%)"
-  jackpotRevenue: BigInt
+  jackpotRevenue: BigInt!
   "Burn amount for this round (0.5%)"
-  roundBurnAmount: BigInt
+  roundBurnAmount: BigInt!
   "Infrastructure revenue share (2%)"
-  infraRevenue: BigInt
+  infraRevenue: BigInt!
   "Array of bets in this round"
   bets: [RouletteBet]! @derivedFrom(field: "round")
   "Array of payout transactions in this round"
@@ -489,11 +318,13 @@ type RouletteRound @entity(immutable: false) {
 }
 
 type RouletteBet @entity(immutable: false) {
-  "User address + round ID"
+  "User address + marketRound id"
   id: Bytes!
   "User who placed the bet"
   user: User!
-  "Round this bet belongs to"
+  "Market (denormalized)"
+  market: Market!
+  "Per-market round slice"
   round: RouletteRound!
   "Per-market projection of this round (null for bets that pre-date multi-market indexing)"
   marketRound: MarketRound
@@ -565,13 +396,13 @@ type PayoutFailure @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-# Global state for the BRB ecosystem
+# Global state for the BRB ecosystem (protocol-wide; per-market vault metrics on Market)
 type GlobalState @entity(immutable: false) {
   "Singleton ID"
   id: Bytes!
-  "Current round ID"
-  currentRound: RouletteRound!
-  "Current round number"
+  "Current global round entity id"
+  currentGlobalRound: GlobalRound!
+  "Current global round number"
   currentRoundNumber: BigInt!
   "Last round start time"
   lastRoundStartTime: BigInt!
@@ -700,6 +531,8 @@ type APYSnapshot @entity(immutable: true) {
 type StakedBRBDeposit @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
+  "Vault market"
+  market: Market!
   "User who deposited"
   user: User!
   "Market this deposit belongs to (null for deposits indexed before multi-market migration)"
@@ -732,6 +565,8 @@ type WithdrawTransaction @entity(immutable: true) {
 type StakedBRBWithdrawal @entity(immutable: true) {
   "Transaction hash + log index"
   id: Bytes!
+  "Vault market"
+  market: Market!
   "User who withdrew"
   user: User!
   "Market this withdrawal belongs to (null for events indexed before multi-market migration)"
@@ -773,6 +608,25 @@ type LargeWithdrawalRequest @entity(immutable: false) {
   blockNumber: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
+}
+
+"Per-market daily aggregates (id: `${day}-${marketId}`)"
+type MarketDailyStat @entity(immutable: false) {
+  id: ID!
+  market: Market!
+  date: Int!
+  volume: BigInt!
+  betCount: BigInt!
+  uniquePlayers: BigInt!
+  revenue: BigInt!
+  stakersRevenue: BigInt!
+  jackpotFunded: BigInt!
+  infraRevenue: BigInt!
+  totalPayouts: BigInt!
+  depositVolume: BigInt!
+  withdrawalVolume: BigInt!
+  roundsCompleted: BigInt!
+  timestamp: BigInt!
 }
 
 type DailyStat @entity(immutable: false) {
@@ -1014,7 +868,7 @@ type MaxBetsUpdate @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-"Singleton vault state for sBRB metrics"
+"Singleton vault state (legacy aggregate; prefer Market for per-asset vault)"
 type VaultState @entity(immutable: false) {
   "Singleton: vault"
   id: ID!
