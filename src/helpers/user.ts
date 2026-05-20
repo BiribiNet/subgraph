@@ -3,6 +3,7 @@ import { User } from "../../generated/schema"
 import { ZERO_ADDRESS } from "./constant"
 import { getOrCreateGlobalState } from "./globalState"
 import { ONE, ZERO } from "./number"
+import { recomputeAndSaveUserPoints } from "./brb-points"
 
 export function getOrCreateUser(userAddress: Bytes): User {
   let user = User.load(userAddress)
@@ -115,7 +116,7 @@ export function updateUserBRBReferalBalance(userAddress: Bytes, amount: BigInt, 
   user.save()
 }
 
-export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDeposit: boolean): void {
+export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDeposit: boolean, timestamp: BigInt): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
@@ -128,9 +129,10 @@ export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDep
   }
 
   user.save()
+  recomputeAndSaveUserPoints(user, timestamp)
 }
 
-export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWin: boolean, isPayout: boolean): void {
+export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWin: boolean, isPayout: boolean, timestamp: BigInt): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
@@ -152,9 +154,10 @@ export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWi
   user.totalLost = user.totalRouletteBets.minus(user.totalWon)
 
   user.save()
+  recomputeAndSaveUserPoints(user, timestamp)
 }
 
-export function updateUserBrbrEarnings(userAddress: Bytes, amount: BigInt, isCredit: boolean): void {
+export function updateUserBrbrEarnings(userAddress: Bytes, amount: BigInt, isCredit: boolean, timestamp: BigInt): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
@@ -167,6 +170,7 @@ export function updateUserBrbrEarnings(userAddress: Bytes, amount: BigInt, isCre
   }
 
   user.save()
+  recomputeAndSaveUserPoints(user, timestamp)
 }
 
 export function updateUserDepositCostBasis(userAddress: Bytes, assets: BigInt, shares: BigInt): void {

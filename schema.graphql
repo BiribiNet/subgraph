@@ -103,6 +103,24 @@ type BankIndex @entity(immutable: false) {
   market: Market!
 }
 
+# Singleton config for the BRBpoints formula. id = bytes("config").
+# Default values are seeded at first access by getOrCreateBrbPointsConfig() in
+# src/helpers/brb-points.ts. Weights and divisor can be migrated later via a
+# config-update handler once an on-chain config contract ships.
+type BRBPointsConfig @entity(immutable: false) {
+  id: Bytes!
+  "Weight applied to totalRouletteBets (BRB wagered). Default: 3."
+  wageredWeight: BigInt!
+  "Weight applied to totalStaked (BRB staked). Default: 1."
+  stakedWeight: BigInt!
+  "Weight applied to totalBrbrEarned (BRBR referral credits). Default: 2."
+  referralWeight: BigInt!
+  "Divisor applied to the weighted sum. Default: 1e18 (so points are denominated in BRB-equivalent units)."
+  divisor: BigInt!
+  "Block timestamp of the last config update."
+  lastUpdatedAt: BigInt!
+}
+
 type User @entity(immutable: false) {
   "User address"
   id: Bytes!

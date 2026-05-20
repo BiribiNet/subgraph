@@ -66,7 +66,7 @@ export function handleDeposit(event: Deposit): void {
   deposit.transactionHash = event.transaction.hash
   deposit.save()
 
-  updateUserStakingStats(event.params.owner, event.params.assets, true)
+  updateUserStakingStats(event.params.owner, event.params.assets, true, event.block.timestamp)
   updateUserLastActive(event.params.owner, event.block.timestamp)
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
 
@@ -117,7 +117,7 @@ export function handleWithdraw(event: Withdraw): void {
   withdrawal.transactionHash = event.transaction.hash
   withdrawal.save()
 
-  updateUserStakingStats(event.params.owner, event.params.assets, false)
+  updateUserStakingStats(event.params.owner, event.params.assets, false, event.block.timestamp)
   updateUserLastActive(event.params.owner, event.block.timestamp)
   updateUserWithdrawalCostBasis(event.params.owner, event.params.shares)
 
@@ -241,7 +241,7 @@ export function handleBetPlaced(event: BetPlaced): void {
     globalState.uniquePlayersCount = globalState.uniquePlayersCount.plus(ONE)
   }
 
-  updateUserRouletteStats(event.params.user, event.params.amount, false, false)
+  updateUserRouletteStats(event.params.user, event.params.amount, false, false, event.block.timestamp)
   updateUserLastActive(event.params.user, event.block.timestamp)
 
   if (decoded) {
