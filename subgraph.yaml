@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x6499456948fa1409a753b8ef40dc18dccd563d01"
-      startBlock: 269389514
+      address: "0xdbc6d17c8e28d1154918f974c20e85cefa720702"
+      startBlock: 269744493
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -43,8 +43,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x0ba41d10c05e970ceeeef4f1d7f2fe2f45c1f888"
-      startBlock: 269389514
+      address: "0x7fc2dcdde161cd44a6697874a2a7cab9d8f17ddc"
+      startBlock: 269744493
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -87,8 +87,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: MergedEvents
-      address: "0x3861523245933a342debab87daa8298f3640c57c"
-      startBlock: 269389514
+      address: "0xc1c96dfb2b494e775c3a4e848e6ba7a97acd86e5"
+      startBlock: 269744493
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -154,7 +154,7 @@ dataSources:
     source:
       abi: BRBReferal
       address: "0x48e85e0f774f0d0d44519b13a959d9faa78e831b"
-      startBlock: 269389514
+      startBlock: 269744493
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

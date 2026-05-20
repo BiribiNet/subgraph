@@ -1,16 +1,17 @@
 {
-  "startBlock": 269389514,
+  "startBlock": 269744493,
   "startBlocks": {
-    "brb": 269389514,
-    "roulette": 269389514,
-    "stakedBRB": 269389514,
-    "brbReferal": 269389514
+    "brb": 269744493,
+    "roulette": 269744493,
+    "stakedBRB": 269744493,
+    "brbReferal": 269744493
   },
   "addresses": {
-    "brb": "0x6499456948fa1409a753b8ef40dc18dccd563d01",
-    "roulette": "0x0ba41d10c05e970ceeeef4f1d7f2fe2f45c1f888",
-    "stakedBRB": "0x3861523245933A342deBAb87daa8298f3640c57C",
+    "brb": "0xdbc6d17c8e28d1154918f974c20e85cefa720702",
+    "roulette": "0x7fc2dcdde161cd44a6697874a2a7cab9d8f17ddc",
+    "stakedBRB": "0xC1c96dFB2B494E775C3a4e848E6Ba7A97acD86E5",
     "brbReferal": "0x48e85e0f774f0d0d44519b13a959d9faa78e831b",
-    "upkeepManager": "0x924b24ca118fa0fbe1ace279d9af2821952015d3"
+    "upkeepManager": "0x8d6c7f269505bcc5812217c7fe55453d204e41e3",
+    "jackpotTreasury": "0xc5221f91b2eca5230ef5cc24c794b7b5d1bcedff"
   }
 }
