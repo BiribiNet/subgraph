@@ -25,6 +25,7 @@ export function getOrCreateMarketByIdWithBank(marketId: BigInt, bank: Address, t
   market.createdAt = timestamp
   market.totalAssets = ZERO
   market.totalShares = ZERO
+  market.brbRatio = ZERO
 
   hydrateMarketMetadata(market, bank)
   market.save()

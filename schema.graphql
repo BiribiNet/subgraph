@@ -133,6 +133,53 @@ type BridgeDeposit @entity(immutable: true) {
   destinationTxHash: Bytes!
 }
 
+# === BRBJackpotFunder events (Phase 1C bis) ===
+# Granular per-swap snapshots: at the end of each profitable round, the funder
+# swaps a slice of the market profit (asset) into BRB on Uniswap V2, sends
+# `brbToTreasury` to JackpotTreasury, and burns `brbBurned`.
+
+type JackpotBuy @entity(immutable: true) {
+  "tx hash + log index"
+  id: Bytes!
+  market: Market!
+  "Asset address (market.asset duplicated for query convenience)"
+  asset: Bytes!
+  "Amount of `asset` swapped (in asset decimals)"
+  assetSwapped: BigInt!
+  "Total BRB received from the swap"
+  brbOut: BigInt!
+  "BRB routed to JackpotTreasury"
+  brbToTreasury: BigInt!
+  "BRB burned"
+  brbBurned: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+# Emitted when a market profit is skipped by the funder (slippage, market paused, etc.).
+type JackpotFundingSkip @entity(immutable: true) {
+  "tx hash + log index"
+  id: Bytes!
+  market: Market!
+  asset: Bytes!
+  "uint8 reason code from FundFromMarketSkipped"
+  reason: Int!
+  timestamp: BigInt!
+}
+
+# Singleton config for the BRBJackpotFunder. Each setter event updates one or more
+# fields and bumps `lastUpdatedAt`. Lazy-init: all fields default to 0 until the
+# first config event fires.
+type JackpotFunderConfig @entity(immutable: false) {
+  id: Bytes!                          # constant singleton ("config")
+  swapAssetTotalBps: BigInt!
+  treasuryBrbNumerator: BigInt!
+  treasuryBrbDenominator: BigInt!
+  slippageBps: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
 # Per-market entity. One per (marketId, bank) registered on the RouletteEngine.
 # Created by RouletteEngine.MarketRegistered handler (or lazily by the BankVault4626 template
 # handler on the first event for a known bank if the engine event hasn't been seen yet).
@@ -159,6 +206,8 @@ type Market @entity(immutable: false) {
   totalAssets: BigInt!
   "Per-market accumulated shares (BankVault4626 totalSupply at last observed event)"
   totalShares: BigInt!
+  "BRB ratio per asset unit set by BRBJackpotFunder.BrbRatioUpdated. 0 until the first ratio update for this market."
+  brbRatio: BigInt!
   "Per-market reverse lookup"
   marketRounds: [MarketRound!]! @derivedFrom(field: "market")
   "Bets placed in this market"

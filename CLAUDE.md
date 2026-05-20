@@ -35,7 +35,9 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 | **BankVault4626 (USDC bank)** | `0x3861523245933a342debab87daa8298f3640c57c` | `Deposit`, `Withdraw`, `WithdrawalRequested/Processed/Ejected`, `BetPlaced`, `Transfer`, `Approval`, `Role*`, `UpkeepRegistered` |
 | **BankVault4626** (template, future markets) | dynamic — spawned by `MarketRegistered` | same as the USDC bank |
 | **BRBReferral** (legacy, deprecated) | `0x48e85e0f774f0d0d44519b13a959d9faa78e831b` | `Transfer`, `Approval` |
-| **MarketRegistry / BRBJackpotFunder / JackpotTreasury** | not yet indexed | — addresses pending ops confirmation, follow-up PR `1C bis` will add them |
+| **BRBJackpotFunder** | `0x60ce672feaf39f35a3f6e5b3e099f46b90aee9fc` | `FundedFromMarket`, `FundFromMarketSkipped`, `SwapAssetBpsUpdated`, `TreasuryBrbSplitUpdated`, `BrbRatioUpdated`, `SlippageBpsUpdated` |
+| **JackpotTreasury** | `0xbbe4d51cf721277d52d916291f6de4fa972e5e22` | `EngineSet` (observability only) |
+| **MarketRegistry** | `0x9a328b11c7189a8ba2af6186643f93204b516987` | not indexed — market lifecycle driven by `RouletteEngine.MarketRegistered` |
 | **UpkeepManager** | `0x924b24ca118fa0fbe1ace279d9af2821952015d3` | not indexed (out of scope) |
 | **UpkeepScheduler** | `0x59558e58429d3e77e9f8bdaa888d30c8f2af4a05` | not indexed (out of scope) |
 
