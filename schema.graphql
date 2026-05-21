@@ -911,7 +911,7 @@ type ProtocolStats @entity(immutable: false) {
 # mappings yet — contract not deployed. The frontend uses mock data via
 # components/features/side-bet/.
 
-enum SideBetType { COLOR_COUNT, NUMBER_HIT, CONSECUTIVE_STREAK, RED_RATIO }
+enum SideBetType { COLOR_COUNT, NUMBER_HIT, CONSECUTIVE_STREAK, RED_RATIO, LIGHTNING_DOUBLE, PERFECT_ALTERNATION, DOZEN_HIT, COLUMN_HIT }
 enum SideBetColor { RED, BLACK }
 enum SideBetStatus { ACTIVE, WON, LOST, EXPIRED, CANCELLED }
 
