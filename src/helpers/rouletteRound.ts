@@ -53,3 +53,31 @@ export function createNewRouletteRound(
   round.startedAt = startedAt
   return round
 }
+
+/** Per-market projection of a global round. Idempotent: returns the existing entity if already created. */
+export function createOrLoadMarketRound(
+  market: Market,
+  localRoundId: BigInt,
+  globalRoundId: BigInt,
+  round: RouletteRound,
+  timestamp: BigInt
+): MarketRound {
+  const id = marketRoundKey(market.marketId, globalRoundId)
+  let mr = MarketRound.load(id)
+  if (mr != null) {
+    return mr
+  }
+  mr = new MarketRound(id)
+  mr.market = market.id
+  mr.localRoundId = localRoundId
+  mr.globalRoundId = globalRoundId
+  mr.status = ROUND_STATUS_BETTING
+  mr.totalBets = ZERO
+  mr.betCount = ZERO
+  mr.totalPayouts = ZERO
+  mr.jackpotFunded = ZERO
+  mr.infraFee = ZERO
+  mr.startedAt = timestamp
+  mr.globalRound = round.id
+  return mr
+}

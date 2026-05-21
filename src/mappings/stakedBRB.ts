@@ -51,7 +51,7 @@ export function handleDeposit(event: Deposit): void {
   deposit.save()
 
   // Update user stats
-  updateUserStakingStats(event.params.owner, event.params.assets, true)
+  updateUserStakingStats(event.params.owner, event.params.assets, true, event.block.timestamp)
   updateUserLastActive(event.params.owner, event.block.timestamp)
 
   // Update cumulative deposit cost basis
@@ -119,7 +119,7 @@ export function handleWithdraw(event: Withdraw): void {
   withdrawal.save()
 
   // Update user stats
-  updateUserStakingStats(event.params.owner, event.params.assets, false)
+  updateUserStakingStats(event.params.owner, event.params.assets, false, event.block.timestamp)
   updateUserLastActive(event.params.owner, event.block.timestamp)
 
   // Update cumulative deposit cost basis (remove cost basis of withdrawn shares)

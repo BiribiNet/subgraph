@@ -8,11 +8,12 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit, Withdraw, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
-import { handleBetPlaced, handleDeposit, handleWithdraw, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
-import { MinJackpotConditionUpdated } from '../generated/RouletteClean/Game';
-import { handleMinJackpotConditionUpdated } from '../src/mappings/roulette';
+import { BetPlaced, Deposit, Withdraw } from '../generated/BankVault4626_USDC/StakedBRB';
+import { handleBetPlaced, handleDeposit, handleWithdraw } from '../src/mappings/bank-vault';
+import { MinJackpotConditionUpdated } from '../generated/RouletteEngine/Game';
+import { handleMinJackpotConditionUpdated } from '../src/mappings/roulette-engine';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
+import { createRoundForTests } from './helpers';
 
 // Helper functions
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
@@ -94,40 +95,21 @@ const createBet = (user: string, amount: string, timestamp: i32, roundId: i32): 
   handleBetPlaced(betPlacedEvent);
 };
 
+// Shim for tests that only need a fresh RouletteRound entity to exist.
+// Phase 1C removed the underlying `RoundCleaningCompleted` event + handler;
+// see tests/helpers.ts for the reasoning.
 const createRoundCleaningCompleted = (
   cleanedRoundId: i32,
-  protocolFees: string,
-  burnAmount: string,
-  jackpotAmount: string,
+  _protocolFees: string,
+  _burnAmount: string,
+  _jackpotAmount: string,
   timestamp: i32
 ): void => {
-  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(
-    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
-  );
-
-  const feesTuple = new ethereum.Tuple();
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
-  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
-
-  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  ev.logIndex = BigInt.fromI32(0);
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundCleaningCompleted(ev);
+  createRoundForTests(cleanedRoundId + 1, timestamp);
 };
 
 const initializeRound = (timestamp: i32 = 1000000): void => {
-  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
+  createRoundForTests(1, timestamp);
 };
 
 const createMinJackpotConditionUpdated = (minJackpotCondition: string, timestamp: i32 = 1000000): void => {
@@ -332,21 +314,11 @@ describe('Max Bet Amount Tests', () => {
     assert.fieldEquals('RouletteRound', roundId, 'totalBets', '20000000000000000000');
   });
 
-  test('maxBetAmount resets to 0 on RoundCleaningCompleted', () => {
-    // Place a single bet to ensure maxBetAmount is non-zero
-    createBet(USER_ADDRESS, '10000000000000000000', 1000000, 1);
-
-    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '99000000000000000000');
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'maxBetAmount', '99000000000000000000');
-
-    // Clean the round, which resets StakedBRB's active maxPayout contribution
-    createRoundCleaningCompleted(1, '0', '0', '0', 1000500);
-
-    // Contract keeps the per-round maxPayoutPerRound value, but reduces global maxPayout.
-    assert.fieldEquals('RouletteRound', roundId, 'maxBetAmount', '99000000000000000000');
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'maxBetAmount', '0');
-  });
+  // Removed: `maxBetAmount resets to 0 on RoundCleaningCompleted` — the
+  // RoundCleaningCompleted event was deleted from the engine ABI in Phase 1C.
+  // The maxBetAmount lifecycle is now driven by BetRecorded / RoundLocked /
+  // RoundResolved and is covered by the rouletteEngineMultiMarket tests
+  // referenced in the Phase 1C plan.
 });
 
 // Test Suite 4: APY Snapshots

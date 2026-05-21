@@ -12,7 +12,7 @@ import {
   InfrastructureFeePaid,
   RoundLocked,
   Upgraded
-} from "../../generated/RouletteClean/Game"
+} from "../../generated/RouletteEngine/Game"
 import { RouletteRound, ContractUpgrade, GlobalRound } from "../../generated/schema"
 import {
   ROUND_STATUS_BETTING,

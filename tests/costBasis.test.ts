@@ -8,45 +8,13 @@ import {
   test,
 } from 'matchstick-as';
 
-import { Deposit, Withdraw, RoundCleaningCompleted } from '../generated/StakedBRB/StakedBRB';
-import { handleDeposit, handleWithdraw, handleRoundCleaningCompleted } from '../src/mappings/stakedBRB';
+import { Deposit, Withdraw } from '../generated/BankVault4626_USDC/StakedBRB';
+import { handleDeposit, handleWithdraw } from '../src/mappings/bank-vault';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
+import { createRoundForTests } from './helpers';
 
 const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
-
-const createRoundCleaningCompleted = (
-  cleanedRoundId: i32,
-  protocolFees: string,
-  burnAmount: string,
-  jackpotAmount: string,
-  timestamp: i32
-): void => {
-  const ev = changetype<RoundCleaningCompleted>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(
-    new ethereum.EventParam('cleanedRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(cleanedRoundId + 1)))
-  );
-  ev.parameters.push(
-    new ethereum.EventParam('boundaryTimestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
-  );
-  const feesTuple = new ethereum.Tuple();
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(protocolFees)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(burnAmount)));
-  feesTuple.push(ethereum.Value.fromUnsignedBigInt(BigInt.fromString(jackpotAmount)));
-  ev.parameters.push(new ethereum.EventParam('fees', ethereum.Value.fromTuple(feesTuple)));
-  ev.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleRoundCleaningCompleted(ev);
-};
-
-const initializeRound = (timestamp: i32 = 1000000): void => {
-  createRoundCleaningCompleted(0, '0', '0', '0', timestamp);
-};
 
 const createDeposit = (user: string, assets: string, shares: string, timestamp: i32): void => {
   const depositEvent = changetype<Deposit>(newMockEvent());
@@ -98,7 +66,7 @@ const createWithdraw = (user: string, assets: string, shares: string, timestamp:
 describe('Cost Basis Calculation Tests', () => {
   beforeEach(() => {
     clearStore();
-    initializeRound();
+    createRoundForTests(1, 1000000);
   });
 
   test('Single deposit: cumulative values match deposit', () => {

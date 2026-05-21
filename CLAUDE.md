@@ -26,17 +26,37 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - The **referral tracking** (BRBR earnings, conversion history)
 - The **BRBP points & tier system** (leaderboard, tier progression)
 
-### Protocol Smart Contracts (Arbitrum)
+### Protocol Smart Contracts (Arbitrum Sepolia, 2026-05-19 redeploy — multi-market)
 
-| Contract | Key Events to Index |
-|---|---|
-| **Game Contract** | `BetPlaced`, `RoundStarted`, `RoundResolved`, `PayoutExecuted`, `RevenueDistributed` |
-| **BRB Token (ERC-20)** | `Transfer`, `Approval`, `Burn` (deflationary: 0.5% burned per round) |
-| **StakedBRB Vault (sBRB, ERC-4626)** | `Deposit`, `Withdraw`, `Transfer` (sBRB shares), vault asset changes |
-| **BRBReferral** | `ReferralRegistered`, `BRBRRewarded`, `BRBRConverted` |
-| **Chainlink VRF** | `RandomWordsRequested`, `RandomWordsFulfilled` |
-| **Jackpot** | `JackpotFunded`, `JackpotTriggered`, `JackpotPaidOut` |
-| **Uniswap V2 (BRB pair)** | `Swap`, `Sync` (for price tracking) |
+| Contract | Address | Key Events to Index |
+|---|---|---|
+| **RouletteEngine** (hub) | `0x0ba41d10c05e970ceeeef4f1d7f2fe2f45c1f888` | `BetRecorded`, `RoundLocked`, `GlobalRoundSealed`, `VrfRequested`, `VRFResult`, `RoundResolved`, `PayoutProgress`, `JackpotFunded`, `InfrastructureFeePaid`, `MarketRegistered`, `MinJackpotConditionUpdated`, `Initialized`, `Upgraded` |
+| **BRB Token (ERC-20)** | `0x6499456948fa1409a753b8ef40dc18dccd563d01` | `Transfer`, `Approval` (deflationary: 0.5% burned per round) |
+| **BankVault4626 (USDC bank)** | `0x3861523245933a342debab87daa8298f3640c57c` | `Deposit`, `Withdraw`, `WithdrawalRequested/Processed/Ejected`, `BetPlaced`, `Transfer`, `Approval`, `Role*`, `UpkeepRegistered` |
+| **BankVault4626** (template, future markets) | dynamic — spawned by `MarketRegistered` | same as the USDC bank |
+| **BRBReferral** (legacy, deprecated) | `0x48e85e0f774f0d0d44519b13a959d9faa78e831b` | `Transfer`, `Approval` |
+| **BRBJackpotFunder** | `0x60ce672feaf39f35a3f6e5b3e099f46b90aee9fc` | `FundedFromMarket`, `FundFromMarketSkipped`, `SwapAssetBpsUpdated`, `TreasuryBrbSplitUpdated`, `BrbRatioUpdated`, `SlippageBpsUpdated` |
+| **JackpotTreasury** | `0xbbe4d51cf721277d52d916291f6de4fa972e5e22` | `EngineSet` (observability only) |
+| **MarketRegistry** | `0x9a328b11c7189a8ba2af6186643f93204b516987` | not indexed — market lifecycle driven by `RouletteEngine.MarketRegistered` |
+| **UpkeepManager** | `0x924b24ca118fa0fbe1ace279d9af2821952015d3` | not indexed (out of scope) |
+| **UpkeepScheduler** | `0x59558e58429d3e77e9f8bdaa888d30c8f2af4a05` | not indexed (out of scope) |
+
+### Multi-market data model (Phase 1C)
+
+- `Market { marketId, asset, bank, assetSymbol, assetDecimals, shareName, shareSymbol, totalAssets, totalShares }` — one per registered market.
+- `MarketRound { market, localRoundId, globalRoundId, status, totalBets, betCount, totalPayouts, jackpotFunded, infraFee }` — per-market projection of a global round.
+- `BankIndex { id: bank, market }` — O(1) reverse lookup from a vault address to its `Market`.
+- `RouletteBet.market` / `RouletteBet.marketRound` (nullable) — attributed at `BetRecorded` time.
+- `StakedBRBDeposit.market`, `StakedBRBWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
+- `RouletteRound` keeps cross-market global aggregates ; `GlobalState` / `VaultState` / `ProtocolStats` singletons keep cross-market lifetime aggregates (mixed-unit during Phase 1, normalized in Phase 2 BRBpoints).
+
+### BRBpoints model (Phase 2A)
+
+- `BRBPointsConfig` singleton (id = `bytes("config")`) holds the formula parameters: `wageredWeight` (default 3), `stakedWeight` (default 1), `referralWeight` (default 2), `divisor` (default 1e18). Seeded by `getOrCreateBrbPointsConfig()` (`src/helpers/brb-points.ts`) on first access.
+- `computeBrbPoints(user, cfg)` = `(user.totalRouletteBets * 3 + user.totalStaked * 1 + user.totalBrbrEarned * 2) / 1e18` with the default config — points are denominated in BRB-equivalent units.
+- `computeTier(points)` maps to `BRONZE / SILVER (≥ 500) / GOLD (≥ 2k) / PLATINUM (≥ 5k) / DIAMOND (≥ 15k) / LEGEND (≥ 50k)`. **These thresholds MUST match the frontend `BRBP_TIERS` array** in `frontend/hooks/use-biribi-points.ts`; the subgraph is the source of truth for `user.tier`.
+- `recomputeAndSaveUserPoints(user, timestamp)` runs after every `updateUserRouletteStats` / `updateUserStakingStats` / `updateUserBrbrEarnings` call — keeps `user.brbpPoints` and `user.tier` always in sync with the components.
+- `User.totalRouletteBets` mixes USDC + BRB across markets (no oracle normalization in Phase 2). Document this trade-off when consumers query the leaderboard.
 
 ### Revenue Distribution (hardcoded per round)
 ```
