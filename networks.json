@@ -1,18 +1,16 @@
 {
   "arbitrum-sepolia": {
-    "BRBToken": { "address": "0xdbc6d17c8e28d1154918f974c20e85cefa720702", "startBlock": 269744493 },
-    "RouletteEngine": { "address": "0x7fc2dcdde161cd44a6697874a2a7cab9d8f17ddc", "startBlock": 269744493 },
-    "BankVault4626_USDC": { "address": "0xc1c96dfb2b494e775c3a4e848e6ba7a97acd86e5", "startBlock": 269744493 },
-    "BRBReferal": { "address": "0xa670a9f1aa3e3d9b489e8d0cc68768556d264a62", "startBlock": 269744493 },
-    "BRBJackpotFunder": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 269744493 },
-    "JackpotTreasury": { "address": "0xc5221f91b2eca5230ef5cc24c794b7b5d1bcedff", "startBlock": 269744493 }
+    "BRBToken": { "address": "0x47e054bb133e75b1c2c7a9a52ba73e52e75a06a1", "startBlock": 255473216 },
+    "RouletteEngine": { "address": "0x60cd5a0f74f1644eaef997496e19e3737690ad1c", "startBlock": 255473216 },
+    "BankVault4626_USDC": { "address": "0xa22939dd41492c2a45348ac8e52b948ba0cfb1ca", "startBlock": 255473216 },
+    "BRBJackpotFunder": { "address": "0x60ce672feaf39f35a3f6e5b3e099f46b90aee9fc", "startBlock": 255473216 },
+    "JackpotTreasury": { "address": "0xbbe4d51cf721277d52d916291f6de4fa972e5e22", "startBlock": 255473216 }
   },
   "arbitrum-one": {
     "_comment": "DEFERRED — mainnet contract deployment pending. Populate addresses + startBlocks when contracts ship and bump v2 to mainnet via Goldsky.",
     "BRBToken": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 0 },
     "RouletteEngine": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 0 },
     "BankVault4626_USDC": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 0 },
-    "BRBReferal": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 0 },
     "BRBJackpotFunder": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 0 },
     "JackpotTreasury": { "address": "0x0000000000000000000000000000000000000000", "startBlock": 0 }
   }
