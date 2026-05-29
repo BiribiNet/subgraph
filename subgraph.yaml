@@ -149,6 +149,28 @@ dataSources:
         - event: EngineSet(address)
           handler: handleEngineSet
       file: ./src/mappings/jackpot-treasury.ts
+  - name: BRBReferral
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRBReferral
+      address: "0x48e85e0f774f0d0d44519b13a959d9faa78e831b"
+      startBlock: 255473216
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - BRBReferalTransfer
+        - User
+        - BRBPointsConfig
+      abis:
+        - name: BRBReferral
+          file: ./abis/BRBReferral.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+      file: ./src/mappings/referral.ts
 templates:
   - name: BankVault
     kind: ethereum/contract

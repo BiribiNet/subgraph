@@ -6,10 +6,13 @@
  *   node scripts/goldsky-deploy.mjs <name>/<version> [--description "..."] [--tag prod]
  *
  * Requires:
- *   - ~/.goldsky/auth_token (written by `goldsky login`)
+ *   - A Goldsky API token, via either:
+ *       • GOLDSKY_API_TOKEN env var (recommended for CI / Claude Code on the web), or
+ *       • ~/.goldsky/auth_token (written by `goldsky login`)
  *   - A successful `graph build` (build/ directory must exist)
  *
  * Environment:
+ *   GOLDSKY_API_TOKEN — Goldsky API token (preferred over the auth_token file)
  *   GOLDSKY_API_BASE  — override API base (default: https://api.goldsky.com)
  */
 import { execSync } from "node:child_process";
@@ -44,12 +47,22 @@ if (!nameAndVersion || !nameAndVersion.includes("/")) {
 const [name, version] = nameAndVersion.split("/", 2);
 
 // ── Auth token ────────────────────────────────────────────────────────────────
+// Resolve the Goldsky API token. Prefer an environment variable (set as an
+// environment secret in CI / Claude Code on the web — never committed), and
+// fall back to the file written by `goldsky login` (~/.goldsky/auth_token) for
+// local interactive use.
 const tokenPath = join(homedir(), ".goldsky", "auth_token");
-if (!existsSync(tokenPath)) {
-  console.error(`Auth token not found at ${tokenPath}. Run: echo -n '<token>' > ~/.goldsky/auth_token`);
+let token = (process.env.GOLDSKY_API_TOKEN ?? process.env.GOLDSKY_TOKEN ?? "").trim();
+if (!token && existsSync(tokenPath)) {
+  token = readFileSync(tokenPath, "utf8").trim();
+}
+if (!token) {
+  console.error(
+    "Goldsky auth token not found. Set the GOLDSKY_API_TOKEN environment variable " +
+    `(recommended for CI / Claude Code on the web), or run \`goldsky login\` to create ${tokenPath}.`,
+  );
   process.exit(1);
 }
-const token = readFileSync(tokenPath, "utf8").trim();
 const apiBase = process.env.GOLDSKY_API_BASE ?? "https://api.goldsky.com";
 
 // ── Build directory ───────────────────────────────────────────────────────────
