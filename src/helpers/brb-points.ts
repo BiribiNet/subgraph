@@ -1,8 +1,9 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts"
-import { BRBPointsConfig, User } from "../../generated/schema"
+import { BRBPointsConfig, User, UserDailyPoints } from "../../generated/schema"
 import { ZERO } from "./number"
 
 const CONFIG_KEY = Bytes.fromUTF8("config")
+const SECONDS_PER_DAY = BigInt.fromI32(86400)
 
 const DEFAULT_WAGERED_WEIGHT = BigInt.fromI32(3)
 const DEFAULT_STAKED_WEIGHT = BigInt.fromI32(1)
@@ -54,10 +55,29 @@ export function computeTier(points: BigInt): string {
   return "BRONZE"
 }
 
+// Upserts the user's daily points snapshot, keeping the latest value for the day.
+// id = userAddress concatenated with the unix day, so a user has one row per day.
+function recordDailyPointsSnapshot(user: User, points: BigInt, tier: string, timestamp: BigInt): void {
+  const day = timestamp.div(SECONDS_PER_DAY).toI32()
+  const id = user.id.concat(Bytes.fromI32(day))
+  let snapshot = UserDailyPoints.load(id)
+  if (snapshot == null) {
+    snapshot = new UserDailyPoints(id)
+    snapshot.user = user.id
+    snapshot.day = day
+  }
+  snapshot.pointsAtEndOfDay = points
+  snapshot.tier = tier
+  snapshot.updatedAt = timestamp
+  snapshot.save()
+}
+
 export function recomputeAndSaveUserPoints(user: User, timestamp: BigInt): void {
   const cfg = getOrCreateBrbPointsConfig(timestamp)
   const points = computeBrbPoints(user, cfg)
+  const tier = computeTier(points)
   user.brbpPoints = points
-  user.tier = computeTier(points)
+  user.tier = tier
   user.save()
+  recordDailyPointsSnapshot(user, points, tier, timestamp)
 }

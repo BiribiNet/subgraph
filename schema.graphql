@@ -1028,4 +1028,23 @@ type BRBPointsConfig @entity(immutable: false) {
   lastUpdatedAt: BigInt!
 }
 
+# Daily snapshot of a user's cumulative BRBpoints. id = userAddress + day bytes
+# (day = timestamp / 86400). Written by recomputeAndSaveUserPoints on every points
+# change, keeping the latest value for the day. Enables time-windowed views
+# (e.g. points gained over the last 7/30 days) by diffing buckets — all derived
+# from the subgraph, no backend.
+type UserDailyPoints @entity(immutable: false) {
+  id: Bytes!
+  "Owner of the snapshot"
+  user: User!
+  "Unix day (timestamp / 86400)"
+  day: Int!
+  "Cumulative brbpPoints at the end of this day"
+  pointsAtEndOfDay: BigInt!
+  "Tier at the end of this day"
+  tier: PlayerTier!
+  "Timestamp of the last update within this day"
+  updatedAt: BigInt!
+}
+
 # sync-pipeline-build-id: 1775000216171

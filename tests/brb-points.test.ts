@@ -111,3 +111,24 @@ describe('computeTier thresholds', () => {
     assert.stringEquals(computeTier(BigInt.fromI32(50000)), 'LEGEND');
   });
 });
+
+describe('UserDailyPoints snapshots', () => {
+  beforeEach(() => {
+    clearStore();
+  });
+
+  test('upserts one row per day and adds a new row on a new day', () => {
+    const day1 = BigInt.fromI32(86400); // day 1
+    const day1Later = BigInt.fromI32(86400 + 3600); // still day 1
+    const day2 = BigInt.fromI32(86400 * 2); // day 2
+
+    updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, true, day1);
+    updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, false, day1Later);
+    // Two updates on the same day → a single (upserted) snapshot.
+    assert.entityCount('UserDailyPoints', 1);
+
+    updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, false, day2);
+    // A new day → a new snapshot row.
+    assert.entityCount('UserDailyPoints', 2);
+  });
+});
