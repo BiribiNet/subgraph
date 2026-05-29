@@ -13,7 +13,7 @@ import {
   RoundLocked,
   Upgraded
 } from "../../generated/RouletteEngine/Game"
-import { RouletteRound, ContractUpgrade, GlobalRound } from "../../generated/schema"
+import { RouletteRound, ContractUpgrade, GlobalRound, RouletteBet } from "../../generated/schema"
 import {
   ROUND_STATUS_BETTING,
   ROUND_STATUS_NO_MORE_BETS,
@@ -26,7 +26,7 @@ import { getOrCreateGlobalState } from "./globalState"
 import { createNewRouletteRound } from "./rouletteRound"
 import { calculateMaxPayoutFromRoundComponents, recordRouletteBetEntry } from "./betting"
 import { getOrCreateDailyStats, trackDailyUniquePlayer } from "./aggregation"
-import { updateUserLastActive } from "./user"
+import { updateUserLastActive, updateUserWageredStats } from "./user"
 import { getOrCreateGlobalRound, globalRoundIdBytes } from "./globalRound"
 import { marketRoundId, requireMarket, getOrCreateMarket } from "./market"
 import { ZERO } from "./number"
@@ -74,6 +74,13 @@ export function processBetRecorded(event: BetRecorded): void {
     const market = requireMarket(marketId)
     const betType = BigInt.fromI32(i32(event.params.betType))
     const number = BigInt.fromI32(i32(event.params.number))
+
+    // Whether this is the user's first bet in this round — drives User.betCount,
+    // which counts distinct rounds (not individual bets). Must be read before
+    // recordRouletteBetEntry creates/updates the RouletteBet entity.
+    const existingUserBet = RouletteBet.load(event.params.player.concat(round.id))
+    const isNewRoundForUser = existingUserBet == null
+
     recordRouletteBetEntry(
       event.params.player,
       event.params.amount,
@@ -84,6 +91,16 @@ export function processBetRecorded(event: BetRecorded): void {
       event.block.number,
       event.block.timestamp,
       event.transaction.hash
+    )
+
+    // Feed the BRBpoints "wagered" component (weight x3). assetDecimals aligns
+    // multi-market amounts to 18 decimals so 1 USDC and 1 BRB count equally.
+    updateUserWageredStats(
+      event.params.player,
+      event.params.amount,
+      market.assetDecimals,
+      isNewRoundForUser,
+      event.block.timestamp
     )
 
     round.betCount = round.betCount.plus(BigInt.fromI32(1))

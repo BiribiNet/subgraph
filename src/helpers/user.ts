@@ -132,22 +132,69 @@ export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDep
   recomputeAndSaveUserPoints(user, timestamp)
 }
 
-export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWin: boolean, isPayout: boolean, timestamp: BigInt): void {
+// BRBP points are denominated in BRB-equivalent units (18 decimals).
+const POINTS_DECIMALS = 18
+
+/**
+ * Normalize a raw token amount to 18 decimals so wagering volume counts by token
+ * quantity, not raw units: 1 USDC (1e6) and 1 BRB (1e18) contribute the same
+ * volume. No price oracle — this is purely a decimals alignment.
+ *
+ * Guard: when `assetDecimals` is unknown (market.ts seeds 0 on a failed read) or
+ * outside the 1..18 range, fall back to no scaling to avoid runaway inflation.
+ */
+function normalizeAmountTo18(amount: BigInt, assetDecimals: i32): BigInt {
+  if (assetDecimals <= 0 || assetDecimals > POINTS_DECIMALS) {
+    log.warning("Unexpected assetDecimals {} for wagered normalization; counting raw amount", [assetDecimals.toString()])
+    return amount
+  }
+  const exponent = POINTS_DECIMALS - assetDecimals
+  if (exponent == 0) {
+    return amount
+  }
+  return amount.times(BigInt.fromI32(10).pow(u8(exponent)))
+}
+
+/**
+ * Records wagering volume for the BRBpoints "wagered" component (weight x3).
+ * Called at bet time from processBetRecorded, mirroring how DailyStats.volume is
+ * accumulated. `assetDecimals` aligns multi-market amounts to 18 decimals;
+ * `isNewRound` increments betCount only once per distinct round per user.
+ */
+export function updateUserWageredStats(userAddress: Bytes, amount: BigInt, assetDecimals: i32, isNewRound: boolean, timestamp: BigInt): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
   const user = getOrCreateUser(userAddress)
 
-  if (isPayout) {
-    if (isWin) {
-      user.totalRouletteWins = user.totalRouletteWins.plus(amount)
-      user.totalWon = user.totalWon.plus(amount)
-      user.netProfit = user.netProfit.plus(amount)
-      user.winCount = user.winCount.plus(ONE)
-    }
-  } else {
-    user.totalRouletteBets = user.totalRouletteBets.plus(amount)
-    user.netProfit = user.netProfit.minus(amount)
+  const normalized = normalizeAmountTo18(amount, assetDecimals)
+  user.totalRouletteBets = user.totalRouletteBets.plus(normalized)
+  user.netProfit = user.netProfit.minus(normalized)
+  if (isNewRound) {
+    user.betCount = user.betCount.plus(ONE)
+  }
+  // Derive totalLost from totalRouletteBets - totalWon (always accurate)
+  user.totalLost = user.totalRouletteBets.minus(user.totalWon)
+
+  user.save()
+  recomputeAndSaveUserPoints(user, timestamp)
+}
+
+/**
+ * Records a roulette payout (a win). Bets are tracked separately at bet time via
+ * updateUserWageredStats, so this only handles the win/payout side.
+ */
+export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWin: boolean, timestamp: BigInt): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
+  const user = getOrCreateUser(userAddress)
+
+  if (isWin) {
+    user.totalRouletteWins = user.totalRouletteWins.plus(amount)
+    user.totalWon = user.totalWon.plus(amount)
+    user.netProfit = user.netProfit.plus(amount)
+    user.winCount = user.winCount.plus(ONE)
   }
 
   // Derive totalLost from totalRouletteBets - totalWon (always accurate)
