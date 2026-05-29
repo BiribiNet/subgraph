@@ -235,6 +235,13 @@ subgraph/
 
 ## Key Entities Reference
 
+> ⚠️ **Illustrative only — `schema.graphql` is the source of truth.** The actual
+> schema names differ from this historical reference: the per-wallet entity is
+> **`User`** (not `Player`), bets are **`RouletteBet`**, rounds are
+> **`RouletteRound`** / **`GlobalRound`**. The BRBpoints model lives on
+> `User.brbpPoints` + `User.tier`, is configured by `BRBPointsConfig`, and its
+> daily time-series is `UserDailyPoints` (see `src/helpers/brb-points.ts`).
+
 ```graphql
 # === CORE GAME ===
 
@@ -333,9 +340,9 @@ type Referral @entity {
   registeredAt: BigInt!
 }
 
-# === PLAYER ===
+# === PLAYER (actual entity: `User` — see schema.graphql) ===
 
-type Player @entity {
+type Player @entity {            # NB: real entity is `User`
   id: Bytes!                     # wallet address
   totalWagered: BigInt!
   totalWon: BigInt!
