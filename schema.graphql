@@ -40,6 +40,14 @@ type Market @entity(immutable: false) {
   bank: Bytes!
   "RouletteEngine address"
   engine: Bytes!
+  "ERC-20 asset symbol (e.g. USDC) — read on-chain at registration"
+  assetSymbol: String!
+  "ERC-20 asset decimals — read on-chain at registration"
+  assetDecimals: Int!
+  "BankVault4626 share token name — read on-chain at registration"
+  shareName: String!
+  "BankVault4626 share token symbol — read on-chain at registration"
+  shareSymbol: String!
   "ERC-4626 total assets in this vault"
   totalAssets: BigInt!
   "ERC-4626 total shares"
