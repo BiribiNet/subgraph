@@ -78,4 +78,32 @@ describe('BRBReferral Transfer handler', () => {
     assert.fieldEquals('User', REFERRER, 'brbReferalBalance', '0');
     assert.fieldEquals('User', REFERRER, 'totalBrbrSpent', ONE_BRB);
   });
+
+  test('accumulates BRBr across multiple credits to the same referrer', () => {
+    emitTransfer(REFEREE, REFERRER, ONE_BRB, 0);
+    emitTransfer(REFEREE, REFERRER, ONE_BRB, 1);
+
+    assert.entityCount('BRBReferalTransfer', 2);
+    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', '2000000000000000000');
+    assert.fieldEquals('User', REFERRER, 'brbReferalBalance', '2000000000000000000');
+    // points = (0*3 + 0*1 + 2e18*2) / 1e18 = 4
+    assert.fieldEquals('User', REFERRER, 'brbpPoints', '4');
+  });
+
+  test('tracks two referrers independently', () => {
+    const other = '0xddddddddc53842141be8f70df9efe4d08538a777';
+    emitTransfer(REFEREE, REFERRER, ONE_BRB, 0);
+    emitTransfer(REFEREE, other, '3000000000000000000', 1);
+
+    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', ONE_BRB);
+    assert.fieldEquals('User', other, 'totalBrbrEarned', '3000000000000000000');
+  });
+
+  test('records the credit transfer value and recipient', () => {
+    const id = emitTransfer(REFEREE, REFERRER, ONE_BRB, 0);
+
+    assert.fieldEquals('BRBReferalTransfer', id, 'value', ONE_BRB);
+    assert.fieldEquals('BRBReferalTransfer', id, 'to', REFERRER);
+    assert.fieldEquals('BRBReferalTransfer', id, 'user', REFERRER);
+  });
 });
