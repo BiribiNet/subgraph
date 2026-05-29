@@ -18,8 +18,16 @@ Player/staker profile with balances and analytics.
 - `brbBalance`, `sbrbBalance`, `brbReferalBalance` — live token balances
 - `totalStaked`, `totalUnstaked` — cumulative staking stats
 - `totalRouletteBets`, `totalRouletteWins`, `netProfit`, `winCount` — roulette P&L
+- `brbpPoints`, `tier` — BRBpoints (play + stake + referral) and leaderboard tier; **this is the DAO voting weight** (see below)
 - `firstSeenAt`, `lastActiveAt` — activity timestamps
 - `cumulativeDepositValue`, `cumulativeDepositShares` — cost basis tracking
+
+### DAO voting power (off-chain Snapshot)
+Governance is off-chain via Snapshot — there is **no Governor contract indexed
+and no `Proposal`/`Vote`/`Delegate` entities here**. The subgraph is only the
+voting-power source: a Snapshot strategy reads `User.brbpPoints` at a proposal's
+snapshot block (time-travel query). See `CLAUDE.md` → "DAO / Snapshot voting
+power" for the canonical query and configuration notes.
 
 ### GlobalState (singleton)
 Protocol-wide metrics.
