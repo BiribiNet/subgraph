@@ -395,6 +395,35 @@ enum StakingActionType { DEPOSIT, WITHDRAW }
 enum PlayerTier { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, LEGEND }
 ```
 
+## DAO / Snapshot voting power
+
+The BiRiBi DAO is **off-chain via Snapshot** — there is **no Governor contract
+to index**, and this subgraph deliberately ships **no governance entities**
+(`Proposal` / `Vote` / `Delegate` live in Snapshot Hub, not here).
+
+The subgraph's only governance role is to be the **voting-power source**:
+`User.brbpPoints` already is the canonical voting weight
+(`a·wagered + b·staked + c·referral`, see `src/helpers/brb-points.ts`).
+Because `User` is `@entity(immutable: false)`, Snapshot can read it **at a
+proposal's snapshot block** via The Graph time-travel queries. A Snapshot
+custom/`api` strategy should use exactly:
+
+```graphql
+query VotingPower($voter: ID!, $block: Int!) {
+  user(id: $voter, block: { number: $block }) {
+    brbpPoints
+  }
+}
+```
+
+Notes for whoever configures the Snapshot space strategy:
+- The score **is** `brbpPoints` as returned — it is already in BRB-equivalent
+  units, so the strategy must **not** re-apply `1e18` decimals.
+- Tier thresholds must stay in sync with the frontend
+  (`frontend/hooks/use-biribi-points.ts` → `BRBP_TIERS`) and the points formula
+  (`src/helpers/brb-points.ts` / `BRBPointsConfig`).
+- `$voter` must be the lowercased wallet address (entity ids are lowercase bytes).
+
 ## Testing (Matchstick)
 
 ```bash
