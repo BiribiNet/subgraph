@@ -6,7 +6,6 @@ import {
   WithdrawalRequested,
   WithdrawalProcessed,
   BetPlaced,
-  WithdrawalEjected,
   Approval,
   RoleGranted,
   RoleRevoked,
@@ -18,7 +17,6 @@ import {
   StakedBRBWithdrawal,
   LargeWithdrawalRequest,
   WithdrawTransaction,
-  WithdrawalEjectedLog,
   TokenApproval,
   AdminRoleChange,
   ContractUpgrade,
@@ -180,7 +178,7 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   const requestId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const request = new LargeWithdrawalRequest(requestId)
   request.user = event.params.owner
-  request.amount = event.params.assets
+  request.amount = BigInt.zero()
   globalState.withdrawalQueueCounter = globalState.withdrawalQueueCounter.plus(ONE)
   request.queuePosition = globalState.withdrawalQueueCounter
   request.requestedAt = event.block.timestamp
@@ -192,7 +190,7 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   user.openWithdrawalRequestId = requestId
   user.save()
 
-  globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.plus(event.params.assets)
+  globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.plus(BigInt.zero())
   globalState.save()
 }
 
@@ -211,27 +209,17 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     user.save()
   }
 
-  if (globalState.totalPendingLargeWithdrawals.lt(event.params.assets)) {
+  const assetsPaid = event.params.assetsPaid
+  if (globalState.totalPendingLargeWithdrawals.lt(assetsPaid)) {
     log.warning("totalPendingLargeWithdrawals underflow: {} < {}", [
       globalState.totalPendingLargeWithdrawals.toString(),
-      event.params.assets.toString()
+      assetsPaid.toString()
     ])
     globalState.totalPendingLargeWithdrawals = ZERO
   } else {
-    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(event.params.assets)
+    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(assetsPaid)
   }
   globalState.save()
-}
-
-export function handleWithdrawalEjected(event: WithdrawalEjected): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const row = new WithdrawalEjectedLog(id)
-  row.user = changetype<Bytes>(event.params.owner)
-  row.reason = event.params.reason
-  row.blockNumber = event.block.number
-  row.timestamp = event.block.timestamp
-  row.transactionHash = event.transaction.hash
-  row.save()
 }
 
 export function handleBetPlaced(_event: BetPlaced): void {

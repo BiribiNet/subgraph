@@ -1,12 +1,11 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts"
 import {
   BetRecorded,
   VrfRequested,
   RoundResolved,
   VRFResult,
-  GlobalRoundSealed,
+  RoundCountdownStarted,
   PayoutProgress,
-  MinJackpotConditionUpdated,
   MarketRegistered,
   JackpotFunded,
   InfrastructureFeePaid,
@@ -25,6 +24,21 @@ import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateGlobalState } from "./globalState"
 import { createNewRouletteRound } from "./rouletteRound"
 import { calculateMaxPayoutFromRoundComponents, recordRouletteBetEntry } from "./betting"
+
+function firstBetTypeAndNumber(betData: Bytes): Array<BigInt> {
+  const decoded = ethereum.decode("(uint256[],uint256[],uint256[])", betData)
+  if (decoded == null) {
+    return [BigInt.zero(), BigInt.zero()]
+  }
+  const tuple = decoded.toTuple()
+  const types = tuple[0].toBigIntArray()
+  const numbers = tuple[1].toBigIntArray()
+  if (types.length == 0) {
+    return [BigInt.zero(), BigInt.zero()]
+  }
+  const number = numbers.length > 0 ? numbers[0] : BigInt.zero()
+  return [types[0], number]
+}
 import { getOrCreateDailyStats, trackDailyUniquePlayer } from "./aggregation"
 import { updateUserLastActive, updateUserWageredStats } from "./user"
 import { getOrCreateGlobalRound, globalRoundIdBytes } from "./globalRound"
@@ -72,8 +86,9 @@ export function processBetRecorded(event: BetRecorded): void {
 
   if (round.status == ROUND_STATUS_BETTING) {
     const market = requireMarket(marketId)
-    const betType = BigInt.fromI32(i32(event.params.betType))
-    const number = BigInt.fromI32(i32(event.params.number))
+    const first = firstBetTypeAndNumber(event.params.betData)
+    const betType = first[0]
+    const number = first[1]
 
     // Whether this is the user's first bet in this round — drives User.betCount,
     // which counts distinct rounds (not individual bets). Must be read before
@@ -83,7 +98,7 @@ export function processBetRecorded(event: BetRecorded): void {
 
     recordRouletteBetEntry(
       event.params.player,
-      event.params.amount,
+      event.params.totalAmount,
       betType,
       number,
       round,
@@ -97,7 +112,7 @@ export function processBetRecorded(event: BetRecorded): void {
     // multi-market amounts to 18 decimals so 1 USDC and 1 BRB count equally.
     updateUserWageredStats(
       event.params.player,
-      event.params.amount,
+      event.params.totalAmount,
       market.assetDecimals,
       isNewRoundForUser,
       event.block.timestamp
@@ -107,17 +122,17 @@ export function processBetRecorded(event: BetRecorded): void {
     round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
     round.save()
 
-    market.pendingBets = market.pendingBets.plus(event.params.amount)
-    market.maxBetAmount = market.maxBetAmount.plus(event.params.amount)
+    market.pendingBets = market.pendingBets.plus(event.params.totalAmount)
+    market.maxBetAmount = market.maxBetAmount.plus(event.params.totalAmount)
     market.save()
 
-    globalState.pendingBets = globalState.pendingBets.plus(event.params.amount)
+    globalState.pendingBets = globalState.pendingBets.plus(event.params.totalAmount)
     globalState.currentGlobalRound = gr.id
     globalState.currentRoundNumber = globalRoundId
 
     const daily = getOrCreateDailyStats(event.block.timestamp)
     daily.betCount = daily.betCount.plus(BigInt.fromI32(1))
-    daily.volume = daily.volume.plus(event.params.amount)
+    daily.volume = daily.volume.plus(event.params.totalAmount)
     daily.save()
 
     trackDailyUniquePlayer(event.block.timestamp, event.params.player.toHexString())
@@ -127,10 +142,10 @@ export function processBetRecorded(event: BetRecorded): void {
   }
 }
 
-export function processGlobalRoundSealed(event: GlobalRoundSealed): void {
-  const gr = GlobalRound.load(globalRoundIdBytes(event.params.globalRoundId))
+export function processRoundCountdownStarted(event: RoundCountdownStarted): void {
+  const gr = GlobalRound.load(globalRoundIdBytes(event.params.roundId))
   if (gr == null) {
-    log.error("GlobalRound not found for GlobalRoundSealed: {}", [event.params.globalRoundId.toString()])
+    log.error("GlobalRound not found for RoundCountdownStarted: {}", [event.params.roundId.toString()])
     return
   }
   gr.status = ROUND_STATUS_NO_MORE_BETS
@@ -140,7 +155,7 @@ export function processGlobalRoundSealed(event: GlobalRoundSealed): void {
   gr.triggerMarket = trigger.id
   gr.save()
 
-  const round = RouletteRound.load(marketRoundId(event.params.globalRoundId, triggerMarketId))
+  const round = RouletteRound.load(marketRoundId(event.params.roundId, triggerMarketId))
   if (round != null) {
     round.status = ROUND_STATUS_NO_MORE_BETS
     round.save()
@@ -269,12 +284,6 @@ export function processMarketRegistered(event: MarketRegistered): void {
   )
   market.save()
   BankVaultTemplate.create(event.params.bank)
-}
-
-export function processMinJackpotConditionUpdated(event: MinJackpotConditionUpdated): void {
-  const globalState = getOrCreateGlobalState()
-  globalState.minJackpotCondition = event.params.newMinJackpotCondition
-  globalState.save()
 }
 
 export function processGameUpgraded(event: Upgraded): void {

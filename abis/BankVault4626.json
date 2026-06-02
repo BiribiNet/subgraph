@@ -27,12 +27,12 @@
   },
   {
     "inputs": [],
-    "name": "CancelWithdrawalBlockedDuringResolution",
+    "name": "DepositBlockedDuringResolution",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "DepositBlockedDuringResolution",
+    "name": "DepositTooSmall",
     "type": "error"
   },
   {
@@ -207,6 +207,21 @@
   },
   {
     "inputs": [],
+    "name": "InsufficientSideBetLiquidity",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidAssetDecimals",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidBps",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidInitialization",
     "type": "error"
   },
@@ -217,17 +232,17 @@
   },
   {
     "inputs": [],
-    "name": "NoWithdrawalPending",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "NotInitializing",
     "type": "error"
   },
   {
     "inputs": [],
     "name": "OnlyEngine",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OnlySideBet",
     "type": "error"
   },
   {
@@ -254,6 +269,11 @@
   {
     "inputs": [],
     "name": "UnauthorizedCaller",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "UnauthorizedSettlementCaller",
     "type": "error"
   },
   {
@@ -526,6 +546,56 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "address",
+        "name": "previousController",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newController",
+        "type": "address"
+      }
+    ],
+    "name": "SideBetControllerUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "stake",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "payoutReserve",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newLockedTotal",
+        "type": "uint256"
+      }
+    ],
+    "name": "SideBetStakeLocked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": true,
         "internalType": "address",
         "name": "from",
@@ -595,28 +665,9 @@
       },
       {
         "indexed": false,
-        "internalType": "uint8",
-        "name": "reason",
-        "type": "uint8"
-      }
-    ],
-    "name": "WithdrawalEjected",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "kind",
-        "type": "uint8"
+        "internalType": "uint16",
+        "name": "bps",
+        "type": "uint16"
       },
       {
         "indexed": false,
@@ -627,13 +678,13 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "assets",
+        "name": "assetsPaid",
         "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "shares",
+        "name": "sharesBurned",
         "type": "uint256"
       }
     ],
@@ -651,27 +702,15 @@
       },
       {
         "indexed": false,
-        "internalType": "uint8",
-        "name": "kind",
-        "type": "uint8"
+        "internalType": "uint16",
+        "name": "bps",
+        "type": "uint16"
       },
       {
         "indexed": false,
         "internalType": "address",
         "name": "receiver",
         "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "assets",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "shares",
-        "type": "uint256"
       }
     ],
     "name": "WithdrawalRequested",
@@ -778,6 +817,32 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "assetDecimals",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "availableForSideBet",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -794,13 +859,6 @@
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "cancelWithdrawal",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -879,6 +937,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "flatWithdrawFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -942,37 +1013,77 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "assetToken_",
-        "type": "address"
-      },
-      {
-        "internalType": "string",
-        "name": "name_",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "symbol_",
-        "type": "string"
-      },
-      {
-        "internalType": "uint32",
-        "name": "marketId_",
-        "type": "uint32"
-      },
-      {
-        "internalType": "address",
-        "name": "engine_",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "admin",
-        "type": "address"
+        "components": [
+          {
+            "internalType": "address",
+            "name": "assetToken",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "internalType": "uint32",
+            "name": "marketId",
+            "type": "uint32"
+          },
+          {
+            "internalType": "address",
+            "name": "engine",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "admin",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "minBet",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "sideBetController",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct BankVault4626.InitializeParams",
+        "name": "p",
+        "type": "tuple"
       }
     ],
     "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "stake",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "payoutReserve",
+        "type": "uint256"
+      }
+    ],
+    "name": "lockSideBetStake",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1171,6 +1282,11 @@
         "internalType": "bytes",
         "name": "betData",
         "type": "bytes"
+      },
+      {
+        "internalType": "address",
+        "name": "referral",
+        "type": "address"
       }
     ],
     "name": "placeBet",
@@ -1189,6 +1305,11 @@
         "internalType": "bytes",
         "name": "betData",
         "type": "bytes"
+      },
+      {
+        "internalType": "address",
+        "name": "referral",
+        "type": "address"
       },
       {
         "internalType": "uint256",
@@ -1343,6 +1464,35 @@
   {
     "inputs": [
       {
+        "internalType": "uint16",
+        "name": "bps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "address",
+        "name": "receiver",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "redeemBps",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "assets",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
@@ -1400,6 +1550,32 @@
     "name": "setMinBet",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newController",
+        "type": "address"
+      }
+    ],
+    "name": "setSideBetController",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "sideBetController",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

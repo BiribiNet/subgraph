@@ -161,8 +161,10 @@ let subgraph = readFileSync(join(root, "subgraph.yaml"), "utf8");
 
 const dsMap = [
   ["BRBToken", "brb"],
-  ["RouletteClean", "roulette"],
-  ["BRBReferal", "brbReferal"],
+  ["RouletteEngine", "roulette"],
+  ["BRBReferral", "brbReferal"],
+  ["BRBJackpotFunder", "jackpotFunder"],
+  ["JackpotTreasury", "jackpotTreasury"],
 ];
 for (const [name, key] of dsMap) {
   const addrRe = new RegExp(

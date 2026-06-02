@@ -3,9 +3,8 @@ import {
   VrfRequested,
   RoundResolved,
   VRFResult,
-  GlobalRoundSealed,
+  RoundCountdownStarted,
   PayoutProgress,
-  MinJackpotConditionUpdated,
   Initialized,
   Upgraded,
   MarketRegistered,
@@ -16,7 +15,7 @@ import {
 import { log } from "@graphprotocol/graph-ts"
 import {
   processBetRecorded,
-  processGlobalRoundSealed,
+  processRoundCountdownStarted,
   processRoundLocked,
   processVrfRequested,
   processVRFResult,
@@ -25,7 +24,6 @@ import {
   processJackpotFunded,
   processInfrastructureFeePaid,
   processMarketRegistered,
-  processMinJackpotConditionUpdated,
   processGameUpgraded
 } from "../helpers/multiMarketRoulette"
 
@@ -33,8 +31,8 @@ export function handleBetRecorded(event: BetRecorded): void {
   processBetRecorded(event)
 }
 
-export function handleGlobalRoundSealed(event: GlobalRoundSealed): void {
-  processGlobalRoundSealed(event)
+export function handleRoundCountdownStarted(event: RoundCountdownStarted): void {
+  processRoundCountdownStarted(event)
 }
 
 export function handleRoundLocked(event: RoundLocked): void {
@@ -67,10 +65,6 @@ export function handleInfrastructureFeePaid(event: InfrastructureFeePaid): void 
 
 export function handleMarketRegistered(event: MarketRegistered): void {
   processMarketRegistered(event)
-}
-
-export function handleMinJackpotConditionUpdated(event: MinJackpotConditionUpdated): void {
-  processMinJackpotConditionUpdated(event)
 }
 
 export function handleGameInitialized(event: Initialized): void {

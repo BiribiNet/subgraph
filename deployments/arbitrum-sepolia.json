@@ -1,37 +1,27 @@
 {
-  "startBlock": 269744493,
+  "startBlock": 273225571,
   "startBlocks": {
-    "brb": 269744493,
-    "roulette": 269744493,
-    "brbReferal": 269744493
+    "brb": 273225571,
+    "roulette": 273225571,
+    "stakedBRB": 273225571,
+    "brbReferal": 273225571
   },
   "addresses": {
-    "brb": "0xdbc6d17c8e28d1154918f974c20e85cefa720702",
-    "roulette": "0x7fc2dcdde161cd44a6697874a2a7cab9d8f17ddc",
-    "brbReferal": "0xa670a9f1aa3e3d9b489e8d0cc68768556d264a62",
+    "brb": "0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf",
+    "roulette": "0x2f6bbd7df2e997788a6a3759edcd7282028d40bd",
+    "registry": "0x2DeF6353F3D5B7623E11938E64fA8071C91F841B",
+    "stakedBRB": "0xf92f56796fE6209D3A021a74A1Dca98dc7c0F954",
     "banks": [
-      "0xc1c96dfb2b494e775c3a4e848e6ba7a97acd86e5",
-      "0xfdbc84092bf8ec2e432e48cb2e7b51789e3a056c",
-      "0x0a3098f747392b5b5fb4c26cbd724faeceeb4c2f"
+      "0xf92f56796fE6209D3A021a74A1Dca98dc7c0F954",
+      "0x1E74418a1eaE7E5296d625F5e3723f9d3203680f",
+      "0x7B2B80024434ED63f120F119856790528c2e23f9"
     ],
-    "markets": {
-      "1": {
-        "marketId": 1,
-        "asset": "0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d",
-        "bank": "0xc1c96dfb2b494e775c3a4e848e6ba7a97acd86e5"
-      },
-      "2": {
-        "marketId": 2,
-        "asset": "0xd94c1c6d1db1bd9c0ec1220bf349938e07da60a0",
-        "bank": "0xfdbc84092bf8ec2e432e48cb2e7b51789e3a056c"
-      },
-      "3": {
-        "marketId": 3,
-        "asset": "0xdbc6d17c8e28d1154918f974c20e85cefa720702",
-        "bank": "0x0a3098f747392b5b5fb4c26cbd724faeceeb4c2f"
-      }
-    },
-    "upkeepManager": "0x8d6c7f269505bcc5812217c7fe55453d204e41e3",
-    "jackpotTreasury": "0xc5221f91b2eca5230ef5cc24c794b7b5d1bcedff"
+    "brbReferal": "0xb6a6a7c9fc32e30fb5af12ad9d6a5cd2a283ad94",
+    "upkeepManager": "0xe451142bd2340e62f2cfe94132b0ae34a925d854",
+    "jackpotTreasury": "0xb52c19254602316613d8161983d2803f71f83814",
+    "jackpotFunder": "0x2a36366e71cc52e21607f71b0a9f14216bfb2510",
+    "sideBet": "0x1CCC659DCEe5af5c42263d1c9A9768d13025A020",
+    "scheduler": "0x1089D2c2F0019fA93a1897BcF3a3BE1d71A7C545",
+    "uniswapRouter": "0x9f90d323b48082f52ef3fe1530c5e14e2271bb84"
   }
 }

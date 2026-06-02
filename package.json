@@ -1,6 +1,6 @@
 {
   "name": "subgraph",
-  "version": "0.1.28",
+  "version": "0.1.32",
   "type": "module",
   "private": true,
   "scripts": {

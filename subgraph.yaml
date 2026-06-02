@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x47e054bb133e75b1c2c7a9a52ba73e52e75a06a1"
-      startBlock: 255473216
+      address: "0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf"
+      startBlock: 273225571
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -45,8 +45,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x60cd5a0f74f1644eaef997496e19e3737690ad1c"
-      startBlock: 255473216
+      address: "0x2f6bbd7df2e997788a6a3759edcd7282028d40bd"
+      startBlock: 273225571
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -72,10 +72,10 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: BetRecorded(uint32,uint64,address,uint256,uint8,uint16)
+        - event: BetRecorded(uint32,uint64,address,uint256,bytes)
           handler: handleBetRecorded
-        - event: GlobalRoundSealed(uint64,uint32)
-          handler: handleGlobalRoundSealed
+        - event: RoundCountdownStarted(uint64,uint32,uint256)
+          handler: handleRoundCountdownStarted
         - event: RoundLocked(uint32,uint64,uint64)
           handler: handleRoundLocked
         - event: VrfRequested(uint64,uint256,uint256)
@@ -92,8 +92,6 @@ dataSources:
           handler: handleInfrastructureFeePaid
         - event: MarketRegistered(uint32,address,address)
           handler: handleMarketRegistered
-        - event: MinJackpotConditionUpdated(uint256)
-          handler: handleMinJackpotConditionUpdated
         - event: Initialized(uint64)
           handler: handleGameInitialized
         - event: Upgraded(indexed address)
@@ -104,8 +102,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBJackpotFunder
-      address: "0x60ce672feaf39f35a3f6e5b3e099f46b90aee9fc"
-      startBlock: 255473216
+      address: "0x2a36366e71cc52e21607f71b0a9f14216bfb2510"
+      startBlock: 273225571
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -130,32 +128,13 @@ dataSources:
         - event: SlippageBpsUpdated(uint256)
           handler: handleSlippageBpsUpdated
       file: ./src/mappings/jackpot-funder.ts
-  - name: JackpotTreasury
-    kind: ethereum/contract
-    network: arbitrum-sepolia
-    source:
-      abi: JackpotTreasury
-      address: "0xbbe4d51cf721277d52d916291f6de4fa972e5e22"
-      startBlock: 255473216
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.9
-      language: wasm/assemblyscript
-      entities: []
-      abis:
-        - name: JackpotTreasury
-          file: ./abis/JackpotTreasury.json
-      eventHandlers:
-        - event: EngineSet(address)
-          handler: handleEngineSet
-      file: ./src/mappings/jackpot-treasury.ts
   - name: BRBReferral
     kind: ethereum/contract
     network: arbitrum-sepolia
     source:
       abi: BRBReferral
-      address: "0x48e85e0f774f0d0d44519b13a959d9faa78e831b"
-      startBlock: 255473216
+      address: "0xb6a6a7c9fc32e30fb5af12ad9d6a5cd2a283ad94"
+      startBlock: 273225571
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -207,12 +186,10 @@ templates:
           handler: handleDeposit
         - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)
           handler: handleWithdraw
-        - event: WithdrawalRequested(address,uint8,address,uint256,uint256)
+        - event: WithdrawalRequested(address,uint16,address)
           handler: handleWithdrawalRequested
-        - event: WithdrawalProcessed(address,uint8,address,uint256,uint256)
+        - event: WithdrawalProcessed(address,uint16,address,uint256,uint256)
           handler: handleWithdrawalProcessed
-        - event: WithdrawalEjected(address,uint8)
-          handler: handleWithdrawalEjected
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
         - event: Approval(indexed address,indexed address,uint256)

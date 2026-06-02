@@ -5,10 +5,56 @@
         "internalType": "address",
         "name": "vrfCoordinator",
         "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "vrfKeyHash2Gwei",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "vrfKeyHash30Gwei",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "vrfKeyHash150Gwei",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint16",
+        "name": "vrfConfirmations",
+        "type": "uint16"
+      },
+      {
+        "internalType": "address",
+        "name": "brbReferral",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
     "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "AccessControlBadConfirmation",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "neededRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AccessControlUnauthorizedAccount",
+    "type": "error"
   },
   {
     "inputs": [
@@ -19,11 +65,6 @@
       }
     ],
     "name": "AddressEmptyCode",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "BettingClosedAwaitingSeal",
     "type": "error"
   },
   {
@@ -79,6 +120,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidReferrer",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidRound",
     "type": "error"
   },
@@ -90,16 +136,6 @@
   {
     "inputs": [],
     "name": "InvalidWithdrawalQueueBatchSize",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NoBets",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NoOpenRound",
     "type": "error"
   },
   {
@@ -126,28 +162,6 @@
   {
     "inputs": [],
     "name": "OnlyRegistry",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnableInvalidOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "OwnableUnauthorizedAccount",
     "type": "error"
   },
   {
@@ -183,11 +197,6 @@
   },
   {
     "inputs": [],
-    "name": "VrfAlreadyPending",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ZeroAddress",
     "type": "error"
   },
@@ -215,42 +224,17 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "amount",
+        "name": "totalAmount",
         "type": "uint256"
       },
       {
         "indexed": false,
-        "internalType": "uint8",
-        "name": "betType",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint16",
-        "name": "number",
-        "type": "uint16"
+        "internalType": "bytes",
+        "name": "betData",
+        "type": "bytes"
       }
     ],
     "name": "BetRecorded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "globalRoundId",
-        "type": "uint64"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "triggerMarketId",
-        "type": "uint32"
-      }
-    ],
-    "name": "GlobalRoundSealed",
     "type": "event"
   },
   {
@@ -321,6 +305,44 @@
     "inputs": [
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "previousFunder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newFunder",
+        "type": "address"
+      }
+    ],
+    "name": "JackpotFunderUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "previousTreasury",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newTreasury",
+        "type": "address"
+      }
+    ],
+    "name": "JackpotTreasuryUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
         "internalType": "uint32",
         "name": "marketId",
         "type": "uint32"
@@ -359,38 +381,6 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "newMinJackpotCondition",
-        "type": "uint256"
-      }
-    ],
-    "name": "MinJackpotConditionUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "previousOwner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "newOwner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
         "internalType": "uint64",
         "name": "globalRoundId",
         "type": "uint64"
@@ -421,6 +411,138 @@
       }
     ],
     "name": "PayoutProgress",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "referrer",
+        "type": "address"
+      }
+    ],
+    "name": "ReferralSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "previousAdminRole",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newAdminRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RoleAdminChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "roundId",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "triggerMarketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lockAt",
+        "type": "uint256"
+      }
+    ],
+    "name": "RoundCountdownStarted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "newRoundDuration",
+        "type": "uint32"
+      }
+    ],
+    "name": "RoundDurationUpdated",
     "type": "event"
   },
   {
@@ -539,6 +661,32 @@
   },
   {
     "inputs": [],
+    "name": "BRB_REFERRAL",
+    "outputs": [
+      {
+        "internalType": "contract IBRBReferal",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DEFAULT_ADMIN_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "DEFAULT_MAX_WITHDRAWAL_QUEUE_LENGTH",
     "outputs": [
       {
@@ -578,7 +726,7 @@
   },
   {
     "inputs": [],
-    "name": "ENGINE_ADMIN_ROLE",
+    "name": "ENGINE_FEE_ROLE",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -587,6 +735,58 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "ENGINE_PAYOUT_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "ENGINE_ROUND_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "ENGINE_WITHDRAWAL_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "INFRA_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -675,19 +875,6 @@
         "internalType": "uint32",
         "name": "",
         "type": "uint32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "SCHEDULER_ROLE",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -850,11 +1037,6 @@
         "type": "tuple"
       },
       {
-        "internalType": "uint32",
-        "name": "maxPayoutsPerCall",
-        "type": "uint32"
-      },
-      {
         "components": [
           {
             "internalType": "address",
@@ -967,59 +1149,17 @@
   {
     "inputs": [
       {
-        "internalType": "uint32",
-        "name": "startCursor",
-        "type": "uint32"
-      },
-      {
-        "internalType": "uint32",
-        "name": "scanLimit",
-        "type": "uint32"
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
       }
     ],
-    "name": "findNextJob",
+    "name": "getRoleAdmin",
     "outputs": [
       {
-        "internalType": "bool",
-        "name": "found",
-        "type": "bool"
-      },
-      {
-        "components": [
-          {
-            "internalType": "enum IRouletteEngine.JobKind",
-            "name": "kind",
-            "type": "uint8"
-          },
-          {
-            "internalType": "uint32",
-            "name": "marketId",
-            "type": "uint32"
-          },
-          {
-            "internalType": "uint64",
-            "name": "roundId",
-            "type": "uint64"
-          },
-          {
-            "internalType": "uint32",
-            "name": "nextCursor",
-            "type": "uint32"
-          },
-          {
-            "internalType": "uint32",
-            "name": "payoutShardIndex",
-            "type": "uint32"
-          },
-          {
-            "internalType": "uint32",
-            "name": "payoutShardWidth",
-            "type": "uint32"
-          }
-        ],
-        "internalType": "struct IRouletteEngine.Job",
-        "name": "job",
-        "type": "tuple"
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -1102,8 +1242,50 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "grantRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "hasPendingVrf",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "hasRole",
     "outputs": [
       {
         "internalType": "bool",
@@ -1144,36 +1326,9 @@
             "type": "uint256"
           },
           {
-            "components": [
-              {
-                "internalType": "bytes32",
-                "name": "keyHash2Gwei",
-                "type": "bytes32"
-              },
-              {
-                "internalType": "bytes32",
-                "name": "keyHash30Gwei",
-                "type": "bytes32"
-              },
-              {
-                "internalType": "bytes32",
-                "name": "keyHash150Gwei",
-                "type": "bytes32"
-              }
-            ],
-            "internalType": "struct RouletteEngineStorageLib.VrfLaneKeyHashes",
-            "name": "vrfLaneKeyHashes",
-            "type": "tuple"
-          },
-          {
             "internalType": "uint32",
             "name": "callbackGasLimit",
             "type": "uint32"
-          },
-          {
-            "internalType": "uint16",
-            "name": "confirmations",
-            "type": "uint16"
           },
           {
             "internalType": "uint32",
@@ -1291,32 +1446,6 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "minJackpotBet",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "owner",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -1516,11 +1645,35 @@
         "internalType": "bytes",
         "name": "betData",
         "type": "bytes"
+      },
+      {
+        "internalType": "address",
+        "name": "referral",
+        "type": "address"
       }
     ],
     "name": "recordBet",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      }
+    ],
+    "name": "referrerOf",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1542,8 +1695,19 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "renounceOwnership",
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "callerConfirmation",
+        "type": "address"
+      }
+    ],
+    "name": "renounceRole",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1551,17 +1715,64 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "requestId",
-        "type": "uint256"
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
       }
     ],
-    "name": "requestIdToGlobalRound",
-    "outputs": [
+    "name": "revokeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
         "internalType": "uint64",
-        "name": "",
+        "name": "roundId",
         "type": "uint64"
+      }
+    ],
+    "name": "roundJackpotTriggered",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "vrfFulfilled",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "jackpotTriggered",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "roundId",
+        "type": "uint64"
+      }
+    ],
+    "name": "roundOutcome",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "vrfFulfilled",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint8",
+        "name": "winningNumber",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -1589,30 +1800,27 @@
   {
     "inputs": [
       {
-        "internalType": "uint64",
-        "name": "roundId",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "internalType": "uint256",
-        "name": "number",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "newFunder",
+        "type": "address"
       }
     ],
-    "name": "roundStraightBetsSum",
-    "outputs": [
+    "name": "setJackpotFunder",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "newTreasury",
+        "type": "address"
       }
     ],
-    "stateMutability": "view",
+    "name": "setJackpotTreasury",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1624,19 +1832,6 @@
       }
     ],
     "name": "setMaxWithdrawalQueueLength",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newMinJackpotBet",
-        "type": "uint256"
-      }
-    ],
-    "name": "setMinJackpotBet",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1657,6 +1852,19 @@
   {
     "inputs": [
       {
+        "internalType": "uint32",
+        "name": "newRoundDuration",
+        "type": "uint32"
+      }
+    ],
+    "name": "setRoundDuration",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "newBatchSize",
         "type": "uint256"
@@ -1670,14 +1878,20 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "newOwner",
-        "type": "address"
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
       }
     ],
-    "name": "transferOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "supportsInterface",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1696,19 +1910,6 @@
     "name": "upgradeToAndCall",
     "outputs": [],
     "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "vrfActiveMarket",
-    "outputs": [
-      {
-        "internalType": "uint32",
-        "name": "",
-        "type": "uint32"
-      }
-    ],
-    "stateMutability": "pure",
     "type": "function"
   },
   {

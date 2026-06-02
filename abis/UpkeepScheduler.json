@@ -8,6 +8,11 @@
       },
       {
         "internalType": "address",
+        "name": "sideBet",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
         "name": "admin",
         "type": "address"
       },
@@ -206,6 +211,31 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lane",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "previousCursor",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newCursor",
+        "type": "uint256"
+      }
+    ],
+    "name": "SideBetCursorAdvanced",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
     "outputs": [
@@ -239,6 +269,19 @@
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SIDE_BET",
+    "outputs": [
+      {
+        "internalType": "contract ISideBet",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -473,6 +516,25 @@
     "name": "setScanLimit",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lane",
+        "type": "uint256"
+      }
+    ],
+    "name": "sideBetCursor",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "cursorBetId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
