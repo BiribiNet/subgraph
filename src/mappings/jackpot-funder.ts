@@ -1,11 +1,14 @@
 import { log } from "@graphprotocol/graph-ts"
 
 import {
+  ColdSlippageBpsUpdated,
   FundFromMarketSkipped,
   FundedFromMarket,
+  PairObservationUpdated,
   SlippageBpsUpdated,
   SwapAssetBpsUpdated,
   TreasuryBrbSplitUpdated,
+  TwapWindowUpdated,
   RoleGranted,
   RoleRevoked,
   RoleAdminChanged,
@@ -21,11 +24,11 @@ import {
   updateRoleAdmin,
 } from "../helpers/access-control"
 
-// NOTE: BrbRatioUpdated handler is intentionally omitted. The event is per-market
-// (marketId + ratioPerAssetUnit) but Bastien's `Market` entity (origin/master)
-// does not carry a `brbRatio` field. A follow-up PR can either:
-//   (a) add `brbRatio: BigInt` to Market in schema.graphql + wire the handler, or
-//   (b) introduce a new MarketBrbRatio entity if per-market history is needed.
+// NOTE: BrbRatioUpdated was removed from the funder in the Uniswap V2 TWAP rework
+// (the per-market fixed ratio setter is gone — BRB price now derives from the
+// on-chain TWAP), so no handler is wired for it. The TWAP config setters below
+// keep the JackpotFunderConfig singleton in sync with the on-chain pricing
+// parameters (cold slippage + TWAP window).
 
 export function handleFundedFromMarket(event: FundedFromMarket): void {
   const marketIdInt32 = event.params.marketId.toI32()
@@ -82,6 +85,29 @@ export function handleTreasuryBrbSplitUpdated(event: TreasuryBrbSplitUpdated): v
 export function handleSlippageBpsUpdated(event: SlippageBpsUpdated): void {
   const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
   cfg.slippageBps = event.params.slippageBps
+  cfg.lastUpdatedAt = event.block.timestamp
+  cfg.save()
+}
+
+export function handleColdSlippageBpsUpdated(event: ColdSlippageBpsUpdated): void {
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  cfg.coldSlippageBps = event.params.coldSlippageBps
+  cfg.lastUpdatedAt = event.block.timestamp
+  cfg.save()
+}
+
+export function handleTwapWindowUpdated(event: TwapWindowUpdated): void {
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  cfg.twapWindowSeconds = event.params.twapWindowSeconds
+  cfg.lastUpdatedAt = event.block.timestamp
+  cfg.save()
+}
+
+// PairObservationUpdated fires whenever the funder refreshes its TWAP observation
+// for a BRB/<asset> pair. We only bump lastUpdatedAt on the config singleton — the
+// raw observation history is not needed by any consumer yet.
+export function handlePairObservationUpdated(event: PairObservationUpdated): void {
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
 }

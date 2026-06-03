@@ -917,6 +917,11 @@ type JackpotFunderConfig @entity(immutable: false) {
   treasuryBrbNumerator: BigInt!
   treasuryBrbDenominator: BigInt!
   slippageBps: BigInt!
+  # Uniswap V2 TWAP pricing parameters (funder TWAP rework).
+  # coldSlippageBps: slippage used when the TWAP observation is stale/cold.
+  # twapWindowSeconds: rolling window length for the BRB/<asset> price oracle.
+  coldSlippageBps: BigInt!
+  twapWindowSeconds: BigInt!
   lastUpdatedAt: BigInt!
 }
 
