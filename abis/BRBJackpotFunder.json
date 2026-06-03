@@ -23,6 +23,11 @@
       },
       {
         "internalType": "address",
+        "name": "sideBet_",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
         "name": "admin",
         "type": "address"
       }
@@ -53,7 +58,7 @@
   },
   {
     "inputs": [],
-    "name": "EngineAlreadySet",
+    "name": "InsufficientBalance",
     "type": "error"
   },
   {
@@ -63,12 +68,7 @@
   },
   {
     "inputs": [],
-    "name": "OnlyEngine",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "RatioNotSet",
+    "name": "OnlyFeeCollector",
     "type": "error"
   },
   {
@@ -88,35 +88,34 @@
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ZeroAmount",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
         "internalType": "uint256",
-        "name": "ratioPerAssetUnit",
+        "name": "coldSlippageBps",
         "type": "uint256"
       }
     ],
-    "name": "BrbRatioUpdated",
+    "name": "ColdSlippageBpsUpdated",
     "type": "event"
   },
   {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "uint32",
         "name": "marketId",
         "type": "uint32"
       },
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "address",
         "name": "asset",
         "type": "address"
@@ -178,7 +177,7 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "uint32",
         "name": "marketId",
         "type": "uint32"
@@ -197,13 +196,13 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "uint32",
         "name": "marketId",
         "type": "uint32"
       },
       {
-        "indexed": true,
+        "indexed": false,
         "internalType": "address",
         "name": "treasury",
         "type": "address"
@@ -216,6 +215,25 @@
       }
     ],
     "name": "JackpotTreasuryTransferFailed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "pair",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "timestamp",
+        "type": "uint32"
+      }
+    ],
+    "name": "PairObservationUpdated",
     "type": "event"
   },
   {
@@ -324,6 +342,31 @@
     "inputs": [
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "asset",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "TokenSwept",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "numerator",
         "type": "uint256"
@@ -336,6 +379,19 @@
       }
     ],
     "name": "TreasuryBrbSplitUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "twapWindowSeconds",
+        "type": "uint32"
+      }
+    ],
+    "name": "TwapWindowUpdated",
     "type": "event"
   },
   {
@@ -366,6 +422,19 @@
   },
   {
     "inputs": [],
+    "name": "DEFAULT_TWAP_WINDOW_SECONDS",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "FUNDER_ADMIN_ROLE",
     "outputs": [
       {
@@ -379,12 +448,12 @@
   },
   {
     "inputs": [],
-    "name": "RATIO_SCALE",
+    "name": "SKIP_NO_QUOTE",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "uint8",
         "name": "",
-        "type": "uint256"
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -417,25 +486,6 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint32",
-        "name": "",
-        "type": "uint32"
-      }
-    ],
-    "name": "brbPerAssetUnitRatio",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "brbToken",
     "outputs": [
@@ -443,6 +493,19 @@
         "internalType": "address",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "coldSlippageBps",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -556,6 +619,35 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "pair",
+        "type": "address"
+      }
+    ],
+    "name": "pairObservations",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "timestamp",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "price0Cumulative",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "price1Cumulative",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "role",
         "type": "bytes32"
@@ -605,30 +697,12 @@
   {
     "inputs": [
       {
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
         "internalType": "uint256",
-        "name": "ratio",
+        "name": "bps",
         "type": "uint256"
       }
     ],
-    "name": "setBrbPerAssetUnitRatio",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "engine_",
-        "type": "address"
-      }
-    ],
-    "name": "setEngine",
+    "name": "setColdSlippageBps",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -678,6 +752,32 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "newWindow",
+        "type": "uint32"
+      }
+    ],
+    "name": "setTwapWindowSeconds",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "sideBet",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "slippageBps",
     "outputs": [
@@ -723,6 +823,29 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "asset",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "sweepToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "treasuryBrbDenominator",
     "outputs": [
@@ -743,6 +866,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "twapWindowSeconds",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",

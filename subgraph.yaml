@@ -130,7 +130,7 @@ dataSources:
       eventHandlers:
         - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
           handler: handleFundedFromMarket
-        - event: FundFromMarketSkipped(indexed uint32,indexed address,uint8)
+        - event: FundFromMarketSkipped(uint32,address,uint8)
           handler: handleFundFromMarketSkipped
         - event: SwapAssetBpsUpdated(uint256)
           handler: handleSwapAssetBpsUpdated
@@ -138,6 +138,12 @@ dataSources:
           handler: handleTreasuryBrbSplitUpdated
         - event: SlippageBpsUpdated(uint256)
           handler: handleSlippageBpsUpdated
+        - event: ColdSlippageBpsUpdated(uint256)
+          handler: handleColdSlippageBpsUpdated
+        - event: TwapWindowUpdated(uint32)
+          handler: handleTwapWindowUpdated
+        - event: PairObservationUpdated(address,uint32)
+          handler: handlePairObservationUpdated
         - event: RoleGranted(indexed bytes32,indexed address,indexed address)
           handler: handleRoleGranted
         - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
