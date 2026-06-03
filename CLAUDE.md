@@ -48,7 +48,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - `BankIndex { id: bank, market }` — O(1) reverse lookup from a vault address to its `Market`.
 - `RouletteBet.market` / `RouletteBet.marketRound` (nullable) — attributed at `BetRecorded` time.
 - `VaultDeposit.market`, `VaultWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
-- `RouletteRound` keeps cross-market global aggregates. **`GlobalState`** (singleton `0x…01`) = live ops: current round, jackpot pool, withdrawal queue, cross-market vault TVL by asset class. **`ProtocolStats`** (`id: "stats"`) = lifetime analytics only (`totalWagered`, `totalBurned`, `totalPayouts`, …) — no field overlap with `GlobalState`. Open wagers: **`Market.pendingBets`** per vault (not a mixed-unit global). Per-vault metrics otherwise live on `Market`.
+- `RouletteRound` keeps cross-market global aggregates. **`GlobalState`** (singleton `0x…01`) = live ops (round pointer, jackpot pool, withdrawal queue, cross-market vault TVL) plus lifetime analytics (`totalWagered`, `totalBurned`, `totalPayouts`, …). Open wagers: **`Market.pendingBets`** per vault (not a mixed-unit global). Per-vault metrics otherwise live on `Market`.
 
 ### BRBpoints model (Phase 2A)
 
@@ -103,7 +103,7 @@ type Bet @entity {
 
 ### Time-Series / Aggregations
 Always maintain rolling aggregation entities for dashboard performance:
-- `ProtocolStats` (singleton): lifetime totals (volume, bets, players, burns, jackpots)
+- `GlobalState` lifetime fields: `totalWagered`, `totalBets`, `totalPlayers`, burns, jackpots, vault deposit/withdraw totals
 - `DailyStats`: per-day aggregation (volume, unique players, revenue, burns)
 - `HourlyVolumeSnapshot`: for charts
 - `VaultSnapshot`: periodic sBRB vault metrics (totalAssets, sharePrice, APY)

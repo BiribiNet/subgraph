@@ -35,7 +35,7 @@ import {
   revokeRoleHolder,
   updateRoleAdmin,
 } from "../helpers/access-control"
-import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
+import { getOrCreateGlobalState } from "../helpers/globalState"
 import { calculateMarketAPYs } from "../helpers/marketApy"
 import { addVaultDepositTotals, subtractVaultAssetsTotals } from "../helpers/vaultClassTotals"
 import { BPS_DENOMINATOR, ONE, ZERO } from "../helpers/number"
@@ -122,9 +122,7 @@ export function handleDeposit(event: Deposit): void {
   hourlyDeposit.depositVolume = hourlyDeposit.depositVolume.plus(event.params.assets)
   hourlyDeposit.save()
 
-  const protocolStatsDeposit = getOrCreateProtocolStats()
-  protocolStatsDeposit.totalDeposited = protocolStatsDeposit.totalDeposited.plus(event.params.assets)
-  protocolStatsDeposit.save()
+  globalState.totalDeposited = globalState.totalDeposited.plus(event.params.assets)
 
   market.save()
   globalState.save()
@@ -255,9 +253,7 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     hourlyWithdraw.withdrawalVolume = hourlyWithdraw.withdrawalVolume.plus(assetsPaid)
     hourlyWithdraw.save()
 
-    const protocolStatsWithdraw = getOrCreateProtocolStats()
-    protocolStatsWithdraw.totalWithdrawn = protocolStatsWithdraw.totalWithdrawn.plus(assetsPaid)
-    protocolStatsWithdraw.save()
+    globalState.totalWithdrawn = globalState.totalWithdrawn.plus(assetsPaid)
 
     market.save()
   }

@@ -447,7 +447,7 @@ type PayoutTransaction @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-"Live protocol singleton — round pointer, jackpot pool, withdrawal queue, cross-market vault rollups. Lifetime counters live on ProtocolStats; per-market open wagers on Market.pendingBets."
+"Protocol singleton (id: 0x…01) — live ops, vault rollups, and lifetime analytics. Per-market open wagers on Market.pendingBets."
 type GlobalState @entity(immutable: false) {
   "Singleton ID"
   id: Bytes!
@@ -483,6 +483,28 @@ type GlobalState @entity(immutable: false) {
   withdrawalQueueCounter: BigInt!
   "Cumulative total BRB transfers TO bank vaults (donations; not ERC-4626 deposits)"
   totalTransfersToPool: BigInt!
+  "Total BRB wagered all time (18-dec normalized across markets)"
+  totalWagered: BigInt!
+  "Total bets placed all time"
+  totalBets: BigInt!
+  "Total rounds completed"
+  totalRounds: BigInt!
+  "Total unique players"
+  totalPlayers: BigInt!
+  "Total BRB burned"
+  totalBurned: BigInt!
+  "Total jackpots paid out"
+  totalJackpotsPaid: BigInt!
+  "Total revenue distributed to stakers"
+  totalStakerRevenue: BigInt!
+  "Current BRB total supply"
+  brbTotalSupply: BigInt!
+  "Total BRB paid out to winners all time"
+  totalPayouts: BigInt!
+  "Total assets deposited into vaults all time (raw market units)"
+  totalDeposited: BigInt!
+  "Total assets withdrawn from vaults all time (raw market units)"
+  totalWithdrawn: BigInt!
 }
 
 # Daily snapshot for per-market APY calculations
@@ -782,34 +804,6 @@ type UpkeepRegistration @entity(immutable: true) {
   timestamp: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
-}
-
-"Singleton lifetime analytics (dashboards, leaderboards). Query id: \"stats\". Operational state is GlobalState."
-type ProtocolStats @entity(immutable: false) {
-  "Singleton: stats"
-  id: ID!
-  "Total BRB wagered all time"
-  totalWagered: BigInt!
-  "Total bets placed all time"
-  totalBets: BigInt!
-  "Total rounds completed"
-  totalRounds: BigInt!
-  "Total unique players"
-  totalPlayers: BigInt!
-  "Total BRB burned"
-  totalBurned: BigInt!
-  "Total jackpots paid out"
-  totalJackpotsPaid: BigInt!
-  "Total revenue distributed to stakers"
-  totalStakerRevenue: BigInt!
-  "Current BRB total supply"
-  brbTotalSupply: BigInt!
-  "Total BRB paid out to winners all time"
-  totalPayouts: BigInt!
-  "Total BRB deposited into sBRB vault all time"
-  totalDeposited: BigInt!
-  "Total BRB withdrawn from sBRB vault all time"
-  totalWithdrawn: BigInt!
 }
 
 # === Side Bet (Phase 3) ===

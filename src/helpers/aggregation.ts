@@ -1,7 +1,7 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
 import { DailyStat, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer, RouletteRound } from "../../generated/schema"
 import { ZERO } from "./number"
-import { getOrCreateProtocolStats } from "./globalState"
+import { getOrCreateGlobalState } from "./globalState"
 
 const SECONDS_PER_DAY = BigInt.fromI32(86400)
 const SECONDS_PER_HOUR = BigInt.fromI32(3600)
@@ -86,9 +86,9 @@ export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: Bi
   daily.revenue = daily.revenue.plus(grossRevenue)
   if (stakersShare.gt(ZERO)) {
     daily.stakersRevenue = daily.stakersRevenue.plus(stakersShare)
-    const stats = getOrCreateProtocolStats()
-    stats.totalStakerRevenue = stats.totalStakerRevenue.plus(stakersShare)
-    stats.save()
+    const globalState = getOrCreateGlobalState()
+    globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(stakersShare)
+    globalState.save()
   }
   daily.save()
 }

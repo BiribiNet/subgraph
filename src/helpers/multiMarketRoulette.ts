@@ -12,7 +12,7 @@ import {
   RoundLocked,
   Upgraded
 } from "../../generated/RouletteEngine/Game"
-import { RouletteRound, ContractUpgrade, GlobalRound, RouletteBet } from "../../generated/schema"
+import { RouletteRound, ContractUpgrade, GlobalRound, RouletteBet, GlobalState } from "../../generated/schema"
 import {
   ROUND_STATUS_BETTING,
   ROUND_STATUS_NO_MORE_BETS,
@@ -21,7 +21,7 @@ import {
   ROUND_STATUS_CLEAN
 } from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
-import { getOrCreateGlobalState, getOrCreateProtocolStats } from "./globalState"
+import { getOrCreateGlobalState } from "./globalState"
 import { createNewRouletteRound } from "./rouletteRound"
 import {
   calculateMaxPayoutFromRoundComponents,
@@ -67,17 +67,19 @@ function loadOrCreateMarketRound(
   return round
 }
 
-function trackProtocolBetStats(amount: BigInt, player: Bytes, timestamp: BigInt): void {
-  const stats = getOrCreateProtocolStats()
-  stats.totalWagered = stats.totalWagered.plus(amount)
-  stats.totalBets = stats.totalBets.plus(BigInt.fromI32(1))
-  stats.save()
+function trackProtocolBetStats(
+  globalState: GlobalState,
+  amount: BigInt,
+  player: Bytes,
+  timestamp: BigInt
+): void {
+  globalState.totalWagered = globalState.totalWagered.plus(amount)
+  globalState.totalBets = globalState.totalBets.plus(BigInt.fromI32(1))
 
   const daily = getOrCreateDailyStats(timestamp)
   if (trackDailyUniquePlayer(timestamp, player.toHexString())) {
     daily.uniquePlayers = daily.uniquePlayers.plus(BigInt.fromI32(1))
-    stats.totalPlayers = stats.totalPlayers.plus(BigInt.fromI32(1))
-    stats.save()
+    globalState.totalPlayers = globalState.totalPlayers.plus(BigInt.fromI32(1))
   }
 }
 
@@ -173,7 +175,7 @@ export function processBetRecorded(event: BetRecorded): void {
     daily.volume = daily.volume.plus(normalizedWager)
     daily.save()
 
-    trackProtocolBetStats(normalizedWager, event.params.player, event.block.timestamp)
+    trackProtocolBetStats(globalState, normalizedWager, event.params.player, event.block.timestamp)
     updateUserLastActive(event.params.player, event.block.timestamp)
     gr.save()
     globalState.save()
@@ -253,7 +255,7 @@ export function processRoundResolved(event: RoundResolved): void {
   const nextGr = getOrCreateGlobalRound(nextRoundId, event.block.timestamp)
   globalState.currentGlobalRound = nextGr.id
   globalState.currentRoundNumber = nextRoundId
-  globalState.save()
+  globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
 
   gr.status = ROUND_STATUS_CLEAN
   gr.resolvedAt = event.block.timestamp
@@ -261,9 +263,7 @@ export function processRoundResolved(event: RoundResolved): void {
 
   finalizeMarketRoundsOnResolve(roundId, event.block.timestamp)
 
-  const stats = getOrCreateProtocolStats()
-  stats.totalRounds = stats.totalRounds.plus(BigInt.fromI32(1))
-  stats.save()
+  globalState.save()
 
   const daily = getOrCreateDailyStats(event.block.timestamp)
   daily.roundsCompleted = daily.roundsCompleted.plus(BigInt.fromI32(1))

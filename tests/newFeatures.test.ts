@@ -98,6 +98,9 @@ describe('Betting Statistics Tests', () => {
     const dayNumber = (1_000_000 / 86400).toString();
     assert.fieldEquals('DailyStat', dayNumber, 'volume', '10000000000000000000');
     assert.fieldEquals('DailyStat', dayNumber, 'betCount', '1');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalWagered', '10000000000000000000');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalBets', '1');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPlayers', '1');
   });
 
   test('second player creates DailyPlayer row', () => {

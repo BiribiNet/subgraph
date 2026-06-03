@@ -110,23 +110,25 @@ query GetRoundInfo($roundId: Bytes!) {
 }
 ```
 
-### Query Protocol Stats
+### Query Protocol Stats (GlobalState singleton)
 ```graphql
 query GetProtocolStats {
   globalState(id: "0x0000000000000000000000000000000000000001") {
-    totalAssets
-    totalShares
-    sharePrice
-    apy7Day
-    apy30Day
-    apyLifetime
-    totalRounds
-    uniquePlayersCount
-    stakersCount
-    totalBurned
+    currentRoundNumber
     currentJackpot
+    totalWagered
+    totalBets
+    totalRounds
+    totalPlayers
+    totalBurned
+    totalPayouts
+    totalJackpotsPaid
     totalStakerRevenue
-    maxBetAmount
+    brbTotalSupply
+    totalDeposited
+    totalWithdrawn
+    stableVaultTotalAssets
+    brbVaultTotalAssets
   }
 }
 ```

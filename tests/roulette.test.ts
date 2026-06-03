@@ -137,5 +137,6 @@ describe('handleRoundResolved', () => {
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'lastRoundPaid', '1');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '2');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundTransitionInProgress', 'false');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalRounds', '1');
   });
 });

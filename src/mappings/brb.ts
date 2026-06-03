@@ -4,7 +4,7 @@ import { BRBTransfer, BRBBurn, RouletteRound, TokenApproval } from "../../genera
 import { updateUserBRBBalance, updateUserLastActive } from "../helpers/user"
 import { JACKPOT_TREASURY_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
-import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
+import { getOrCreateGlobalState } from "../helpers/globalState"
 import { marketRoundId, isKnownBank, loadMarketByBank } from "../helpers/market"
 import { getOrCreateDailyStats } from "../helpers/aggregation"
 import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
@@ -54,9 +54,8 @@ export function handleTransfer(event: Transfer): void {
   const toHex = event.params.to.toHexString()
 
   if (fromHex == ZERO_ADDRESS) {
-    const protocolStats = getOrCreateProtocolStats()
-    protocolStats.brbTotalSupply = protocolStats.brbTotalSupply.plus(event.params.value)
-    protocolStats.save()
+    globalState.brbTotalSupply = globalState.brbTotalSupply.plus(event.params.value)
+    globalState.save()
     return
   }
 
@@ -82,10 +81,8 @@ export function handleTransfer(event: Transfer): void {
     }
     burn.save()
 
-    const protocolStatsBurn = getOrCreateProtocolStats()
-    protocolStatsBurn.totalBurned = protocolStatsBurn.totalBurned.plus(event.params.value)
-    protocolStatsBurn.brbTotalSupply = protocolStatsBurn.brbTotalSupply.minus(event.params.value)
-    protocolStatsBurn.save()
+    globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
+    globalState.brbTotalSupply = globalState.brbTotalSupply.minus(event.params.value)
 
     const dailyStatsBurn = getOrCreateDailyStats(event.block.timestamp)
     dailyStatsBurn.burnAmount = dailyStatsBurn.burnAmount.plus(event.params.value)

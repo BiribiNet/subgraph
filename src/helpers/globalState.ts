@@ -1,5 +1,5 @@
 import { Bytes, BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { GlobalState, ProtocolStats } from "../../generated/schema"
+import { GlobalState } from "../../generated/schema"
 import { ZERO } from "./number"
 import { getOrCreateGlobalRound } from "./globalRound"
 
@@ -27,6 +27,17 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.totalPendingLargeWithdrawals = ZERO
     globalState.withdrawalQueueCounter = ZERO
     globalState.totalTransfersToPool = ZERO
+    globalState.totalWagered = ZERO
+    globalState.totalBets = ZERO
+    globalState.totalRounds = ZERO
+    globalState.totalPlayers = ZERO
+    globalState.totalBurned = ZERO
+    globalState.totalJackpotsPaid = ZERO
+    globalState.totalStakerRevenue = ZERO
+    globalState.brbTotalSupply = ZERO
+    globalState.totalPayouts = ZERO
+    globalState.totalDeposited = ZERO
+    globalState.totalWithdrawn = ZERO
   }
   return globalState
 }
@@ -41,25 +52,6 @@ export function calculateSharePrice(totalAssets: BigInt, totalShares: BigInt): B
       .div(PRECISION.toBigDecimal())
   }
   return BigDecimal.fromString("1")
-}
-
-export function getOrCreateProtocolStats(): ProtocolStats {
-  let stats = ProtocolStats.load("stats")
-  if (!stats) {
-    stats = new ProtocolStats("stats")
-    stats.totalWagered = ZERO
-    stats.totalBets = ZERO
-    stats.totalRounds = ZERO
-    stats.totalPlayers = ZERO
-    stats.totalBurned = ZERO
-    stats.totalJackpotsPaid = ZERO
-    stats.totalStakerRevenue = ZERO
-    stats.brbTotalSupply = ZERO
-    stats.totalPayouts = ZERO
-    stats.totalDeposited = ZERO
-    stats.totalWithdrawn = ZERO
-  }
-  return stats
 }
 
 export { GLOBAL_STATE_ID }

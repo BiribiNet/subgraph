@@ -10,7 +10,7 @@ import {
 import { JACKPOT_TREASURY_ADDRESS, ROUND_STATUS_PAYOUT } from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "./aggregation"
-import { getOrCreateGlobalState, getOrCreateProtocolStats } from "./globalState"
+import { getOrCreateGlobalState } from "./globalState"
 import { findBetInGlobalRound, findBetInMarketRound, isKnownBank, loadMarketByBank } from "./market"
 import { updateUserRouletteStats } from "./user"
 import { recordUserMarketWin } from "./user-market-stats"
@@ -93,10 +93,8 @@ export function tryRecordMarketPayoutTransfer(
 
     globalState.currentJackpot = globalState.currentJackpot.minus(value)
 
-    const protocolStatsJackpot = getOrCreateProtocolStats()
-    protocolStatsJackpot.totalJackpotsPaid = protocolStatsJackpot.totalJackpotsPaid.plus(value)
-    protocolStatsJackpot.totalPayouts = protocolStatsJackpot.totalPayouts.plus(value)
-    protocolStatsJackpot.save()
+    globalState.totalJackpotsPaid = globalState.totalJackpotsPaid.plus(value)
+    globalState.totalPayouts = globalState.totalPayouts.plus(value)
 
     updateUserRouletteStats(to, value, assetDecimals, true, !wasAlreadyWinner, timestamp)
     if (payoutMarket != null) {
@@ -129,9 +127,7 @@ export function tryRecordMarketPayoutTransfer(
       recordUserMarketWin(to, payoutMarket, value, !wasAlreadyWinner, timestamp)
     }
 
-    const protocolStatsPayout = getOrCreateProtocolStats()
-    protocolStatsPayout.totalPayouts = protocolStatsPayout.totalPayouts.plus(value)
-    protocolStatsPayout.save()
+    globalState.totalPayouts = globalState.totalPayouts.plus(value)
 
     const dailyStatsRegularPayout = getOrCreateDailyStats(timestamp)
     dailyStatsRegularPayout.totalPayouts = dailyStatsRegularPayout.totalPayouts.plus(normalizedPayout)

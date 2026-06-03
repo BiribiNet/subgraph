@@ -31,7 +31,6 @@ dataSources:
         - RouletteBet
         - DailyStat
         - TokenApproval
-        - ProtocolStats
       abis:
         - name: BRB
           file: ./abis/BRB.json
@@ -65,7 +64,6 @@ dataSources:
         - ContractRole
         - RoleHolder
         - ContractUpgrade
-        - ProtocolStats
         - DailyStat
       abis:
         - name: Game
@@ -242,7 +240,6 @@ templates:
         - ContractRole
         - RoleHolder
         - UpkeepRegistration
-        - ProtocolStats
         - MarketAPYSnapshot
         - DailyStat
         - HourlyVolumeSnapshot
