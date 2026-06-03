@@ -914,17 +914,51 @@ type ProtocolStats @entity(immutable: false) {
   totalWithdrawn: BigInt!
 }
 
-# === Side Bet (Phase 3 — scaffold) ===
-# Forward-declared entities for the upcoming SideBet game. No data source or
-# mappings yet — contract not deployed. The frontend uses mock data via
-# components/features/side-bet/.
+# === Side Bet (BRBGAME) ===
+# Indexed from the deployed SideBet contract (single-player multi-spin side bets).
+# `SideBetType` mirrors the 9 on-chain bet types (ISideBet.SideBetType).
 
-enum SideBetType { COLOR_COUNT, NUMBER_HIT, CONSECUTIVE_STREAK, RED_RATIO }
+enum SideBetType {
+  COLOR_COUNT
+  NUMBER_HIT
+  CONSECUTIVE_STREAK
+  RED_RATIO
+  LIGHTNING_DOUBLE
+  PERFECT_ALTERNATION
+  DOZEN_HIT
+  COLUMN_HIT
+  JACKPOT_IN_WINDOW
+}
 enum SideBetColor { RED, BLACK }
 enum SideBetStatus { ACTIVE, WON, LOST, EXPIRED, CANCELLED }
 
+# Admin-defined side-bet template. id = configId (as bytes). Created on ConfigAdded,
+# enriched via a getConfig read (config events carry only configId/marketId/betType),
+# stake limits refreshed on ConfigStakeLimitsUpdated, deactivated on ConfigRemoved.
+type SideBetConfig @entity(immutable: false) {
+  id: Bytes!
+  configId: BigInt!
+  market: Market!
+  marketId: Int!
+  betType: SideBetType!
+  color: SideBetColor
+  targetNumber: Int
+  targetCount: Int
+  redRatioBps: Int
+  windowSpins: Int!
+  multiplierBps: Int!
+  minStake: BigInt!
+  maxStake: BigInt!
+  active: Boolean!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+  bets: [SideBet!]! @derivedFrom(field: "config")
+}
+
 type SideBet @entity(immutable: false) {
   id: Bytes!
+  betId: BigInt!
+  config: SideBetConfig!
   player: User!
   market: Market!
   bank: Bytes!
@@ -936,6 +970,7 @@ type SideBet @entity(immutable: false) {
   windowSpins: Int!
   spinsResolved: Int!
   multiplierBps: Int!
+  startGlobalRound: BigInt!
   stake: BigInt!
   potentialPayout: BigInt!
   actualPayout: BigInt!
@@ -1013,6 +1048,10 @@ type JackpotFunderConfig @entity(immutable: false) {
   treasuryBrbNumerator: BigInt!
   treasuryBrbDenominator: BigInt!
   slippageBps: BigInt!
+  "Cold-start slippage tolerance used when the TWAP window is not yet warm"
+  coldSlippageBps: BigInt!
+  "TWAP observation window length in seconds"
+  twapWindowSeconds: BigInt!
   lastUpdatedAt: BigInt!
 }
 

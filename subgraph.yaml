@@ -119,7 +119,7 @@ dataSources:
       eventHandlers:
         - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
           handler: handleFundedFromMarket
-        - event: FundFromMarketSkipped(indexed uint32,indexed address,uint8)
+        - event: FundFromMarketSkipped(uint32,address,uint8)
           handler: handleFundFromMarketSkipped
         - event: SwapAssetBpsUpdated(uint256)
           handler: handleSwapAssetBpsUpdated
@@ -127,6 +127,12 @@ dataSources:
           handler: handleTreasuryBrbSplitUpdated
         - event: SlippageBpsUpdated(uint256)
           handler: handleSlippageBpsUpdated
+        - event: ColdSlippageBpsUpdated(uint256)
+          handler: handleColdSlippageBpsUpdated
+        - event: TwapWindowUpdated(uint32)
+          handler: handleTwapWindowUpdated
+        - event: PairObservationUpdated(address,uint32)
+          handler: handlePairObservationUpdated
       file: ./src/mappings/jackpot-funder.ts
   - name: BRBReferral
     kind: ethereum/contract
@@ -150,6 +156,44 @@ dataSources:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
       file: ./src/mappings/referral.ts
+  - name: SideBet
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: SideBet
+      address: "0x1CCC659DCEe5af5c42263d1c9A9768d13025A020"
+      startBlock: 273225571
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - SideBet
+        - SideBetConfig
+        - SideBetSettlement
+        - User
+        - Market
+      abis:
+        - name: SideBet
+          file: ./abis/SideBet.json
+      eventHandlers:
+        - event: ConfigAdded(uint256,uint32,uint8)
+          handler: handleConfigAdded
+        - event: ConfigUpdated(uint256)
+          handler: handleConfigUpdated
+        - event: ConfigRemoved(uint256)
+          handler: handleConfigRemoved
+        - event: ConfigStakeLimitsUpdated(uint256,uint256,uint256)
+          handler: handleConfigStakeLimitsUpdated
+        - event: SideBetPlaced(uint256,address,uint256,uint32,uint256,uint256,uint64,uint16)
+          handler: handleSideBetPlaced
+        - event: SideBetSettled(uint256,address,uint8,uint256)
+          handler: handleSideBetSettled
+        - event: SideBetJackpotFunded(uint32,uint256)
+          handler: handleSideBetJackpotFunded
+        - event: SideBetInfrastructureFeePaid(uint32,uint256)
+          handler: handleSideBetInfrastructureFeePaid
+      file: ./src/mappings/side-bet.ts
 templates:
   - name: BankVault
     kind: ethereum/contract

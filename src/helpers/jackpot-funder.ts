@@ -20,6 +20,8 @@ export function getOrCreateJackpotFunderConfig(timestamp: BigInt): JackpotFunder
   cfg.treasuryBrbNumerator = ZERO
   cfg.treasuryBrbDenominator = ZERO
   cfg.slippageBps = ZERO
+  cfg.coldSlippageBps = ZERO
+  cfg.twapWindowSeconds = ZERO
   cfg.lastUpdatedAt = timestamp
   cfg.save()
   return cfg
