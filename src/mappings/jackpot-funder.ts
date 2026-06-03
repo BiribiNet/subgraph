@@ -5,12 +5,21 @@ import {
   FundedFromMarket,
   SlippageBpsUpdated,
   SwapAssetBpsUpdated,
-  TreasuryBrbSplitUpdated
+  TreasuryBrbSplitUpdated,
+  RoleGranted,
+  RoleRevoked,
+  RoleAdminChanged,
 } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
 import { JackpotBuy, JackpotFundingSkip } from "../../generated/schema"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateJackpotFunderConfig } from "../helpers/jackpot-funder"
 import { getMarketById } from "../helpers/market"
+import {
+  ROLE_CONTRACT_JACKPOT_FUNDER,
+  grantRoleHolder,
+  revokeRoleHolder,
+  updateRoleAdmin,
+} from "../helpers/access-control"
 
 // NOTE: BrbRatioUpdated handler is intentionally omitted. The event is per-market
 // (marketId + ratioPerAssetUnit) but Bastien's `Market` entity (origin/master)
@@ -75,4 +84,34 @@ export function handleSlippageBpsUpdated(event: SlippageBpsUpdated): void {
   cfg.slippageBps = event.params.slippageBps
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
+}
+
+export function handleRoleGranted(event: RoleGranted): void {
+  grantRoleHolder(
+    event.address,
+    ROLE_CONTRACT_JACKPOT_FUNDER,
+    event.params.role,
+    event.params.account,
+    event.params.sender,
+    event.block.timestamp
+  )
+}
+
+export function handleRoleRevoked(event: RoleRevoked): void {
+  revokeRoleHolder(
+    event.address,
+    event.params.role,
+    event.params.account,
+    event.params.sender,
+    event.block.timestamp
+  )
+}
+
+export function handleRoleAdminChanged(event: RoleAdminChanged): void {
+  updateRoleAdmin(
+    event.address,
+    ROLE_CONTRACT_JACKPOT_FUNDER,
+    event.params.role,
+    event.params.newAdminRole
+  )
 }

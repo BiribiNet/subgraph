@@ -9,7 +9,10 @@ import {
 } from 'matchstick-as';
 
 import { Transfer } from '../generated/BRBReferral/BRBReferral';
+import { ReferralSet } from '../generated/RouletteEngine/Game';
 import { handleTransfer } from '../src/mappings/referral';
+import { handleReferralSet } from '../src/mappings/roulette';
+import { CORNER_BET_DATA, emitBetRecorded, setupTestMarket, TEST_ENGINE } from './helpers';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { ZERO_ADDRESS } from '../src/helpers/constant';
 
@@ -39,6 +42,20 @@ function emitTransfer(from: string, to: string, value: string, logIndex: i32): s
   return event.transaction.hash.concat(bigintToBytes(event.logIndex)).toHexString();
 }
 
+function emitReferralSet(player: string, referrer: string): void {
+  const event = changetype<ReferralSet>(newMockEvent());
+  event.address = TEST_ENGINE;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('player', ethereum.Value.fromAddress(Address.fromString(player)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('referrer', ethereum.Value.fromAddress(Address.fromString(referrer)))
+  );
+  event.block.timestamp = BigInt.fromI32(1_000_000);
+  handleReferralSet(event);
+}
+
 describe('BRBReferral Transfer handler', () => {
   beforeEach(() => {
     clearStore();
@@ -50,14 +67,16 @@ describe('BRBReferral Transfer handler', () => {
     assert.entityCount('BRBReferalTransfer', 1);
     assert.fieldEquals('BRBReferalTransfer', id, 'isCredit', 'true');
     assert.fieldEquals('BRBReferalTransfer', id, 'user', REFERRER);
-    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', ONE_BRB);
+    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', '0');
     assert.fieldEquals('User', REFERRER, 'brbReferalBalance', ONE_BRB);
   });
 
-  test('recomputes BRBpoints (x2 weight) and tier on credit', () => {
-    emitTransfer(ZERO_ADDRESS, REFERRER, ONE_BRB, 0);
+  test('recomputes BRBpoints (x2 weight) and tier when bet follows ReferralSet', () => {
+    setupTestMarket();
+    emitReferralSet(REFEREE, REFERRER);
+    emitBetRecorded(REFEREE, ONE_BRB, CORNER_BET_DATA, 1);
 
-    // points = (0*3 + 0*1 + 1e18*2) / 1e18 = 2
+    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', ONE_BRB);
     assert.fieldEquals('User', REFERRER, 'brbpPoints', '2');
     assert.fieldEquals('User', REFERRER, 'tier', 'BRONZE');
   });
@@ -79,24 +98,27 @@ describe('BRBReferral Transfer handler', () => {
     assert.fieldEquals('User', REFERRER, 'totalBrbrSpent', ONE_BRB);
   });
 
-  test('accumulates BRBr across multiple credits to the same referrer', () => {
-    emitTransfer(REFEREE, REFERRER, ONE_BRB, 0);
-    emitTransfer(REFEREE, REFERRER, ONE_BRB, 1);
+  test('accumulates BRBr across multiple bets for the same referrer', () => {
+    setupTestMarket();
+    emitReferralSet(REFEREE, REFERRER);
+    emitBetRecorded(REFEREE, ONE_BRB, CORNER_BET_DATA, 1, 1, 1_000_000, 0);
+    emitBetRecorded(REFEREE, ONE_BRB, CORNER_BET_DATA, 1, 1, 1_000_100, 1);
 
-    assert.entityCount('BRBReferalTransfer', 2);
     assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', '2000000000000000000');
-    assert.fieldEquals('User', REFERRER, 'brbReferalBalance', '2000000000000000000');
-    // points = (0*3 + 0*1 + 2e18*2) / 1e18 = 4
     assert.fieldEquals('User', REFERRER, 'brbpPoints', '4');
   });
 
   test('tracks two referrers independently', () => {
-    const other = '0xddddddddc53842141be8f70df9efe4d08538a777';
-    emitTransfer(REFEREE, REFERRER, ONE_BRB, 0);
-    emitTransfer(REFEREE, other, '3000000000000000000', 1);
+    setupTestMarket();
+    const otherReferee = '0xddddddddc53842141be8f70df9efe4d08538a777';
+    const otherReferrer = '0xeeeeeeee53842141be8f70df9efe4d08538a8888';
+    emitReferralSet(REFEREE, REFERRER);
+    emitReferralSet(otherReferee, otherReferrer);
+    emitBetRecorded(REFEREE, ONE_BRB, CORNER_BET_DATA, 1, 1, 1_000_000, 0);
+    emitBetRecorded(otherReferee, '3000000000000000000', CORNER_BET_DATA, 1, 1, 1_000_100, 1);
 
     assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', ONE_BRB);
-    assert.fieldEquals('User', other, 'totalBrbrEarned', '3000000000000000000');
+    assert.fieldEquals('User', otherReferrer, 'totalBrbrEarned', '3000000000000000000');
   });
 
   test('records the credit transfer value and recipient', () => {

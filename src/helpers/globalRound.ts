@@ -14,8 +14,8 @@ export function getOrCreateGlobalRound(roundNumber: BigInt, startedAt: BigInt): 
     gr.startedAt = startedAt
     gr.forceResolved = false
     gr.participantMarketCount = BigInt.fromI32(0)
-    gr.settledMarketCount = BigInt.fromI32(0)
     gr.firstBetAt = ZERO
+    gr.lockAt = ZERO
   }
   return gr
 }

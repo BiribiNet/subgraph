@@ -1,4 +1,4 @@
-import { BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts"
 import {
   BetRecorded,
   VrfRequested,
@@ -21,30 +21,33 @@ import {
   ROUND_STATUS_CLEAN
 } from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
-import { getOrCreateGlobalState } from "./globalState"
+import { getOrCreateGlobalState, getOrCreateProtocolStats } from "./globalState"
 import { createNewRouletteRound } from "./rouletteRound"
-import { calculateMaxPayoutFromRoundComponents, recordRouletteBetEntry } from "./betting"
-
-function firstBetTypeAndNumber(betData: Bytes): Array<BigInt> {
-  const decoded = ethereum.decode("(uint256[],uint256[],uint256[])", betData)
-  if (decoded == null) {
-    return [BigInt.zero(), BigInt.zero()]
-  }
-  const tuple = decoded.toTuple()
-  const types = tuple[0].toBigIntArray()
-  const numbers = tuple[1].toBigIntArray()
-  if (types.length == 0) {
-    return [BigInt.zero(), BigInt.zero()]
-  }
-  const number = numbers.length > 0 ? numbers[0] : BigInt.zero()
-  return [types[0], number]
-}
+import {
+  calculateMaxPayoutFromRoundComponents,
+  recordRouletteBetFromPayload,
+  updateRoundMaxPayoutComponents,
+} from "./betting"
+import { decodeBetDataPayload } from "./bet-data"
 import { getOrCreateDailyStats, trackDailyUniquePlayer } from "./aggregation"
-import { updateUserLastActive, updateUserWageredStats } from "./user"
+import {
+  getOrCreateUser,
+  updateUserLastActive,
+  updateUserWageredStats,
+  normalizeAmountTo18,
+  updateUserBrbrEarnings,
+} from "./user"
+import { recordUserMarketWager } from "./user-market-stats"
 import { getOrCreateGlobalRound, globalRoundIdBytes } from "./globalRound"
 import { marketRoundId, requireMarket, getOrCreateMarket } from "./market"
 import { ZERO } from "./number"
 import { BankVault as BankVaultTemplate } from "../../generated/templates"
+import { recordTxBetToBank } from "./tx-activity"
+import {
+  finalizeMarketRoundsOnResolve,
+  lockAllParticipatingMarketRounds,
+} from "./round-sync"
+import { observeSideBetSpinsForRound } from "./side-bet-vrf"
 
 function loadOrCreateMarketRound(
   globalRoundId: BigInt,
@@ -64,17 +67,26 @@ function loadOrCreateMarketRound(
   return round
 }
 
+function trackProtocolBetStats(amount: BigInt, player: Bytes, timestamp: BigInt): void {
+  const stats = getOrCreateProtocolStats()
+  stats.totalWagered = stats.totalWagered.plus(amount)
+  stats.totalBets = stats.totalBets.plus(BigInt.fromI32(1))
+  stats.save()
+
+  const daily = getOrCreateDailyStats(timestamp)
+  if (trackDailyUniquePlayer(timestamp, player.toHexString())) {
+    daily.uniquePlayers = daily.uniquePlayers.plus(BigInt.fromI32(1))
+    stats.totalPlayers = stats.totalPlayers.plus(BigInt.fromI32(1))
+    stats.save()
+  }
+}
+
 export function processBetRecorded(event: BetRecorded): void {
   const globalRoundId = event.params.localRound
   const marketId = event.params.marketId.toI32()
   const globalState = getOrCreateGlobalState()
   const grKey = globalRoundIdBytes(globalRoundId)
-  const existingGr = GlobalRound.load(grKey)
   const gr = getOrCreateGlobalRound(globalRoundId, event.block.timestamp)
-  if (existingGr == null) {
-    globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
-    gr.save()
-  }
   const round = loadOrCreateMarketRound(globalRoundId, marketId, event.block.timestamp)
 
   if (round.firstBetAt.equals(ZERO)) {
@@ -86,21 +98,15 @@ export function processBetRecorded(event: BetRecorded): void {
 
   if (round.status == ROUND_STATUS_BETTING) {
     const market = requireMarket(marketId)
-    const first = firstBetTypeAndNumber(event.params.betData)
-    const betType = first[0]
-    const number = first[1]
+    const payload = decodeBetDataPayload(event.params.betData)
 
-    // Whether this is the user's first bet in this round — drives User.betCount,
-    // which counts distinct rounds (not individual bets). Must be read before
-    // recordRouletteBetEntry creates/updates the RouletteBet entity.
     const existingUserBet = RouletteBet.load(event.params.player.concat(round.id))
     const isNewRoundForUser = existingUserBet == null
 
-    recordRouletteBetEntry(
+    recordRouletteBetFromPayload(
       event.params.player,
+      payload,
       event.params.totalAmount,
-      betType,
-      number,
       round,
       market,
       event.block.number,
@@ -108,8 +114,21 @@ export function processBetRecorded(event: BetRecorded): void {
       event.transaction.hash
     )
 
-    // Feed the BRBpoints "wagered" component (weight x3). assetDecimals aligns
-    // multi-market amounts to 18 decimals so 1 USDC and 1 BRB count equally.
+    const legCount = payload.types.length
+    if (legCount == 0) {
+      updateRoundMaxPayoutComponents(round, event.params.totalAmount, ZERO, ZERO)
+    } else {
+      for (let i = 0; i < legCount; i++) {
+        updateRoundMaxPayoutComponents(
+          round,
+          payload.amounts[i],
+          payload.types[i],
+          payload.numbers[i]
+        )
+      }
+    }
+
+    const normalizedWager = normalizeAmountTo18(event.params.totalAmount, market.assetDecimals)
     updateUserWageredStats(
       event.params.player,
       event.params.totalAmount,
@@ -117,25 +136,44 @@ export function processBetRecorded(event: BetRecorded): void {
       isNewRoundForUser,
       event.block.timestamp
     )
+    recordUserMarketWager(
+      event.params.player,
+      market,
+      event.params.totalAmount,
+      isNewRoundForUser,
+      event.block.timestamp
+    )
+
+    recordTxBetToBank(event.transaction.hash, event.params.totalAmount, marketId)
+
+    const player = getOrCreateUser(event.params.player)
+    const referrerId = player.referrer
+    if (referrerId) {
+      updateUserBrbrEarnings(
+        changetype<Bytes>(referrerId),
+        normalizedWager,
+        true,
+        event.block.timestamp
+      )
+    }
 
     round.betCount = round.betCount.plus(BigInt.fromI32(1))
     round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
     round.save()
 
     market.pendingBets = market.pendingBets.plus(event.params.totalAmount)
-    market.maxBetAmount = market.maxBetAmount.plus(event.params.totalAmount)
+    market.maxBetAmount = round.maxBetAmount
     market.save()
 
-    globalState.pendingBets = globalState.pendingBets.plus(event.params.totalAmount)
     globalState.currentGlobalRound = gr.id
     globalState.currentRoundNumber = globalRoundId
 
     const daily = getOrCreateDailyStats(event.block.timestamp)
     daily.betCount = daily.betCount.plus(BigInt.fromI32(1))
-    daily.volume = daily.volume.plus(event.params.totalAmount)
+    daily.volume = daily.volume.plus(normalizedWager)
     daily.save()
 
-    trackDailyUniquePlayer(event.block.timestamp, event.params.player.toHexString())
+    trackProtocolBetStats(normalizedWager, event.params.player, event.block.timestamp)
     updateUserLastActive(event.params.player, event.block.timestamp)
     gr.save()
     globalState.save()
@@ -148,18 +186,11 @@ export function processRoundCountdownStarted(event: RoundCountdownStarted): void
     log.error("GlobalRound not found for RoundCountdownStarted: {}", [event.params.roundId.toString()])
     return
   }
-  gr.status = ROUND_STATUS_NO_MORE_BETS
-  gr.endedAt = event.block.timestamp
   const triggerMarketId = event.params.triggerMarketId.toI32()
   const trigger = requireMarket(triggerMarketId)
   gr.triggerMarket = trigger.id
+  gr.lockAt = event.params.lockAt
   gr.save()
-
-  const round = RouletteRound.load(marketRoundId(event.params.roundId, triggerMarketId))
-  if (round != null) {
-    round.status = ROUND_STATUS_NO_MORE_BETS
-    round.save()
-  }
 }
 
 export function processRoundLocked(event: RoundLocked): void {
@@ -167,15 +198,15 @@ export function processRoundLocked(event: RoundLocked): void {
   gr.status = ROUND_STATUS_NO_MORE_BETS
   gr.endedAt = event.block.timestamp
   gr.save()
+
+  lockAllParticipatingMarketRounds(event.params.globalRoundId)
 }
 
 export function processVrfRequested(event: VrfRequested): void {
   const globalState = getOrCreateGlobalState()
   const resolvingRoundId = event.params.newRoundId
-  const nextRoundId = resolvingRoundId.plus(BigInt.fromI32(1))
-  const nextGr = getOrCreateGlobalRound(nextRoundId, event.block.timestamp)
-  globalState.currentGlobalRound = nextGr.id
-  globalState.currentRoundNumber = nextRoundId
+  globalState.currentGlobalRound = globalRoundIdBytes(resolvingRoundId)
+  globalState.currentRoundNumber = resolvingRoundId
   globalState.roundTransitionInProgress = true
   globalState.save()
 
@@ -199,8 +230,11 @@ export function processVRFResult(event: VRFResult): void {
 
   gr.jackpotNumber = BigInt.fromI32(i32(event.params.jackpotNumber))
   gr.winningNumber = BigInt.fromI32(i32(event.params.winningNumber))
+  gr.jackpotTriggered = i32(event.params.winningNumber) == i32(event.params.jackpotNumber)
   gr.vrfResultAt = event.block.timestamp
   gr.save()
+
+  observeSideBetSpinsForRound(roundId, BigInt.fromI32(i32(event.params.winningNumber)))
 }
 
 export function processRoundResolved(event: RoundResolved): void {
@@ -212,17 +246,28 @@ export function processRoundResolved(event: RoundResolved): void {
   }
 
   const globalState = getOrCreateGlobalState()
-  if (globalState.pendingBets.gt(BigInt.fromI32(0))) {
-    globalState.pendingBets = BigInt.fromI32(0)
-  }
-
   globalState.lastRoundPaid = roundId
+  globalState.lastRoundResolved = event.block.timestamp
   globalState.roundTransitionInProgress = false
+  const nextRoundId = roundId.plus(BigInt.fromI32(1))
+  const nextGr = getOrCreateGlobalRound(nextRoundId, event.block.timestamp)
+  globalState.currentGlobalRound = nextGr.id
+  globalState.currentRoundNumber = nextRoundId
   globalState.save()
 
   gr.status = ROUND_STATUS_CLEAN
   gr.resolvedAt = event.block.timestamp
   gr.save()
+
+  finalizeMarketRoundsOnResolve(roundId, event.block.timestamp)
+
+  const stats = getOrCreateProtocolStats()
+  stats.totalRounds = stats.totalRounds.plus(BigInt.fromI32(1))
+  stats.save()
+
+  const daily = getOrCreateDailyStats(event.block.timestamp)
+  daily.roundsCompleted = daily.roundsCompleted.plus(BigInt.fromI32(1))
+  daily.save()
 }
 
 export function processPayoutProgress(event: PayoutProgress): void {
@@ -231,9 +276,7 @@ export function processPayoutProgress(event: PayoutProgress): void {
   if (round == null) {
     return
   }
-  if (round.status == ROUND_STATUS_PAYOUT) {
-    // already in payout
-  } else {
+  if (round.status != ROUND_STATUS_PAYOUT) {
     round.status = ROUND_STATUS_PAYOUT
   }
   round.totalPayouts = round.totalPayouts.plus(event.params.paidAmount)
@@ -241,13 +284,9 @@ export function processPayoutProgress(event: PayoutProgress): void {
   round.save()
 
   const gr = GlobalRound.load(globalRoundIdBytes(event.params.globalRoundId))
-  if (gr != null) {
-    if (gr.status == ROUND_STATUS_PAYOUT) {
-      // already set
-    } else {
-      gr.status = ROUND_STATUS_PAYOUT
-      gr.save()
-    }
+  if (gr != null && gr.status != ROUND_STATUS_PAYOUT) {
+    gr.status = ROUND_STATUS_PAYOUT
+    gr.save()
   }
 }
 
@@ -259,6 +298,10 @@ export function processJackpotFunded(event: JackpotFunded): void {
   }
   round.jackpotRevenue = round.jackpotRevenue.plus(event.params.amount)
   round.save()
+
+  const daily = getOrCreateDailyStats(event.block.timestamp)
+  daily.jackpotFunded = daily.jackpotFunded.plus(event.params.amount)
+  daily.save()
 }
 
 export function processInfrastructureFeePaid(event: InfrastructureFeePaid): void {

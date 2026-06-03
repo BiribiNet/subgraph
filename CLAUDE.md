@@ -47,8 +47,8 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - `MarketRound { market, localRoundId, globalRoundId, status, totalBets, betCount, totalPayouts, jackpotFunded, infraFee }` — per-market projection of a global round.
 - `BankIndex { id: bank, market }` — O(1) reverse lookup from a vault address to its `Market`.
 - `RouletteBet.market` / `RouletteBet.marketRound` (nullable) — attributed at `BetRecorded` time.
-- `StakedBRBDeposit.market`, `StakedBRBWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
-- `RouletteRound` keeps cross-market global aggregates ; `GlobalState` / `VaultState` / `ProtocolStats` singletons keep cross-market lifetime aggregates (mixed-unit during Phase 1, normalized in Phase 2 BRBpoints).
+- `VaultDeposit.market`, `VaultWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
+- `RouletteRound` keeps cross-market global aggregates. **`GlobalState`** (singleton `0x…01`) = live ops: current round, jackpot pool, withdrawal queue, cross-market vault TVL by asset class. **`ProtocolStats`** (`id: "stats"`) = lifetime analytics only (`totalWagered`, `totalBurned`, `totalPayouts`, …) — no field overlap with `GlobalState`. Open wagers: **`Market.pendingBets`** per vault (not a mixed-unit global). Per-vault metrics otherwise live on `Market`.
 
 ### BRBpoints model (Phase 2A)
 
@@ -278,16 +278,7 @@ type Bet @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-# === STAKING (sBRB VAULT) ===
-
-type VaultState @entity {
-  id: ID!                        # singleton "vault"
-  totalAssets: BigInt!           # total BRB in vault
-  totalShares: BigInt!           # total sBRB supply
-  sharePrice: BigDecimal!        # BRB per sBRB
-  stakerCount: BigInt!
-  allTimeRevenue: BigInt!        # cumulative 95% staker revenue
-}
+# === STAKING (per-market BankVault — see `Market` in schema.graphql) ===
 
 type StakingAction @entity(immutable: true) {
   id: ID!
@@ -505,27 +496,22 @@ curl -s 'https://api.thegraph.com/index-node/graphql' \
 5. **Build check**: `graph build` must pass with zero warnings before deploy.
 6. **Deploy to Studio**: Always deploy to Subgraph Studio staging first, verify indexing completes, test queries, then publish.
 
-## Deployment Config (networks.json)
+## Deployment Config
 
-```json
-{
-  "arbitrum-one": {
-    "BiribiGame": { "address": "0x...", "startBlock": 0 },
-    "BRBToken": { "address": "0x...", "startBlock": 0 },
-    "StakedBRB": { "address": "0x...", "startBlock": 0 },
-    "BRBReferral": { "address": "0x...", "startBlock": 0 },
-    "BiribiJackpot": { "address": "0x...", "startBlock": 0 },
-    "UniswapV2Pair": { "address": "0x...", "startBlock": 0 }
-  },
-  "arbitrum-sepolia": {
-    "BiribiGame": { "address": "0x...", "startBlock": 0 },
-    "BRBToken": { "address": "0x...", "startBlock": 0 },
-    "StakedBRB": { "address": "0x...", "startBlock": 0 },
-    "BRBReferral": { "address": "0x...", "startBlock": 0 },
-    "BiribiJackpot": { "address": "0x...", "startBlock": 0 }
-  }
-}
-```
+**Goldsky / turbo:** `deployments/arbitrum-sepolia.json` →
+`DEPLOY_JSON=./deployments/arbitrum-sepolia.json yarn sync:pipeline` (patches `subgraph.yaml` +
+`turbo.applied.yaml`). Includes `addresses.banks[]` for turbo only — vaults are **not** static data
+sources (`MarketRegistered` → `BankVault` template).
+
+**The Graph `networks.json`:** strict graph-cli format only — top-level network name → data source
+**`name`** from `subgraph.yaml` → `{ address, startBlock }`. No `_comment`, templates, or turbo-only
+addresses. Apply with `graph build --network arbitrum-sepolia` / `graph deploy --network …`. Keys must
+match data source names exactly (`BRBToken`, `RouletteEngine`, …). `BankVault` is a template and is
+omitted. After redeploy, sync `deployments/*.json`, run `sync:pipeline`, then update `networks.json` to
+match (or rely on sync-pipeline alone if you do not use `--network`).
+
+**Jackpot treasury** is not a data source; BRB transfers use `JACKPOT_TREASURY_ADDRESS` in
+`src/helpers/constant.ts` (keep in sync with `deployments/…/jackpotTreasury`).
 
 **IMPORTANT**: Always set `startBlock` to the contract deployment block to avoid indexing from genesis (massive time waste on Arbitrum).
 

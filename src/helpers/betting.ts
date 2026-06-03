@@ -1,6 +1,8 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { RouletteRound, RouletteBet, Market } from "../../generated/schema"
-import { BetPlaced } from "../../generated/templates/BankVault/StakedBRB"
+import { DecodedBetData } from "./bet-data"
+import { ZERO } from "./number"
+import { BetPlaced } from "../../generated/templates/BankVault/BankVault4626"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
   BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN,
@@ -57,7 +59,7 @@ function max3(a: BigInt, b: BigInt, c: BigInt): BigInt {
   return m
 }
 
-function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, betType: BigInt, number: BigInt): void {
+export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, betType: BigInt, number: BigInt): void {
   const betTypeInt = betType.toI32()
   const numI32 = number.toI32()
 
@@ -134,11 +136,11 @@ export function calculateMaxPayoutFromRoundComponents(round: RouletteRound): Big
   return raw.times(BigInt.fromI32(11000)).div(BigInt.fromI32(10000))
 }
 
-export function recordRouletteBetEntry(
+/** One BetRecorded tx; decodes and stores every leg from betData (engine multi-bet payload). */
+export function recordRouletteBetFromPayload(
   user: Bytes,
-  amount: BigInt,
-  betType: BigInt,
-  number: BigInt,
+  payload: DecodedBetData,
+  totalAmount: BigInt,
   round: RouletteRound,
   market: Market,
   blockNumber: BigInt,
@@ -153,39 +155,78 @@ export function recordRouletteBetEntry(
     bet.user = user
     bet.market = market.id
     bet.round = round.id
-    bet.amounts = [amount]
-    bet.betTypes = [getBetTypeFromNumber(betType)]
-    bet.numbers = [number]
-    bet.totalAmount = amount
-    bet.betCount = BigInt.fromI32(1)
+    bet.amounts = new Array<BigInt>(0)
+    bet.betTypes = new Array<string>(0)
+    bet.numbers = new Array<BigInt>(0)
+    bet.totalAmount = ZERO
+    bet.betCount = ZERO
     bet.firstBetBlockNumber = blockNumber
     bet.firstBetTimestamp = timestamp
-    bet.latestBetBlockNumber = blockNumber
-    bet.latestBetTimestamp = timestamp
-    bet.latestTransactionHash = transactionHash
     bet.won = false
-    bet.actualPayout = BigInt.fromI32(0)
-  } else {
-    const currentAmounts = bet.amounts
-    const currentBetTypes = bet.betTypes
-    const currentNumbers = bet.numbers
-
-    currentAmounts.push(amount)
-    currentBetTypes.push(getBetTypeFromNumber(betType))
-    currentNumbers.push(number)
-
-    bet.amounts = currentAmounts
-    bet.betTypes = currentBetTypes
-    bet.numbers = currentNumbers
-    bet.totalAmount = bet.totalAmount.plus(amount)
-    bet.betCount = bet.betCount.plus(BigInt.fromI32(1))
-    bet.latestBetBlockNumber = blockNumber
-    bet.latestBetTimestamp = timestamp
-    bet.latestTransactionHash = transactionHash
+    bet.actualPayout = ZERO
   }
 
+  const legCount = payload.types.length
+  if (legCount == 0) {
+    const amounts = bet.amounts
+    const types = bet.betTypes
+    const numbers = bet.numbers
+    amounts.push(totalAmount)
+    types.push(getBetTypeFromNumber(ZERO))
+    numbers.push(ZERO)
+    bet.amounts = amounts
+    bet.betTypes = types
+    bet.numbers = numbers
+  } else {
+    for (let i = 0; i < legCount; i++) {
+      const amounts = bet.amounts
+      const types = bet.betTypes
+      const numbers = bet.numbers
+      amounts.push(payload.amounts[i])
+      types.push(getBetTypeFromNumber(payload.types[i]))
+      numbers.push(payload.numbers[i])
+      bet.amounts = amounts
+      bet.betTypes = types
+      bet.numbers = numbers
+    }
+  }
+
+  bet.totalAmount = bet.totalAmount.plus(totalAmount)
+  bet.betCount = bet.betCount.plus(BigInt.fromI32(1))
+  bet.latestBetBlockNumber = blockNumber
+  bet.latestBetTimestamp = timestamp
+  bet.latestTransactionHash = transactionHash
   bet.save()
-  round.totalBets = round.totalBets.plus(amount)
+
+  round.totalBets = round.totalBets.plus(totalAmount)
+  return bet
+}
+
+export function recordRouletteBetEntry(
+  user: Bytes,
+  amount: BigInt,
+  betType: BigInt,
+  number: BigInt,
+  round: RouletteRound,
+  market: Market,
+  blockNumber: BigInt,
+  timestamp: BigInt,
+  transactionHash: Bytes
+): RouletteBet {
+  const payload = new DecodedBetData()
+  payload.types.push(betType)
+  payload.numbers.push(number)
+  payload.amounts.push(amount)
+  const bet = recordRouletteBetFromPayload(
+    user,
+    payload,
+    amount,
+    round,
+    market,
+    blockNumber,
+    timestamp,
+    transactionHash
+  )
   updateRoundMaxPayoutComponents(round, amount, betType, number)
   return bet
 }

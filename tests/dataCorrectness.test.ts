@@ -1,4 +1,4 @@
-import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
+import { Address, BigInt, ethereum } from '@graphprotocol/graph-ts';
 import {
   assert,
   beforeEach,
@@ -8,65 +8,34 @@ import {
   test,
 } from 'matchstick-as';
 
-import { BetPlaced, Deposit } from '../generated/BankVault4626_USDC/StakedBRB';
-import { handleBetPlaced, handleDeposit } from '../src/mappings/bank-vault';
-import { Transfer as BRBRTransfer } from '../generated/BRBReferal/BRBReferal';
-import { handleTransfer as handleBrbrTransfer } from '../src/mappings/brbReferal';
-import { bigintToBytes } from '../src/helpers/bigintToBytes';
-import { createRoundForTests } from './helpers';
+import { Transfer } from '../generated/BRBReferral/BRBReferral';
+import { ReferralSet } from '../generated/RouletteEngine/Game';
+import { handleTransfer } from '../src/mappings/referral';
+import { handleReferralSet } from '../src/mappings/roulette';
+import {
+  CORNER_BET_DATA,
+  DEFAULT_USER,
+  emitBetRecorded,
+  createRoundForTests,
+  TEST_ENGINE,
+} from './helpers';
 
-const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
-const USER_ADDRESS = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
-const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
+const REFERRAL_TOKEN = Address.fromString('0xb6a6a7c9fc32e30fb5af12ad9d6a5cd2a283ad94');
+const ZERO = '0x0000000000000000000000000000000000000000';
 
-// Shim — Phase 1C removed `RoundCleaningCompleted`. Tests only need a fresh
-// round entity to exist; see tests/helpers.ts for the rationale.
-function initializeRound(timestamp: i32 = 1000000): void {
-  createRoundForTests(1, timestamp);
-}
-
-// BetPlaced with specific bet type
-// The data param encodes: (uint256[] amounts, uint256[] betTypes, uint256[] numbers)
-function createBetPlacedData(amount: string, betType: i32, number: i32): Bytes {
-  const encoded = ethereum.encode(
-    ethereum.Value.fromTuple(changetype<ethereum.Tuple>([
-      ethereum.Value.fromUnsignedBigIntArray([BigInt.fromString(amount)]),
-      ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(betType)]),
-      ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(number)])
-    ]))
-  );
-  return encoded ? encoded : Bytes.empty();
-}
-
-function placeBet(user: string, amount: string, betType: i32, number: i32, roundId: i32 = 1, timestamp: i32 = 1000000): void {
-  const ev = changetype<BetPlaced>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString(user))));
-  ev.parameters.push(new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount))));
-  ev.parameters.push(new ethereum.EventParam('data', ethereum.Value.fromBytes(createBetPlacedData(amount, betType, number))));
-  ev.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId))));
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
-  ev.logIndex = BigInt.fromI32(0);
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleBetPlaced(ev);
-}
-
-function createBrbrTransfer(from: string, to: string, amount: string, timestamp: i32 = 1000000): void {
-  const ev = changetype<BRBRTransfer>(newMockEvent());
+function emitReferralTransfer(from: string, to: string, value: string, timestamp: i32 = 1_000_000): void {
+  const ev = changetype<Transfer>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
   ev.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString(from))));
   ev.parameters.push(new ethereum.EventParam('to', ethereum.Value.fromAddress(Address.fromString(to))));
-  ev.parameters.push(new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount))));
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
+  ev.parameters.push(new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value))));
+  ev.address = REFERRAL_TOKEN;
   ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
-  handleBrbrTransfer(ev);
+  handleTransfer(ev);
 }
-
-// === totalLost SEMANTICS TESTS ===
 
 describe('totalLost derived calculation', () => {
   beforeEach(() => {
@@ -74,67 +43,55 @@ describe('totalLost derived calculation', () => {
   });
 
   test('After bet placement, totalLost equals totalRouletteBets (no wins yet)', () => {
-    initializeRound();
-    // BET_STRAIGHT = 1, number = 4
-    placeBet(USER_ADDRESS, '10000000000000000000', 1, 4);
+    createRoundForTests(1, 1_000_000);
+    emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
 
-    assert.fieldEquals('User', USER_ADDRESS, 'totalRouletteBets', '10000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalLost', '10000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalWon', '0');
-    assert.fieldEquals('User', USER_ADDRESS, 'netProfit', '-10000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalRouletteBets', '10000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalLost', '10000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalWon', '0');
   });
-
-  // Removed: `After winning payout, totalLost decreases correctly` — depended
-  // on the `ComputedPayouts` event + handler that Phase 1C deleted from the
-  // engine ABI. Payout detection now flows through PayoutProgress (per
-  // market) and BRB Transfer (jackpot/burn). A replacement test belongs in
-  // the new rouletteEngineMultiMarket suite (referenced in the Phase 1C plan).
 
   test('Multiple bets without wins: totalLost accumulates correctly', () => {
-    initializeRound();
+    createRoundForTests(1, 1_000_000);
+    emitBetRecorded(DEFAULT_USER, '5000000000000000000', CORNER_BET_DATA, 1, 1, 1_000_000, 0);
+    emitBetRecorded(DEFAULT_USER, '3000000000000000000', CORNER_BET_DATA, 1, 1, 1_000_100, 1);
 
-    placeBet(USER_ADDRESS, '5000000000000000000', 1, 4, 1);
-    placeBet(USER_ADDRESS, '3000000000000000000', 8, 0, 1); // RED bet
-
-    assert.fieldEquals('User', USER_ADDRESS, 'totalRouletteBets', '8000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalLost', '8000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalWon', '0');
-    assert.fieldEquals('User', USER_ADDRESS, 'netProfit', '-8000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalRouletteBets', '8000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalLost', '8000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalWon', '0');
   });
 });
-
-// === BRBR EARNINGS TRACKING TESTS ===
 
 describe('BRBR earnings tracking on User', () => {
   beforeEach(() => {
     clearStore();
   });
 
-  test('BRBR credit increments totalBrbrEarned', () => {
-    // Mint BRBR from zero address to user
-    createBrbrTransfer(
-      '0x0000000000000000000000000000000000000000',
-      USER_ADDRESS,
-      '100000000000000000000'
+  test('ReferralSet + bet increments referrer totalBrbrEarned', () => {
+    createRoundForTests(1, 1_000_000);
+    const bind = changetype<ReferralSet>(newMockEvent());
+    bind.address = TEST_ENGINE;
+    bind.parameters = new Array<ethereum.EventParam>();
+    bind.parameters.push(
+      new ethereum.EventParam('player', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
     );
+    bind.parameters.push(
+      new ethereum.EventParam('referrer', ethereum.Value.fromAddress(Address.fromString(USER_ADDRESS_2)))
+    );
+    bind.block.timestamp = BigInt.fromI32(1_000_000);
+    handleReferralSet(bind);
+    emitBetRecorded(DEFAULT_USER, '100000000000000000000', CORNER_BET_DATA, 1);
 
-    assert.fieldEquals('User', USER_ADDRESS, 'totalBrbrEarned', '100000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalBrbrSpent', '0');
+    assert.fieldEquals('User', USER_ADDRESS_2, 'totalBrbrEarned', '100000000000000000000');
+    assert.fieldEquals('User', USER_ADDRESS_2, 'totalBrbrSpent', '0');
   });
 
-  test('BRBR debit increments totalBrbrSpent', () => {
-    // First credit
-    createBrbrTransfer(
-      '0x0000000000000000000000000000000000000000',
-      USER_ADDRESS,
-      '100000000000000000000'
-    );
-    // Then debit (user sends to someone)
-    createBrbrTransfer(USER_ADDRESS, USER_ADDRESS_2, '30000000000000000000');
+  test('BRBR burn increments totalBrbrSpent', () => {
+    emitReferralTransfer(ZERO, DEFAULT_USER, '100000000000000000000');
+    emitReferralTransfer(DEFAULT_USER, ZERO, '30000000000000000000', 1_000_100);
 
-    assert.fieldEquals('User', USER_ADDRESS, 'totalBrbrEarned', '100000000000000000000');
-    assert.fieldEquals('User', USER_ADDRESS, 'totalBrbrSpent', '30000000000000000000');
-    // Receiver gets credit
-    assert.fieldEquals('User', USER_ADDRESS_2, 'totalBrbrEarned', '30000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalBrbrEarned', '0');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalBrbrSpent', '30000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'brbReferalBalance', '70000000000000000000');
   });
 });

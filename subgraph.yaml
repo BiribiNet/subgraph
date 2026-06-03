@@ -23,6 +23,7 @@ dataSources:
         - BRBTransfer
         - BRBBurn
         - User
+        - UserMarketStats
         - WithdrawTransaction
         - JackpotPayout
         - PayoutTransaction
@@ -60,7 +61,9 @@ dataSources:
         - RouletteBet
         - PayoutTransaction
         - User
-        - AdminRoleChange
+        - UserMarketStats
+        - ContractRole
+        - RoleHolder
         - ContractUpgrade
         - ProtocolStats
         - DailyStat
@@ -92,10 +95,18 @@ dataSources:
           handler: handleInfrastructureFeePaid
         - event: MarketRegistered(uint32,address,address)
           handler: handleMarketRegistered
+        - event: ReferralSet(address,address)
+          handler: handleReferralSet
         - event: Initialized(uint64)
           handler: handleGameInitialized
         - event: Upgraded(indexed address)
           handler: handleGameUpgraded
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
       file: ./src/mappings/roulette.ts
   - name: BRBJackpotFunder
     kind: ethereum/contract
@@ -127,6 +138,12 @@ dataSources:
           handler: handleTreasuryBrbSplitUpdated
         - event: SlippageBpsUpdated(uint256)
           handler: handleSlippageBpsUpdated
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
       file: ./src/mappings/jackpot-funder.ts
   - name: BRBReferral
     kind: ethereum/contract
@@ -150,6 +167,53 @@ dataSources:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
       file: ./src/mappings/referral.ts
+  - name: SideBet
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: SideBet
+      address: "0x1ccc659dcee5af5c42263d1c9a9768d13025a020"
+      startBlock: 273225571
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - SideBet
+        - SideBetSettlement
+        - SideBetConfig
+        - Market
+        - User
+        - UserMarketStats
+        - ContractRole
+        - RoleHolder
+      abis:
+        - name: SideBet
+          file: ./abis/SideBet.json
+      eventHandlers:
+        - event: ConfigAdded(uint256,uint32,uint8)
+          handler: handleConfigAdded
+        - event: ConfigUpdated(uint256)
+          handler: handleConfigUpdated
+        - event: ConfigStakeLimitsUpdated(uint256,uint256,uint256)
+          handler: handleConfigStakeLimitsUpdated
+        - event: ConfigRemoved(uint256)
+          handler: handleConfigRemoved
+        - event: SideBetPlaced(uint256,address,uint256,uint32,uint256,uint256,uint64,uint16)
+          handler: handleSideBetPlaced
+        - event: SideBetSettled(uint256,address,uint8,uint256)
+          handler: handleSideBetSettled
+        - event: SideBetJackpotFunded(uint32,uint256)
+          handler: handleSideBetJackpotFunded
+        - event: SideBetInfrastructureFeePaid(uint32,uint256)
+          handler: handleSideBetInfrastructureFeePaid
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+      file: ./src/mappings/side-bet.ts
 templates:
   - name: BankVault
     kind: ethereum/contract
@@ -163,21 +227,21 @@ templates:
       entities:
         - GlobalState
         - Market
-        - StakedBRBDeposit
-        - StakedBRBWithdrawal
+        - VaultDeposit
+        - VaultWithdrawal
         - LargeWithdrawalRequest
-        - WithdrawalEjectedLog
         - User
+        - UserMarketStats
         - TokenApproval
-        - AdminRoleChange
+        - ContractRole
+        - RoleHolder
         - UpkeepRegistration
-        - VaultState
         - ProtocolStats
-        - APYSnapshot
+        - MarketAPYSnapshot
         - DailyStat
         - HourlyVolumeSnapshot
       abis:
-        - name: StakedBRB
+        - name: BankVault4626
           file: ./abis/BankVault4626.json
         - name: MergedEvents
           file: ./abis/MergedEvents.json
@@ -190,16 +254,26 @@ templates:
           handler: handleWithdrawalRequested
         - event: WithdrawalProcessed(address,uint16,address,uint256,uint256)
           handler: handleWithdrawalProcessed
+        - event: BetsReleased(uint256,uint256)
+          handler: handleBetsReleased
+        - event: SideBetStakeLocked(indexed address,uint256,uint256,uint256)
+          handler: handleSideBetStakeLocked
+        - event: BetPlaced(address,uint256,bytes,uint256)
+          handler: handleBetPlaced
+        - event: PayoutBatchProcessed(uint256,uint256)
+          handler: handlePayoutBatchProcessed
+        - event: FundsTransferred(address,uint256)
+          handler: handleFundsTransferred
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
         - event: Approval(indexed address,indexed address,uint256)
           handler: handleApproval
         - event: RoleGranted(indexed bytes32,indexed address,indexed address)
-          handler: handleVaultRoleGranted
+          handler: handleRoleGranted
         - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
-          handler: handleVaultRoleRevoked
+          handler: handleRoleRevoked
         - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
-          handler: handleVaultRoleAdminChanged
+          handler: handleRoleAdminChanged
         - event: UpkeepRegistered(uint256,uint256,address,uint96)
           handler: handleUpkeepRegistered
-      file: ./src/mappings/stakedBRB.ts
+      file: ./src/mappings/bank-vault.ts

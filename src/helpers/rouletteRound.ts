@@ -41,43 +41,10 @@ export function createNewRouletteRound(
   round.otherBetsPayout = BigInt.fromI32(0)
   round.currentPayoutsCount = BigInt.fromI32(0)
   round.totalPayouts = BigInt.fromI32(0)
-  round.uniqueBettors = BigInt.fromI32(0)
   round.betCount = BigInt.fromI32(0)
-  round.failedPayoutBatches = BigInt.fromI32(0)
-  round.failedJackpotBatches = BigInt.fromI32(0)
-  round.stakersRevenue = ZERO
   round.jackpotRevenue = ZERO
-  round.roundBurnAmount = ZERO
   round.infraRevenue = ZERO
   round.firstBetAt = ZERO
   round.startedAt = startedAt
   return round
-}
-
-/** Per-market projection of a global round. Idempotent: returns the existing entity if already created. */
-export function createOrLoadMarketRound(
-  market: Market,
-  localRoundId: BigInt,
-  globalRoundId: BigInt,
-  round: RouletteRound,
-  timestamp: BigInt
-): MarketRound {
-  const id = marketRoundKey(market.marketId, globalRoundId)
-  let mr = MarketRound.load(id)
-  if (mr != null) {
-    return mr
-  }
-  mr = new MarketRound(id)
-  mr.market = market.id
-  mr.localRoundId = localRoundId
-  mr.globalRoundId = globalRoundId
-  mr.status = ROUND_STATUS_BETTING
-  mr.totalBets = ZERO
-  mr.betCount = ZERO
-  mr.totalPayouts = ZERO
-  mr.jackpotFunded = ZERO
-  mr.infraFee = ZERO
-  mr.startedAt = timestamp
-  mr.globalRound = round.id
-  return mr
 }

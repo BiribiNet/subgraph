@@ -60,6 +60,8 @@ describe('MarketRegistered tests', () => {
     assert.fieldEquals('Market', '1', 'shareSymbol', 'bvUSDC');
     assert.fieldEquals('Market', '1', 'asset', ASSET.toHexString());
     assert.fieldEquals('Market', '1', 'bank', BANK.toHexString());
+    assert.entityCount('BankAddress', 1);
+    assert.fieldEquals('BankAddress', BANK.toHexString(), 'market', '1');
   });
 
   test('falls back to defaults when metadata calls revert', () => {
@@ -74,5 +76,6 @@ describe('MarketRegistered tests', () => {
     assert.fieldEquals('Market', '1', 'assetDecimals', '0');
     assert.fieldEquals('Market', '1', 'shareName', '');
     assert.fieldEquals('Market', '1', 'shareSymbol', '');
+    assert.entityCount('BankAddress', 1);
   });
 });

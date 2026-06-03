@@ -3,14 +3,13 @@
   "startBlocks": {
     "brb": 273225571,
     "roulette": 273225571,
-    "stakedBRB": 273225571,
-    "brbReferal": 273225571
+    "brbReferal": 273225571,
+    "sideBet": 273225571
   },
   "addresses": {
     "brb": "0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf",
     "roulette": "0x2f6bbd7df2e997788a6a3759edcd7282028d40bd",
     "registry": "0x2DeF6353F3D5B7623E11938E64fA8071C91F841B",
-    "stakedBRB": "0xf92f56796fE6209D3A021a74A1Dca98dc7c0F954",
     "banks": [
       "0xf92f56796fE6209D3A021a74A1Dca98dc7c0F954",
       "0x1E74418a1eaE7E5296d625F5e3723f9d3203680f",

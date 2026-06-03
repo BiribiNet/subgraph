@@ -1,5 +1,13 @@
-export const STAKED_BRB_CONTRACT_ADDRESS = "0xc1c96dfb2b494e775c3a4e848e6ba7a97acd86e5"
-export const JACKPOT_CONTRACT_ADDRESS = "0xc5221f91b2eca5230ef5cc24c794b7b5d1bcedff"
+import { Address } from "@graphprotocol/graph-ts"
+
+/** Must match deployments/arbitrum-sepolia.json addresses.jackpotTreasury (sync-pipeline). */
+export const JACKPOT_TREASURY_ADDRESS = Address.fromString(
+  "0xb52c19254602316613d8161983d2803f71f83814"
+)
+/** Must match deployments/arbitrum-sepolia.json addresses.brb (sync-pipeline). */
+export const BRB_TOKEN_ADDRESS = Address.fromString(
+  "0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf"
+)
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 // Constants for bet types (same as in roulette.ts)
 export const BET_STRAIGHT = 1
@@ -22,7 +30,6 @@ export const BET_TRIO_023 = 15
 export const ROUND_STATUS_BETTING = "BETTING"
 export const ROUND_STATUS_NO_MORE_BETS = "NO_MORE_BETS"
 export const ROUND_STATUS_VRF = "VRF"
-export const ROUND_STATUS_COMPUTING_PAYOUT = "COMPUTING_PAYOUT"
 export const ROUND_STATUS_PAYOUT = "PAYOUT"
 export const ROUND_STATUS_CLEAN = "CLEAN"
 

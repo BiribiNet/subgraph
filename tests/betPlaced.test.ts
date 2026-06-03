@@ -1,70 +1,41 @@
-import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
 import {
   assert,
   beforeEach,
   clearStore,
   describe,
-  newMockEvent,
   test,
 } from 'matchstick-as';
 
-import { BetPlaced } from '../generated/BankVault4626_USDC/StakedBRB';
-import { handleBetPlaced } from '../src/mappings/bank-vault';
-import { VRFResult } from '../generated/RouletteEngine/Game';
-import { handleVRFResult } from '../src/mappings/roulette-engine';
 import { ROUND_STATUS_BETTING } from '../src/helpers/constant';
-import { bigintToBytes } from '../src/helpers/bigintToBytes';
-import { createRoundForTests } from './helpers';
+import {
+  CORNER_BET_DATA,
+  DEFAULT_USER,
+  createRoundForTests,
+  emitBetRecorded,
+  testRoundId,
+} from './helpers';
 
-// Phase 1C removed the legacy `RoundCleaningCompleted` event. These tests now
-// use `createRoundForTests` to bootstrap a RouletteRound entity directly.
-
-const initializeBet = (): void => {
-  const betPlacedEvent = changetype<BetPlaced>(newMockEvent());
-  betPlacedEvent.parameters = new Array<ethereum.EventParam>();
-  betPlacedEvent.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString('0xbbbbedc42dc53842141be8f70df9efe4d08538a4'))));
-  betPlacedEvent.parameters.push(new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("10000000000000000000"))));
-  betPlacedEvent.parameters.push(new ethereum.EventParam('data', ethereum.Value.fromBytes(Bytes.fromHexString("0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e800000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001"))));
-  betPlacedEvent.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("1"))));
-  betPlacedEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  betPlacedEvent.logIndex = BigInt.fromI32(0);
-  betPlacedEvent.block.timestamp = BigInt.fromI32(1_000_000);
-  betPlacedEvent.block.number = BigInt.fromI32(10000);
-  handleBetPlaced(betPlacedEvent);
-};
-
-const vrfResult = (): void => {
-  const vrfResultEvent = changetype<VRFResult>(newMockEvent());
-  vrfResultEvent.parameters = new Array<ethereum.EventParam>();
-  vrfResultEvent.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("1"))));
-  vrfResultEvent.parameters.push(new ethereum.EventParam('jackpotNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("5"))));
-  vrfResultEvent.parameters.push(new ethereum.EventParam('winningNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromString("7"))));
-  vrfResultEvent.address = Address.fromString('0x15dc1be843c63317e87865e1df14afa782fae171');
-  vrfResultEvent.logIndex = BigInt.fromI32(0);
-  vrfResultEvent.block.timestamp = BigInt.fromI32(1_000_100);
-  vrfResultEvent.block.number = BigInt.fromI32(10001);
-  handleVRFResult(vrfResultEvent);
-};
-
-describe('RouletteBet tests', () => {
+describe('BetRecorded / multi-market roulette bets', () => {
   beforeEach(() => {
     clearStore();
   });
 
-  test('RouletteBet initialized', () => {
+  test('BetRecorded creates RouletteBet and updates round totals', () => {
     createRoundForTests(1, 1_000_000);
-    initializeBet();
-    vrfResult();
+    emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
+
     assert.entityCount('RouletteBet', 1);
-    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
+    assert.fieldEquals('RouletteRound', testRoundId(1), 'status', ROUND_STATUS_BETTING);
+    assert.fieldEquals('RouletteRound', testRoundId(1), 'totalBets', '10000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalRouletteBets', '10000000000000000000');
   });
 
-  test('BetPlaced without a pre-seeded round lazily creates one (handleBetPlaced provisional path)', () => {
-    initializeBet();
-    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
+  test('BetRecorded without pre-seeded round creates GlobalRound + market round', () => {
+    emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
+
+    assert.entityCount('GlobalRound', 1);
     assert.entityCount('RouletteRound', 1);
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
-    assert.fieldEquals('RouletteRound', roundId, 'startedAt', '1000000');
+    assert.fieldEquals('RouletteRound', testRoundId(1), 'status', ROUND_STATUS_BETTING);
+    assert.fieldEquals('RouletteRound', testRoundId(1), 'startedAt', '1000000');
   });
 });

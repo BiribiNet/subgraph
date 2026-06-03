@@ -43,7 +43,6 @@ describe('BRBpoints wagered component', () => {
     assert.fieldEquals('User', USER_A, 'brbpPoints', '3');
     assert.fieldEquals('User', USER_A, 'tier', 'BRONZE');
     assert.fieldEquals('User', USER_A, 'betCount', '1');
-    assert.fieldEquals('User', USER_A, 'netProfit', '-1000000000000000000');
     assert.fieldEquals('User', USER_A, 'totalLost', ONE_BRB);
   });
 
@@ -85,13 +84,10 @@ describe('BRBpoints wagered component', () => {
 
   test('payouts update wins without inflating wagered points', () => {
     updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // points = 3
-    updateUserRouletteStats(addr(USER_A), bi('500000000000000000'), true, TS); // win 0.5 BRB
+    updateUserRouletteStats(addr(USER_A), bi('500000000000000000'), 18, true, true, TS); // win 0.5 BRB
 
     assert.fieldEquals('User', USER_A, 'totalWon', '500000000000000000');
-    assert.fieldEquals('User', USER_A, 'totalRouletteWins', '500000000000000000');
     assert.fieldEquals('User', USER_A, 'winCount', '1');
-    // netProfit = -1e18 + 0.5e18 = -0.5e18 ; totalLost = 1e18 - 0.5e18 = 0.5e18
-    assert.fieldEquals('User', USER_A, 'netProfit', '-500000000000000000');
     assert.fieldEquals('User', USER_A, 'totalLost', '500000000000000000');
     // wagered (and thus points) unchanged by a payout
     assert.fieldEquals('User', USER_A, 'totalRouletteBets', ONE_BRB);

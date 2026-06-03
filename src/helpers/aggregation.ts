@@ -1,6 +1,7 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { DailyStat, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer } from "../../generated/schema"
+import { DailyStat, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer, RouletteRound } from "../../generated/schema"
 import { ZERO } from "./number"
+import { getOrCreateProtocolStats } from "./globalState"
 
 const SECONDS_PER_DAY = BigInt.fromI32(86400)
 const SECONDS_PER_HOUR = BigInt.fromI32(3600)
@@ -73,4 +74,21 @@ export function trackHourlyUniquePlayer(timestamp: BigInt, playerAddress: string
     return true // new player this hour
   }
   return false
+}
+
+export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: BigInt): void {
+  if (round.totalBets.le(round.totalPayouts)) {
+    return
+  }
+  const grossRevenue = round.totalBets.minus(round.totalPayouts)
+  const stakersShare = grossRevenue.minus(round.jackpotRevenue).minus(round.infraRevenue)
+  const daily = getOrCreateDailyStats(timestamp)
+  daily.revenue = daily.revenue.plus(grossRevenue)
+  if (stakersShare.gt(ZERO)) {
+    daily.stakersRevenue = daily.stakersRevenue.plus(stakersShare)
+    const stats = getOrCreateProtocolStats()
+    stats.totalStakerRevenue = stats.totalStakerRevenue.plus(stakersShare)
+    stats.save()
+  }
+  daily.save()
 }

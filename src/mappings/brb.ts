@@ -1,15 +1,30 @@
-import { BigInt, log } from "@graphprotocol/graph-ts"
+import { Address, BigInt } from "@graphprotocol/graph-ts"
 import { Transfer, Approval } from "../../generated/BRBToken/BRB"
-import { BRBTransfer, BRBBurn, RouletteRound, RouletteBet, PayoutTransaction, JackpotPayout, WithdrawTransaction, TokenApproval } from "../../generated/schema"
-import { updateUserBRBBalance, updateUserRouletteStats, updateUserLastActive } from "../helpers/user"
-import { JACKPOT_CONTRACT_ADDRESS, ROUND_STATUS_COMPUTING_PAYOUT, ROUND_STATUS_PAYOUT, ZERO_ADDRESS } from "../helpers/constant"
+import { BRBTransfer, BRBBurn, RouletteRound, TokenApproval } from "../../generated/schema"
+import { updateUserBRBBalance, updateUserLastActive } from "../helpers/user"
+import { JACKPOT_TREASURY_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState, getOrCreateProtocolStats } from "../helpers/globalState"
-import { marketRoundId, isKnownBank, findBetInGlobalRound, loadMarketByBank } from "../helpers/market"
-import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "../helpers/aggregation"
+import { marketRoundId, isKnownBank, loadMarketByBank } from "../helpers/market"
+import { getOrCreateDailyStats } from "../helpers/aggregation"
+import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
+import { addGrossVaultBalance } from "../helpers/vault-ledger"
+import { isBankInboundExcludedFromDonation } from "../helpers/tx-activity"
+import { findBurnRoundForGlobalRound } from "../helpers/round-sync"
+
+/** BRB wallet balance applies to EOAs only — not vaults, jackpot treasury, or zero address. */
+function isBrbWalletAddress(addr: Address): bool {
+  const hex = addr.toHexString()
+  if (hex == ZERO_ADDRESS) {
+    return false
+  }
+  if (addr.equals(JACKPOT_TREASURY_ADDRESS)) {
+    return false
+  }
+  return !isKnownBank(addr)
+}
 
 export function handleTransfer(event: Transfer): void {
-  // Create transfer entity
   const transfer = new BRBTransfer(event.transaction.hash.concat(bigintToBytes(event.logIndex)))
   transfer.from = event.params.from
   transfer.to = event.params.to
@@ -19,20 +34,25 @@ export function handleTransfer(event: Transfer): void {
   transfer.transactionHash = event.transaction.hash
   transfer.save()
 
-  // Update user balances
-  updateUserBRBBalance(event.params.from, event.params.value, false) // Subtract from sender
-  updateUserBRBBalance(event.params.to, event.params.value, true)   // Add to receiver
+  if (isBrbWalletAddress(event.params.from)) {
+    updateUserBRBBalance(event.params.from, event.params.value, false)
+  }
+  if (isBrbWalletAddress(event.params.to)) {
+    updateUserBRBBalance(event.params.to, event.params.value, true)
+  }
 
-  // Update user activity timestamps
-  updateUserLastActive(event.params.from, event.block.timestamp)
-  updateUserLastActive(event.params.to, event.block.timestamp)
+  if (isBrbWalletAddress(event.params.from)) {
+    updateUserLastActive(event.params.from, event.block.timestamp)
+  }
+  if (isBrbWalletAddress(event.params.to)) {
+    updateUserLastActive(event.params.to, event.block.timestamp)
+  }
 
   const globalState = getOrCreateGlobalState()
 
   const fromHex = event.params.from.toHexString()
-  const toHex = event.params.to.toHexString();
+  const toHex = event.params.to.toHexString()
 
-  // Mints (from zero address): track total supply, then skip payout/burn/jackpot logic.
   if (fromHex == ZERO_ADDRESS) {
     const protocolStats = getOrCreateProtocolStats()
     protocolStats.brbTotalSupply = protocolStats.brbTotalSupply.plus(event.params.value)
@@ -40,7 +60,7 @@ export function handleTransfer(event: Transfer): void {
     return
   }
 
-  if (toHex == JACKPOT_CONTRACT_ADDRESS) {
+  if (event.params.to.equals(JACKPOT_TREASURY_ADDRESS)) {
     globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
     const dailyStatsJackpot = getOrCreateDailyStats(event.block.timestamp)
     dailyStatsJackpot.jackpotFunded = dailyStatsJackpot.jackpotFunded.plus(event.params.value)
@@ -48,148 +68,52 @@ export function handleTransfer(event: Transfer): void {
   }
 
   if (toHex == ZERO_ADDRESS) {
-    // Burned
-    globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
-
-    // Create individual burn record
     const burnId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
     const burn = new BRBBurn(burnId)
     burn.amount = event.params.value
     burn.timestamp = event.block.timestamp
     burn.blockNumber = event.block.number
     burn.transactionHash = event.transaction.hash
-    // Associate with current round if possible
-    if (globalState.currentRoundNumber.gt(BigInt.fromI32(1))) {
-      const prevRoundId = bigintToBytes(globalState.currentRoundNumber.minus(BigInt.fromI32(1)))
-      const prevRound = RouletteRound.load(prevRoundId)
-      if (prevRound != null) {
-        burn.round = prevRound.id
+    if (globalState.lastRoundPaid.gt(BigInt.fromI32(0))) {
+      const burnRound = findBurnRoundForGlobalRound(globalState.lastRoundPaid)
+      if (burnRound != null) {
+        burn.round = burnRound.id
       }
     }
     burn.save()
 
-    // Update ProtocolStats burn tracking
     const protocolStatsBurn = getOrCreateProtocolStats()
+    protocolStatsBurn.totalBurned = protocolStatsBurn.totalBurned.plus(event.params.value)
     protocolStatsBurn.brbTotalSupply = protocolStatsBurn.brbTotalSupply.minus(event.params.value)
     protocolStatsBurn.save()
 
-    // Update DailyStats burn tracking
     const dailyStatsBurn = getOrCreateDailyStats(event.block.timestamp)
     dailyStatsBurn.burnAmount = dailyStatsBurn.burnAmount.plus(event.params.value)
     dailyStatsBurn.save()
   }
 
-  // Track BRB transfers TO any bank vault (donation / liquidity)
   if (isKnownBank(event.params.to)) {
-    globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
-    const market = loadMarketByBank(event.params.to)
-    if (market != null) {
-      market.totalAssets = market.totalAssets.plus(event.params.value)
-      market.save()
+    if (!isBankInboundExcludedFromDonation(event.transaction.hash, event.params.value)) {
+      globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
+      const market = loadMarketByBank(event.params.to)
+      if (market != null) {
+        market.brbDonations = market.brbDonations.plus(event.params.value)
+        addGrossVaultBalance(market, event.params.value)
+        market.save()
+      }
     }
   }
 
-  // Payout detection: transfers from bank vault or jackpot treasury during payout phase
-  if (globalState.currentRoundNumber.gt(BigInt.fromI32(1))) {
-    const resolvingRoundId = globalState.currentRoundNumber.minus(BigInt.fromI32(1))
-    const bet = findBetInGlobalRound(event.params.to, resolvingRoundId)
-    let currentRound: RouletteRound | null = null
-    if (bet != null) {
-      currentRound = RouletteRound.load(bet.round)
-    }
+  tryRecordMarketPayoutTransfer(
+    event.params.from,
+    event.params.to,
+    event.params.value,
+    event.block.number,
+    event.block.timestamp,
+    event.transaction.hash,
+    event.logIndex
+  )
 
-    if (
-      currentRound != null &&
-      bet != null &&
-      (currentRound.status == ROUND_STATUS_COMPUTING_PAYOUT || currentRound.status == ROUND_STATUS_PAYOUT)
-    ) {
-        const payoutId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-        if (fromHex == JACKPOT_CONTRACT_ADDRESS) {
-          // Jackpot payout transfer
-          const jackpotPayoutTx = new JackpotPayout(payoutId)
-          jackpotPayoutTx.user = event.params.to;
-          jackpotPayoutTx.round = currentRound.id
-          jackpotPayoutTx.bet = bet.id
-          jackpotPayoutTx.amount = event.params.value
-          jackpotPayoutTx.blockNumber = event.block.number
-          jackpotPayoutTx.timestamp = event.block.timestamp
-          jackpotPayoutTx.transactionHash = event.transaction.hash
-          jackpotPayoutTx.save()
-          globalState.currentJackpot = globalState.currentJackpot.minus(event.params.value)
-          globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
-
-          // Update ProtocolStats jackpot tracking
-          const protocolStatsJackpot = getOrCreateProtocolStats()
-          protocolStatsJackpot.totalJackpotsPaid = protocolStatsJackpot.totalJackpotsPaid.plus(event.params.value)
-          protocolStatsJackpot.totalPayouts = protocolStatsJackpot.totalPayouts.plus(event.params.value)
-          protocolStatsJackpot.save()
-          updateUserRouletteStats(event.params.to, event.params.value, true, event.block.timestamp)
-          bet.won = true
-
-          // Accumulate jackpot payout into bet.actualPayout
-          bet.actualPayout = bet.actualPayout.plus(event.params.value)
-
-          // Track payout in DailyStats and HourlyVolumeSnapshot
-          const dailyStatsJackpotPayout = getOrCreateDailyStats(event.block.timestamp)
-          dailyStatsJackpotPayout.totalPayouts = dailyStatsJackpotPayout.totalPayouts.plus(event.params.value)
-          dailyStatsJackpotPayout.save()
-          const hourlyJackpotPayout = getOrCreateHourlySnapshot(event.block.timestamp)
-          hourlyJackpotPayout.totalPayouts = hourlyJackpotPayout.totalPayouts.plus(event.params.value)
-          hourlyJackpotPayout.save()
-        } else if (isKnownBank(event.params.from)) {
-          const withdrawTx = WithdrawTransaction.load(event.transaction.hash);
-          if (withdrawTx == null) { // if we are in a withdraw scenario exit
-            // Regular payout transfer
-            const payoutTx = new PayoutTransaction(payoutId)
-            payoutTx.user = event.params.to
-            payoutTx.round = currentRound.id
-            payoutTx.bet = bet.id
-            payoutTx.amount = event.params.value
-            payoutTx.blockNumber = event.block.number
-            payoutTx.timestamp = event.block.timestamp
-            payoutTx.transactionHash = event.transaction.hash
-            payoutTx.save()
-
-            // Update the corresponding RouletteBet entity
-            bet.actualPayout = bet.actualPayout.plus(event.params.value)
-            bet.won = true
-
-            // Update round totals
-            currentRound.totalPayouts = currentRound.totalPayouts.plus(event.params.value)
-            // Update global totals
-            globalState.totalPayouts = globalState.totalPayouts.plus(event.params.value)
-            updateUserRouletteStats(event.params.to, event.params.value, true, event.block.timestamp)
-
-            // Update ProtocolStats.totalPayouts
-            const protocolStatsPayout = getOrCreateProtocolStats()
-            protocolStatsPayout.totalPayouts = protocolStatsPayout.totalPayouts.plus(event.params.value)
-            protocolStatsPayout.save()
-
-            // Track payout in DailyStats and HourlyVolumeSnapshot
-            const dailyStatsRegularPayout = getOrCreateDailyStats(event.block.timestamp)
-            dailyStatsRegularPayout.totalPayouts = dailyStatsRegularPayout.totalPayouts.plus(event.params.value)
-            dailyStatsRegularPayout.save()
-            const hourlyRegularPayout = getOrCreateHourlySnapshot(event.block.timestamp)
-            hourlyRegularPayout.totalPayouts = hourlyRegularPayout.totalPayouts.plus(event.params.value)
-            hourlyRegularPayout.save()
-          }
-        }
-
-        // Sanity check: warn if actualPayout exceeds theoretical max (36x straight bet)
-        const maxTheoreticalPayout = bet.totalAmount.times(BigInt.fromI32(36))
-        if (bet.actualPayout.gt(maxTheoreticalPayout)) {
-          log.warning("Bet {} payout {} exceeds 36x max ({}) for wager {}", [
-            bet.id.toHexString(),
-            bet.actualPayout.toString(),
-            maxTheoreticalPayout.toString(),
-            bet.totalAmount.toString()
-          ])
-        }
-
-        bet.save()
-        currentRound.save()
-    }
-  }
   globalState.save()
 }
 

@@ -1,7 +1,6 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
-import { User } from "../../generated/schema"
+import { User, Market } from "../../generated/schema"
 import { ZERO_ADDRESS } from "./constant"
-import { getOrCreateGlobalState } from "./globalState"
 import { ONE, ZERO } from "./number"
 import { recomputeAndSaveUserPoints } from "./brb-points"
 
@@ -17,8 +16,6 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.cumulativeDepositValue = BigInt.fromI32(0)
     user.cumulativeDepositShares = BigInt.fromI32(0)
     user.totalRouletteBets = BigInt.fromI32(0)
-    user.totalRouletteWins = BigInt.fromI32(0)
-    user.netProfit = BigInt.fromI32(0)
     user.tier = "BRONZE"
     user.brbpPoints = BigInt.fromI32(0)
     user.firstSeenAt = BigInt.fromI32(0)
@@ -58,7 +55,10 @@ export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncre
     user.brbBalance = user.brbBalance.plus(amount)
   } else {
     if (user.brbBalance.lt(amount)) {
-      log.warning("BRB balance underflow for user {}: {} < {}", [userAddress.toHexString(), user.brbBalance.toString(), amount.toString()])
+      // Only warn when we had a positive tracked balance (likely stale index vs true anomaly).
+      if (user.brbBalance.gt(ZERO)) {
+        log.warning("BRB balance underflow for user {}: {} < {}", [userAddress.toHexString(), user.brbBalance.toString(), amount.toString()])
+      }
       user.brbBalance = ZERO
     } else {
       user.brbBalance = user.brbBalance.minus(amount)
@@ -68,16 +68,21 @@ export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncre
   user.save()
 }
 
-export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncrease: boolean): void {
+export function updateUserSBRBBalance(
+  userAddress: Bytes,
+  amount: BigInt,
+  isIncrease: boolean,
+  market: Market | null
+): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
   const user = getOrCreateUser(userAddress)
-  const globalState = getOrCreateGlobalState()
 
   if (isIncrease) {
-    if (user.sbrbBalance.equals(ZERO)) {
-      globalState.stakersCount = globalState.stakersCount.plus(ONE)
+    if (user.sbrbBalance.equals(ZERO) && market != null) {
+      market.stakerCount = market.stakerCount.plus(ONE)
+      market.save()
     }
     user.sbrbBalance = user.sbrbBalance.plus(amount)
   } else {
@@ -87,12 +92,14 @@ export function updateUserSBRBBalance(userAddress: Bytes, amount: BigInt, isIncr
     } else {
       user.sbrbBalance = user.sbrbBalance.minus(amount)
     }
-    if (user.sbrbBalance.equals(ZERO)) {
-      globalState.stakersCount = globalState.stakersCount.minus(ONE)
+    if (user.sbrbBalance.equals(ZERO) && market != null) {
+      if (market.stakerCount.gt(ZERO)) {
+        market.stakerCount = market.stakerCount.minus(ONE)
+      }
+      market.save()
     }
   }
 
-  globalState.save();
   user.save()
 }
 
@@ -143,7 +150,7 @@ const POINTS_DECIMALS = 18
  * Guard: when `assetDecimals` is unknown (market.ts seeds 0 on a failed read) or
  * outside the 1..18 range, fall back to no scaling to avoid runaway inflation.
  */
-function normalizeAmountTo18(amount: BigInt, assetDecimals: i32): BigInt {
+export function normalizeAmountTo18(amount: BigInt, assetDecimals: i32): BigInt {
   if (assetDecimals <= 0 || assetDecimals > POINTS_DECIMALS) {
     log.warning("Unexpected assetDecimals {} for wagered normalization; counting raw amount", [assetDecimals.toString()])
     return amount
@@ -169,7 +176,6 @@ export function updateUserWageredStats(userAddress: Bytes, amount: BigInt, asset
 
   const normalized = normalizeAmountTo18(amount, assetDecimals)
   user.totalRouletteBets = user.totalRouletteBets.plus(normalized)
-  user.netProfit = user.netProfit.minus(normalized)
   if (isNewRound) {
     user.betCount = user.betCount.plus(ONE)
   }
@@ -184,20 +190,27 @@ export function updateUserWageredStats(userAddress: Bytes, amount: BigInt, asset
  * Records a roulette payout (a win). Bets are tracked separately at bet time via
  * updateUserWageredStats, so this only handles the win/payout side.
  */
-export function updateUserRouletteStats(userAddress: Bytes, amount: BigInt, isWin: boolean, timestamp: BigInt): void {
+export function updateUserRouletteStats(
+  userAddress: Bytes,
+  amount: BigInt,
+  assetDecimals: i32,
+  isWin: boolean,
+  isFirstWinForBet: boolean,
+  timestamp: BigInt
+): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
   const user = getOrCreateUser(userAddress)
 
   if (isWin) {
-    user.totalRouletteWins = user.totalRouletteWins.plus(amount)
-    user.totalWon = user.totalWon.plus(amount)
-    user.netProfit = user.netProfit.plus(amount)
-    user.winCount = user.winCount.plus(ONE)
+    const normalized = normalizeAmountTo18(amount, assetDecimals)
+    user.totalWon = user.totalWon.plus(normalized)
+    if (isFirstWinForBet) {
+      user.winCount = user.winCount.plus(ONE)
+    }
   }
 
-  // Derive totalLost from totalRouletteBets - totalWon (always accurate)
   user.totalLost = user.totalRouletteBets.minus(user.totalWon)
 
   user.save()

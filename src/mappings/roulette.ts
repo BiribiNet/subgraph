@@ -10,9 +10,20 @@ import {
   MarketRegistered,
   JackpotFunded,
   InfrastructureFeePaid,
-  RoundLocked
+  RoundLocked,
+  ReferralSet,
+  RoleGranted,
+  RoleRevoked,
+  RoleAdminChanged,
 } from "../../generated/RouletteEngine/Game"
 import { log } from "@graphprotocol/graph-ts"
+import {
+  grantRoleHolder,
+  revokeRoleHolder,
+  updateRoleAdmin,
+  ROLE_CONTRACT_ROULETTE_ENGINE,
+} from "../helpers/access-control"
+import { processReferralSet } from "../helpers/referral-engine"
 import {
   processBetRecorded,
   processRoundCountdownStarted,
@@ -73,4 +84,43 @@ export function handleGameInitialized(event: Initialized): void {
 
 export function handleGameUpgraded(event: Upgraded): void {
   processGameUpgraded(event)
+}
+
+export function handleReferralSet(event: ReferralSet): void {
+  processReferralSet(
+    event.params.player,
+    event.params.referrer,
+    event.transaction.hash,
+    event.block.timestamp
+  )
+}
+
+export function handleRoleGranted(event: RoleGranted): void {
+  grantRoleHolder(
+    event.address,
+    ROLE_CONTRACT_ROULETTE_ENGINE,
+    event.params.role,
+    event.params.account,
+    event.params.sender,
+    event.block.timestamp
+  )
+}
+
+export function handleRoleRevoked(event: RoleRevoked): void {
+  revokeRoleHolder(
+    event.address,
+    event.params.role,
+    event.params.account,
+    event.params.sender,
+    event.block.timestamp
+  )
+}
+
+export function handleRoleAdminChanged(event: RoleAdminChanged): void {
+  updateRoleAdmin(
+    event.address,
+    ROLE_CONTRACT_ROULETTE_ENGINE,
+    event.params.role,
+    event.params.newAdminRole
+  )
 }

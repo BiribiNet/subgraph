@@ -4,9 +4,42 @@ import { ERC20 } from "../../generated/RouletteEngine/ERC20"
 import { BankVault4626 } from "../../generated/RouletteEngine/BankVault4626"
 import { bigintToBytes } from "./bigintToBytes"
 import { ZERO } from "./number"
-import { ZERO_ADDRESS } from "./constant"
+import { ZERO_ADDRESS, BRB_TOKEN_ADDRESS } from "./constant"
 
 const EMPTY_BYTES = Bytes.fromHexString(ZERO_ADDRESS)
+
+export function classifyVaultAssetClass(asset: Bytes): string {
+  if (asset.equals(EMPTY_BYTES) || asset.equals(Bytes.empty())) {
+    return "STABLE"
+  }
+  if (Address.fromBytes(asset).equals(BRB_TOKEN_ADDRESS)) {
+    return "BRB"
+  }
+  return "STABLE"
+}
+
+function initMarketApyFields(market: Market): void {
+  market.apy7Day = BigDecimal.fromString("0")
+  market.apy30Day = BigDecimal.fromString("0")
+  market.apy365Day = BigDecimal.fromString("0")
+  market.apyLifetime = BigDecimal.fromString("0")
+  market.apyLifetimeBaselineTimestamp = ZERO
+  market.apyLifetimeBaselineTotalAssets = ZERO
+  market.apyLifetimeBaselineTotalShares = ZERO
+  market.lastApySnapshotTimestamp = ZERO
+}
+
+function ensureBankAddressIndex(marketId: string, bank: Bytes): void {
+  if (bank.equals(EMPTY_BYTES) || bank.equals(Bytes.empty())) {
+    return
+  }
+  let bankLookup = BankAddress.load(bank)
+  if (bankLookup == null) {
+    bankLookup = new BankAddress(bank)
+    bankLookup.market = marketId
+    bankLookup.save()
+  }
+}
 
 /**
  * Read token metadata (asset symbol/decimals, vault share name/symbol) on-chain
@@ -63,6 +96,8 @@ export function getOrCreateMarket(
     market.asset = asset
     market.bank = bank
     market.engine = engine
+    market.grossVaultBalance = ZERO
+    market.lockedBetLiquidity = ZERO
     market.totalAssets = ZERO
     market.totalShares = ZERO
     market.sharePrice = BigDecimal.fromString("1")
@@ -70,8 +105,11 @@ export function getOrCreateMarket(
     market.totalDepositVolume = ZERO
     market.totalWithdrawVolume = ZERO
     market.pendingBets = ZERO
+    market.brbDonations = ZERO
+    market.sideBetJackpotFees = ZERO
+    market.sideBetInfraFees = ZERO
+    market.lockedSideBetLiquidity = ZERO
     market.maxBetAmount = ZERO
-    market.minBet = ZERO
     market.active = true
     market.createdAt = timestamp
     market.createdAtBlock = blockNumber
@@ -79,9 +117,14 @@ export function getOrCreateMarket(
     market.assetDecimals = 0
     market.shareName = ""
     market.shareSymbol = ""
+    market.assetClass = classifyVaultAssetClass(asset)
+    initMarketApyFields(market)
     hydrateMarketTokenMetadata(market, asset, bank)
+    market.assetClass = classifyVaultAssetClass(market.asset)
+    ensureBankAddressIndex(id, bank)
   } else {
-    if (asset.notEqual(Bytes.empty()) && market.asset.notEqual(asset)) {
+    const assetUnset = market.asset.equals(EMPTY_BYTES) || market.asset.equals(Bytes.empty())
+    if (asset.notEqual(Bytes.empty()) && assetUnset) {
       market.asset = asset
     }
     market.bank = bank
@@ -89,15 +132,11 @@ export function getOrCreateMarket(
       market.engine = engine
     }
     market.active = true
-    let bankLookup = BankAddress.load(bank)
-    if (bankLookup == null) {
-      bankLookup = new BankAddress(bank)
-      bankLookup.market = id
-      bankLookup.save()
-    }
+    ensureBankAddressIndex(id, bank)
     // Real registration carries the asset/bank addresses; (re)read token metadata
     // so a market first created provisionally (empty addresses) gets populated.
     hydrateMarketTokenMetadata(market, asset, bank)
+    market.assetClass = classifyVaultAssetClass(market.asset)
   }
   return market
 }
@@ -112,9 +151,19 @@ export function getMarketByBank(bank: Address): Market | null {
 
 const MAX_MARKET_SCAN: i32 = 32
 
+/** Prefer market-scoped lookup (matches engine payout per market). */
+export function findBetInMarketRound(
+  user: Bytes,
+  globalRoundId: BigInt,
+  marketId: i32
+): RouletteBet | null {
+  return RouletteBet.load(user.concat(marketRoundId(globalRoundId, marketId)))
+}
+
+/** Fallback when market is unknown: first participating market in id order. */
 export function findBetInGlobalRound(user: Bytes, globalRoundId: BigInt): RouletteBet | null {
   for (let mid: i32 = 1; mid <= MAX_MARKET_SCAN; mid++) {
-    const bet = RouletteBet.load(user.concat(marketRoundId(globalRoundId, mid)))
+    const bet = findBetInMarketRound(user, globalRoundId, mid)
     if (bet != null) {
       return bet
     }

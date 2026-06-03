@@ -8,34 +8,26 @@ import {
   test,
 } from 'matchstick-as';
 
-import {
-  VrfRequested,
-  VRFResult,
-  RoundResolved,
-  MinJackpotConditionUpdated,
-} from '../generated/RouletteEngine/Game';
+import { VrfRequested, VRFResult, RoundResolved } from '../generated/RouletteEngine/Game';
 import {
   handleVrfRequested,
   handleVRFResult,
   handleRoundResolved,
-  handleMinJackpotConditionUpdated,
-} from '../src/mappings/roulette-engine';
-import { bigintToBytes } from '../src/helpers/bigintToBytes';
+} from '../src/mappings/roulette';
+import {
+  GLOBAL_STATE_ID,
+  TEST_ENGINE,
+  createRoundForTests,
+  globalRoundIdHex,
+  testRoundId,
+} from './helpers';
 import {
   ROUND_STATUS_BETTING,
   ROUND_STATUS_VRF,
   ROUND_STATUS_CLEAN,
 } from '../src/helpers/constant';
-import { createRoundForTests } from './helpers';
 
-const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
-const CONTRACT_ADDRESS = '0x15dc1be843c63317e87865e1df14afa782fae171';
-
-function createVrfRequestedEvent(
-  newRoundId: i32,
-  requestId: i32 = 1,
-  timestamp: i32 = 1000000
-): VrfRequested {
+function createVrfRequestedEvent(newRoundId: i32, requestId: i32 = 1, timestamp: i32 = 1_000_100): VrfRequested {
   const ev = changetype<VrfRequested>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
   ev.parameters.push(
@@ -47,7 +39,7 @@ function createVrfRequestedEvent(
   ev.parameters.push(
     new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(timestamp)))
   );
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
+  ev.address = TEST_ENGINE;
   ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
@@ -58,7 +50,7 @@ function createVRFResultEvent(
   roundId: i32,
   winningNumber: i32,
   jackpotNumber: i32 = 5,
-  timestamp: i32 = 1000100
+  timestamp: i32 = 1_000_200
 ): VRFResult {
   const ev = changetype<VRFResult>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
@@ -71,71 +63,43 @@ function createVRFResultEvent(
   ev.parameters.push(
     new ethereum.EventParam('jackpotNumber', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(jackpotNumber)))
   );
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
+  ev.address = TEST_ENGINE;
   ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   return ev;
 }
 
-function createRoundResolvedEvent(roundId: i32, timestamp: i32 = 1000200): RoundResolved {
+function createRoundResolvedEvent(roundId: i32, timestamp: i32 = 1_000_300): RoundResolved {
   const ev = changetype<RoundResolved>(newMockEvent());
   ev.parameters = new Array<ethereum.EventParam>();
   ev.parameters.push(
     new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
   );
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
+  ev.address = TEST_ENGINE;
   ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
   return ev;
 }
-
-function createMinJackpotConditionUpdatedEvent(
-  newMinJackpotCondition: string,
-  timestamp: i32 = 1000000
-): MinJackpotConditionUpdated {
-  const ev = changetype<MinJackpotConditionUpdated>(newMockEvent());
-  ev.parameters = new Array<ethereum.EventParam>();
-  ev.parameters.push(
-    new ethereum.EventParam(
-      'newMinJackpotCondition',
-      ethereum.Value.fromUnsignedBigInt(BigInt.fromString(newMinJackpotCondition))
-    )
-  );
-  ev.address = Address.fromString(CONTRACT_ADDRESS);
-  ev.logIndex = BigInt.fromI32(0);
-  ev.block.timestamp = BigInt.fromI32(timestamp);
-  ev.block.number = BigInt.fromI32(timestamp / 100);
-  return ev;
-}
-
-// Removed tests (Phase 1C deleted the underlying events):
-// - handleRoundCleaningCompleted creates new round
-// - handleBettingWindowClosed sets NO_MORE_BETS
-// - handleComputedPayouts sets COMPUTING_PAYOUT
-// - handleBatchProcessed increments currentPayoutsCount (replaced by PayoutBatchProcessed)
-// - handleJackpotResultEvent sets jackpotWinnerCount
-// A replacement suite belongs in a future rouletteEngineMultiMarket.test.ts
-// covering BetRecorded -> RoundLocked -> VRFResult -> PayoutProgress ->
-// RoundResolved for the multi-market lifecycle.
 
 describe('handleVrfRequested', () => {
   beforeEach(() => {
     clearStore();
   });
 
-  test('sets resolving round to VRF and advances currentRoundNumber', () => {
-    createRoundForTests(1, 1000000);
-    const round1Id = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_BETTING);
+  test('sets GlobalRound to VRF while keeping currentRoundNumber on resolving round', () => {
+    createRoundForTests(1, 1_000_000);
+    const grId = globalRoundIdHex(1);
+    assert.fieldEquals('GlobalRound', grId, 'status', ROUND_STATUS_BETTING);
 
-    const ev = createVrfRequestedEvent(1, 200, 1000100);
+    const ev = createVrfRequestedEvent(1, 200, 1_000_100);
     handleVrfRequested(ev);
 
-    assert.fieldEquals('RouletteRound', round1Id, 'status', ROUND_STATUS_VRF);
-    assert.fieldEquals('RouletteRound', round1Id, 'requestId', '200');
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '2');
+    assert.fieldEquals('GlobalRound', grId, 'status', ROUND_STATUS_VRF);
+    assert.fieldEquals('GlobalRound', grId, 'requestId', '200');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '1');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundTransitionInProgress', 'true');
   });
 });
 
@@ -144,18 +108,15 @@ describe('handleVRFResult', () => {
     clearStore();
   });
 
-  test('sets winning + jackpot numbers and vrfResultAt without changing status', () => {
-    createRoundForTests(1, 1000000);
+  test('sets winning + jackpot numbers on GlobalRound without changing market round status', () => {
+    createRoundForTests(1, 1_000_000);
+    handleVRFResult(createVRFResultEvent(1, 17, 5));
 
-    const ev = createVRFResultEvent(1, 17, 5, 1000100);
-    handleVRFResult(ev);
-
-    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'winningNumber', '17');
-    assert.fieldEquals('RouletteRound', roundId, 'jackpotNumber', '5');
-    // VRFResult does not change status — that transition belongs to PayoutProgress / RoundResolved.
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_BETTING);
-    assert.fieldEquals('RouletteRound', roundId, 'vrfResultAt', '1000100');
+    const grId = globalRoundIdHex(1);
+    assert.fieldEquals('GlobalRound', grId, 'winningNumber', '17');
+    assert.fieldEquals('GlobalRound', grId, 'jackpotNumber', '5');
+    assert.fieldEquals('GlobalRound', grId, 'vrfResultAt', '1000200');
+    assert.fieldEquals('RouletteRound', testRoundId(1), 'status', ROUND_STATUS_BETTING);
   });
 });
 
@@ -164,29 +125,17 @@ describe('handleRoundResolved', () => {
     clearStore();
   });
 
-  test('sets status to CLEAN and updates globalState', () => {
-    createRoundForTests(1, 1000000);
+  test('sets GlobalRound to CLEAN, clears pending bets, and opens next global round', () => {
+    createRoundForTests(1, 1_000_000);
 
-    const ev = createRoundResolvedEvent(1, 1000200);
-    handleRoundResolved(ev);
+    handleRoundResolved(createRoundResolvedEvent(1));
 
-    const roundId = bigintToBytes(BigInt.fromI32(1)).toHexString();
-    assert.fieldEquals('RouletteRound', roundId, 'status', ROUND_STATUS_CLEAN);
-    assert.fieldEquals('RouletteRound', roundId, 'resolvedAt', '1000200');
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'pendingBets', '0');
+    const grId = globalRoundIdHex(1);
+    assert.fieldEquals('GlobalRound', grId, 'status', ROUND_STATUS_CLEAN);
+    assert.fieldEquals('GlobalRound', grId, 'resolvedAt', '1000300');
+    assert.fieldEquals('Market', '1', 'pendingBets', '0');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'lastRoundPaid', '1');
-  });
-});
-
-describe('handleMinJackpotConditionUpdated', () => {
-  beforeEach(() => {
-    clearStore();
-  });
-
-  test('updates global state minJackpotCondition', () => {
-    const ev = createMinJackpotConditionUpdatedEvent('500000000000000000');
-    handleMinJackpotConditionUpdated(ev);
-
-    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'minJackpotCondition', '500000000000000000');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '2');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundTransitionInProgress', 'false');
   });
 });

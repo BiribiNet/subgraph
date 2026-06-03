@@ -9,9 +9,10 @@
  *
  * Env:
  *   DEPLOY_JSON              — path to JSON (required) see deployments/example-arbitrum-sepolia.json
- *                            — optional startBlocks.{brb,roulette,brbReferal,stakedBRB} override startBlock per data source
+ *                            — optional startBlocks.{brb,roulette,brbReferal,sideBet,jackpotFunder} override startBlock per data source
  *                            — addresses.banks[] (or addresses.markets.*.bank) appended to turbo `WHERE address IN` for vault events
- *                            — optional addresses.upkeepManager appends UpkeepManager to turbo `WHERE address IN`
+ *                            — optional addresses.upkeepManager, sideBet, jackpotFunder appended to turbo `WHERE address IN`
+ *                            — MergedEvents.json is extended with SideBet + BRBJackpotFunder events from abis/*.json
  *   GOLDSKY_SUBGRAPH_NAME    — default biribi
  *   GOLDSKY_SYNC_FILES_ONLY  — if 1, only patch YAML files (no goldsky CLI)
  *   WEBHOOK_SECRET           — required for full sync if turbo.yaml url contains ${WEBHOOK_SECRET}
@@ -76,15 +77,114 @@ function collectBankAddresses() {
       if (m && typeof m === "object" && m.bank) add(m.bank);
     }
   }
-  if (out.length === 0 && a.stakedBRB) add(addr("stakedBRB"));
   return out;
 }
 
 const bankAddresses = collectBankAddresses();
 const turboAddresses = [addr("brb"), addr("roulette"), addr("brbReferal"), ...bankAddresses];
 if (a.upkeepManager) turboAddresses.push(addr("upkeepManager"));
+if (a.sideBet) turboAddresses.push(addr("sideBet"));
+if (a.jackpotFunder) turboAddresses.push(addr("jackpotFunder"));
 if (bankAddresses.length > 0) {
   console.log(`Turbo vault addresses: ${bankAddresses.length} bank(s)`);
+}
+
+/** SideBet.sol events indexed by subgraph + turbo webhook mirror. */
+const SIDEBET_TURBO_EVENTS = new Set([
+  "ConfigAdded",
+  "ConfigUpdated",
+  "ConfigStakeLimitsUpdated",
+  "ConfigRemoved",
+  "SideBetPlaced",
+  "SideBetSettled",
+  "SideBetInfrastructureFeePaid",
+  "SideBetJackpotFunded",
+]);
+
+/** BRBJackpotFunder events for subgraph handlers + useful mirror observability. */
+const JACKPOT_FUNDER_TURBO_EVENTS = new Set([
+  "FundedFromMarket",
+  "FundFromMarketSkipped",
+  "SwapAssetBpsUpdated",
+  "TreasuryBrbSplitUpdated",
+  "SlippageBpsUpdated",
+  "BrbRatioUpdated",
+  "JackpotBurnFailed",
+  "JackpotTreasuryTransferFailed",
+]);
+
+function normalizeEventInput(input) {
+  const next = { ...input };
+  const typeEnum =
+    typeof next.type === "string" && next.type.startsWith("enum ");
+  const internalEnum =
+    typeof next.internalType === "string" && next.internalType.startsWith("enum ");
+  if (typeEnum || internalEnum) {
+    next.type = "uint8";
+    next.internalType = "uint8";
+  }
+  return next;
+}
+
+function normalizeEventInputsInAbi(abiArray) {
+  return abiArray.map((fragment) => {
+    if (fragment.type !== "event") return fragment;
+    const needsNorm = fragment.inputs?.some(
+      (input) =>
+        (typeof input.type === "string" && input.type.startsWith("enum ")) ||
+        (typeof input.internalType === "string" &&
+          input.internalType.startsWith("enum ")),
+    );
+    return needsNorm ? normalizeEventFragment(fragment) : fragment;
+  });
+}
+
+function normalizeEventFragment(event) {
+  return {
+    ...event,
+    inputs: event.inputs.map(normalizeEventInput),
+  };
+}
+
+function mergeContractEventsFromAbi(abiArray, abiFile, trackedEvents, label) {
+  const abiPath = join(root, "abis", abiFile);
+  if (!existsSync(abiPath)) return abiArray;
+
+  let raw = readFileSync(abiPath, "utf8");
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  const parsed = JSON.parse(raw);
+  const contractAbi = Array.isArray(parsed) ? parsed : parsed.abi;
+  if (!Array.isArray(contractAbi)) return abiArray;
+
+  const existing = new Set(
+    abiArray.filter((f) => f.type === "event").map((f) => f.name),
+  );
+  const merged = [...abiArray];
+  let added = 0;
+  for (const fragment of contractAbi) {
+    if (fragment.type !== "event" || !trackedEvents.has(fragment.name)) continue;
+    if (existing.has(fragment.name)) continue;
+    merged.push(normalizeEventFragment(fragment));
+    existing.add(fragment.name);
+    added++;
+  }
+  if (added > 0) {
+    console.log(`Merged ${added} ${label} event(s) into pipeline ABI`);
+  }
+  return merged;
+}
+
+function mergeSideBetContractEvents(abiArray) {
+  return mergeContractEventsFromAbi(abiArray, "SideBet.json", SIDEBET_TURBO_EVENTS, "SideBet");
+}
+
+function mergeJackpotFunderContractEvents(abiArray) {
+  return mergeContractEventsFromAbi(
+    abiArray,
+    "BRBJackpotFunder.json",
+    JACKPOT_FUNDER_TURBO_EVENTS,
+    "BRBJackpotFunder",
+  );
 }
 
 const mergedAbiPath = join(root, "abis", "MergedEvents.json");
@@ -107,55 +207,46 @@ try {
   throw new Error(`sync:pipeline: ${mergedAbiPath}: ${e.message}`);
 }
 
+const abiBeforeMerge = JSON.stringify(abiArray);
+abiArray = normalizeEventInputsInAbi(
+  mergeJackpotFunderContractEvents(mergeSideBetContractEvents(abiArray)),
+);
+if (JSON.stringify(abiArray) !== abiBeforeMerge) {
+  writeFileSync(mergedAbiPath, `${JSON.stringify(abiArray, null, 2)}\n`, "utf8");
+  console.log(`Wrote ${mergedAbiPath} (SideBet + BRBJackpotFunder events)`);
+}
+
 const minifiedAbi = JSON.stringify(abiArray);
 const sqlAbiLiteral = minifiedAbi.replace(/\\/g, "\\\\").replace(/'/g, "''");
 console.log(
   `Merged ABI: ${abiArray.length} event fragment(s), ${minifiedAbi.length} chars (minified)`,
 );
 
-function injectMergedAbiIntoTurbo(turboContent, escapedAbi) {
-  if (/_gs_fetch_abi\s*\(/.test(turboContent)) {
-    return turboContent.replace(
-      /_gs_fetch_abi\('((?:[^']|'')*)',\s*'raw'\)/,
-      `'${escapedAbi}'`,
-    );
-  }
-  return turboContent.replace(
-    /(_gs_log_decode\(\s*[\r\n]+\s*)'([\s\S]*?)',\s*[\r\n]+\s*topics/,
-    `$1'${escapedAbi}',\n          topics`,
-  );
-}
-
 const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
+const abiPlaceholder = "__SYNC_PIPELINE_ABI__";
 const turboTemplatePath = join(root, "turbo.yaml");
 const turboAppliedPath = join(root, "turbo.applied.yaml");
 
 let turboTemplate = readFileSync(turboTemplatePath, "utf8");
-const hasFetchAbiCall = /_gs_fetch_abi\s*\(/.test(turboTemplate);
-const hasInlineDecodeAbi =
-  /_gs_log_decode\(\s*[\r\n]+\s*'[\s\S]*?',\s*[\r\n]+\s*topics/.test(turboTemplate);
-const turboAfterAbi = injectMergedAbiIntoTurbo(turboTemplate, sqlAbiLiteral);
-if (turboAfterAbi === turboTemplate && !hasFetchAbiCall && !hasInlineDecodeAbi) {
+if (!turboTemplate.includes(abiPlaceholder)) {
   throw new Error(
-    "sync:pipeline: turbo.yaml: expected _gs_fetch_abi('…','raw') or _gs_log_decode('…', … topics — fix decoded_events SQL.",
+    `sync:pipeline: turbo.yaml must contain ${abiPlaceholder} (keep turbo.yaml as the readable template).`,
   );
 }
-let turbo = turboAfterAbi;
+if (!turboTemplate.includes(addressPlaceholder)) {
+  throw new Error(
+    `sync:pipeline: turbo.yaml must contain ${addressPlaceholder}.`,
+  );
+}
 
+let turbo = turboTemplate.replace(abiPlaceholder, sqlAbiLiteral);
 const inList = turboAddresses.map((x) => `        '${x}'`).join(",\n");
-const usesAddressPlaceholder = turbo.includes(addressPlaceholder);
-if (usesAddressPlaceholder) {
-  turbo = turbo.replace(addressPlaceholder, inList);
-} else {
-  turbo = turbo.replace(
-    /FROM raw_logs\s*\n\s*WHERE address IN\s*\([\s\S]*?\)/,
-    `FROM raw_logs\n      WHERE address IN (\n${inList}\n      )`,
-  );
-}
-writeFileSync(turboTemplatePath, turbo, "utf8");
-console.log("Wrote turbo.yaml (ABI + addresses from DEPLOY_JSON)");
+turbo = turbo.replace(addressPlaceholder, inList);
+
 writeFileSync(turboAppliedPath, turbo, "utf8");
-console.log("Wrote turbo.applied.yaml (resolved ABI + addresses from DEPLOY_JSON)");
+console.log(
+  "Wrote turbo.applied.yaml (resolved ABI + addresses; turbo.yaml template unchanged)",
+);
 
 let subgraph = readFileSync(join(root, "subgraph.yaml"), "utf8");
 
@@ -164,7 +255,7 @@ const dsMap = [
   ["RouletteEngine", "roulette"],
   ["BRBReferral", "brbReferal"],
   ["BRBJackpotFunder", "jackpotFunder"],
-  ["JackpotTreasury", "jackpotTreasury"],
+  ["SideBet", "sideBet"],
 ];
 for (const [name, key] of dsMap) {
   const addrRe = new RegExp(
@@ -332,7 +423,7 @@ try {
   execSync("yarn codegen", { cwd: root, stdio: "inherit" });
   execSync("yarn build", { cwd: root, stdio: "inherit" });
 
-  let turboPipelineFile = usesAddressPlaceholder ? "turbo.applied.yaml" : "turbo.yaml";
+  let turboPipelineFile = "turbo.applied.yaml";
   if (turbo.includes("${WEBHOOK_SECRET}")) {
     const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
     if (!webhookSecret) {

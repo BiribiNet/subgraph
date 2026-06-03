@@ -43,7 +43,6 @@ export function handleTransfer(event: Transfer): void {
     return
   }
 
-  // Credit: the referrer receives soulbound BRBr (feeds their BRBpoints).
   getOrCreateUser(to)
 
   const credit = new BRBReferalTransfer(id)
@@ -57,7 +56,11 @@ export function handleTransfer(event: Transfer): void {
   credit.transactionHash = event.transaction.hash
   credit.save()
 
-  updateUserBrbrEarnings(to, value, true, timestamp)
+  // Engine mint (from zero): BRBpoints referral weight is applied at BetRecorded with
+  // asset-decimal normalization. Non-mint transfers still update earnings directly.
+  if (from.toHexString() != ZERO_ADDRESS) {
+    updateUserBrbrEarnings(to, value, true, timestamp)
+  }
   updateUserBRBReferalBalance(to, value, true)
   updateUserLastActive(to, timestamp)
 }
