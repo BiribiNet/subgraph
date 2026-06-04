@@ -95,6 +95,16 @@ dataSources:
           handler: handleMarketRegistered
         - event: ReferralSet(address,address)
           handler: handleReferralSet
+        - event: WithdrawalQueueBatchSizeUpdated(uint256)
+          handler: handleWithdrawalQueueBatchSizeUpdated
+        - event: MaxWithdrawalQueueLengthUpdated(uint256)
+          handler: handleMaxWithdrawalQueueLengthUpdated
+        - event: RoundDurationUpdated(uint32)
+          handler: handleRoundDurationUpdated
+        - event: JackpotFunderUpdated(address,address)
+          handler: handleJackpotFunderUpdated
+        - event: JackpotTreasuryUpdated(address,address)
+          handler: handleJackpotTreasuryUpdated
         - event: Initialized(uint64)
           handler: handleGameInitialized
         - event: Upgraded(indexed address)
@@ -121,6 +131,7 @@ dataSources:
         - JackpotBuy
         - JackpotFundingSkip
         - JackpotFunderConfig
+        - JackpotFunderIncident
         - Market
       abis:
         - name: BRBJackpotFunder
@@ -130,6 +141,12 @@ dataSources:
           handler: handleFundedFromMarket
         - event: FundFromMarketSkipped(uint32,address,uint8)
           handler: handleFundFromMarketSkipped
+        - event: JackpotBurnFailed(uint32,uint256)
+          handler: handleJackpotBurnFailed
+        - event: JackpotTreasuryTransferFailed(uint32,address,uint256)
+          handler: handleJackpotTreasuryTransferFailed
+        - event: TokenSwept(address,address,uint256)
+          handler: handleTokenSwept
         - event: SwapAssetBpsUpdated(uint256)
           handler: handleSwapAssetBpsUpdated
         - event: TreasuryBrbSplitUpdated(uint256,uint256)
@@ -186,6 +203,7 @@ dataSources:
         - SideBet
         - SideBetSettlement
         - SideBetConfig
+        - SideBetGlobalConfig
         - Market
         - User
         - UserMarketStats
@@ -211,6 +229,8 @@ dataSources:
           handler: handleSideBetJackpotFunded
         - event: SideBetInfrastructureFeePaid(uint32,uint256)
           handler: handleSideBetInfrastructureFeePaid
+        - event: MultiplierBandUpdated(uint32,uint32)
+          handler: handleMultiplierBandUpdated
         - event: RoleGranted(indexed bytes32,indexed address,indexed address)
           handler: handleRoleGranted
         - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
@@ -267,6 +287,10 @@ templates:
           handler: handlePayoutBatchProcessed
         - event: FundsTransferred(address,uint256)
           handler: handleFundsTransferred
+        - event: MinBetUpdated(uint256,uint256)
+          handler: handleMinBetUpdated
+        - event: SideBetControllerUpdated(address,address)
+          handler: handleSideBetControllerUpdated
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
         - event: Approval(indexed address,indexed address,uint256)

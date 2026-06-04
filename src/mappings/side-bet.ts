@@ -9,6 +9,7 @@ import {
   SideBetSettled,
   SideBetJackpotFunded,
   SideBetInfrastructureFeePaid,
+  MultiplierBandUpdated,
   RoleGranted,
   RoleRevoked,
   RoleAdminChanged,
@@ -17,6 +18,7 @@ import { SideBet, SideBetSettlement, Market } from "../../generated/schema"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import {
   createSideBetFromChain,
+  getOrCreateSideBetGlobalConfig,
   sideBetIdFromBetId,
   sideBetStatusFromI32,
   syncSideBetConfig
@@ -126,6 +128,14 @@ export function handleSideBetJackpotFunded(event: SideBetJackpotFunded): void {
 
 export function handleSideBetInfrastructureFeePaid(event: SideBetInfrastructureFeePaid): void {
   accrueSideBetFee(event.params.marketId.toI32(), false, event.params.amount)
+}
+
+export function handleMultiplierBandUpdated(event: MultiplierBandUpdated): void {
+  const cfg = getOrCreateSideBetGlobalConfig(event.block.timestamp)
+  cfg.minMultiplierBps = event.params.minMultiplierBps.toI32()
+  cfg.maxMultiplierBps = event.params.maxMultiplierBps.toI32()
+  cfg.lastUpdatedAt = event.block.timestamp
+  cfg.save()
 }
 
 export function handleRoleGranted(event: RoleGranted): void {

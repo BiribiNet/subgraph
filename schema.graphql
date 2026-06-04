@@ -98,6 +98,10 @@ type Market @entity(immutable: false) {
   lockedSideBetLiquidity: BigInt!
   "Max payout liability buffer for the active open round (mirrors RouletteRound.maxBetAmount)"
   maxBetAmount: BigInt!
+  "Per-market minimum bet enforced by the bank (BankVault4626.minBet) — read on-chain at registration, kept in sync via MinBetUpdated"
+  minBet: BigInt!
+  "Current SideBet controller authorized on the bank (BankVault4626.sideBetController) — null until set"
+  sideBetController: Bytes
   "Registry-registered and engine-linked"
   active: Boolean!
   "First MarketRegistered (engine) timestamp"
@@ -505,6 +509,12 @@ type GlobalState @entity(immutable: false) {
   totalDeposited: BigInt!
   "Total assets withdrawn from vaults all time (raw market units)"
   totalWithdrawn: BigInt!
+  "Round duration in seconds (engine config — RoundDurationUpdated)"
+  roundDuration: BigInt!
+  "Active BRBJackpotFunder address (engine config — JackpotFunderUpdated); null until set"
+  jackpotFunder: Bytes
+  "Active JackpotTreasury address (engine config — JackpotTreasuryUpdated); null until set"
+  jackpotTreasury: Bytes
 }
 
 # Daily snapshot for per-market APY calculations
@@ -876,6 +886,15 @@ type SideBetSettlement @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+# Singleton SideBet pricing band (SideBet.MultiplierBandUpdated). Bounds the
+# multiplier any config may use; lazy-init to 0 until the first band event fires.
+type SideBetGlobalConfig @entity(immutable: false) {
+  id: Bytes!
+  minMultiplierBps: Int!
+  maxMultiplierBps: Int!
+  lastUpdatedAt: BigInt!
+}
+
 # === BRBJackpotFunder events (Phase 1C bis) ===
 # Per-swap snapshots: at the end of each profitable round, the funder swaps a
 # slice of the market profit (asset) into BRB on Uniswap V2, sends
@@ -900,6 +919,27 @@ type JackpotFundingSkip @entity(immutable: true) {
   asset: Bytes!
   reason: Int!
   timestamp: BigInt!
+}
+
+# Non-reverting failure / recovery incidents emitted by the funder during
+# settlement (burn failed, treasury transfer failed, stuck-token sweep). Each is
+# a discrete, immutable log keyed by txHash-logIndex.
+enum JackpotFunderIncidentKind { BURN_FAILED, TREASURY_TRANSFER_FAILED, TOKEN_SWEPT }
+
+type JackpotFunderIncident @entity(immutable: true) {
+  id: Bytes!
+  kind: JackpotFunderIncidentKind!
+  "Market the incident relates to (null for TokenSwept)"
+  market: Market
+  "Treasury (TREASURY_TRANSFER_FAILED) or swept asset (TOKEN_SWEPT); null for BURN_FAILED"
+  asset: Bytes
+  "Recipient of a swept token (TOKEN_SWEPT only); null otherwise"
+  to: Bytes
+  "BRB amount (BURN_FAILED / TREASURY_TRANSFER_FAILED) or swept amount (TOKEN_SWEPT)"
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
 }
 
 # Singleton config for the BRBJackpotFunder. Each setter event updates one or

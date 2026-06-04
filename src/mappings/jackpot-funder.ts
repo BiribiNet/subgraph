@@ -9,11 +9,19 @@ import {
   SwapAssetBpsUpdated,
   TreasuryBrbSplitUpdated,
   TwapWindowUpdated,
+  JackpotBurnFailed,
+  JackpotTreasuryTransferFailed,
+  TokenSwept,
   RoleGranted,
   RoleRevoked,
   RoleAdminChanged,
 } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
-import { JackpotBuy, JackpotFundingSkip } from "../../generated/schema"
+import { JackpotBuy, JackpotFundingSkip, JackpotFunderIncident } from "../../generated/schema"
+
+// JackpotFunderIncident.kind enum values (must match schema enum JackpotFunderIncidentKind).
+const INCIDENT_BURN_FAILED = "BURN_FAILED"
+const INCIDENT_TREASURY_TRANSFER_FAILED = "TREASURY_TRANSFER_FAILED"
+const INCIDENT_TOKEN_SWEPT = "TOKEN_SWEPT"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateJackpotFunderConfig } from "../helpers/jackpot-funder"
 import { getMarketById } from "../helpers/market"
@@ -65,6 +73,53 @@ export function handleFundFromMarketSkipped(event: FundFromMarketSkipped): void 
   skip.reason = event.params.reason
   skip.timestamp = event.block.timestamp
   skip.save()
+}
+
+// Non-reverting settlement incidents. The funder emits these instead of
+// reverting so a failed burn/transfer never bricks round payout. We record each
+// as an immutable log; the market is resolved best-effort (null if unknown).
+export function handleJackpotBurnFailed(event: JackpotBurnFailed): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const incident = new JackpotFunderIncident(id)
+  incident.kind = INCIDENT_BURN_FAILED
+  const market = getMarketById(event.params.marketId.toI32())
+  if (market != null) {
+    incident.market = market.id
+  }
+  incident.amount = event.params.amount
+  incident.timestamp = event.block.timestamp
+  incident.blockNumber = event.block.number
+  incident.transactionHash = event.transaction.hash
+  incident.save()
+}
+
+export function handleJackpotTreasuryTransferFailed(event: JackpotTreasuryTransferFailed): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const incident = new JackpotFunderIncident(id)
+  incident.kind = INCIDENT_TREASURY_TRANSFER_FAILED
+  const market = getMarketById(event.params.marketId.toI32())
+  if (market != null) {
+    incident.market = market.id
+  }
+  incident.asset = event.params.treasury
+  incident.amount = event.params.amount
+  incident.timestamp = event.block.timestamp
+  incident.blockNumber = event.block.number
+  incident.transactionHash = event.transaction.hash
+  incident.save()
+}
+
+export function handleTokenSwept(event: TokenSwept): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const incident = new JackpotFunderIncident(id)
+  incident.kind = INCIDENT_TOKEN_SWEPT
+  incident.asset = event.params.asset
+  incident.to = event.params.to
+  incident.amount = event.params.amount
+  incident.timestamp = event.block.timestamp
+  incident.blockNumber = event.block.number
+  incident.transactionHash = event.transaction.hash
+  incident.save()
 }
 
 export function handleSwapAssetBpsUpdated(event: SwapAssetBpsUpdated): void {

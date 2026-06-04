@@ -69,6 +69,10 @@ function hydrateMarketTokenMetadata(market: Market, asset: Bytes, bank: Bytes): 
     if (!shareSymbol.reverted) {
       market.shareSymbol = shareSymbol.value
     }
+    const minBet = vault.try_minBet()
+    if (!minBet.reverted) {
+      market.minBet = minBet.value
+    }
   }
 }
 
@@ -110,6 +114,7 @@ export function getOrCreateMarket(
     market.sideBetInfraFees = ZERO
     market.lockedSideBetLiquidity = ZERO
     market.maxBetAmount = ZERO
+    market.minBet = ZERO
     market.active = true
     market.createdAt = timestamp
     market.createdAtBlock = blockNumber
