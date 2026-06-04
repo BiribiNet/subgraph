@@ -1,12 +1,31 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { SideBet as SideBetContract } from "../../generated/SideBet/SideBet"
-import { SideBet, SideBetConfig } from "../../generated/schema"
+import { SideBet, SideBetConfig, SideBetGlobalConfig } from "../../generated/schema"
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateUser, updateUserLastActive } from "./user"
 import { recordUserMarketSideBetStake } from "./user-market-stats"
 import { getMarketById, requireMarket } from "./market"
 
 const BPS_DENOMINATOR = BigInt.fromI32(10000)
+
+const SIDE_BET_CONFIG_KEY = Bytes.fromUTF8("config")
+
+/**
+ * Singleton accessor for the SideBet pricing band (MultiplierBandUpdated).
+ * Bounds default to 0 until the first band event fires (lazy init).
+ */
+export function getOrCreateSideBetGlobalConfig(timestamp: BigInt): SideBetGlobalConfig {
+  let cfg = SideBetGlobalConfig.load(SIDE_BET_CONFIG_KEY)
+  if (cfg != null) {
+    return cfg
+  }
+  cfg = new SideBetGlobalConfig(SIDE_BET_CONFIG_KEY)
+  cfg.minMultiplierBps = 0
+  cfg.maxMultiplierBps = 0
+  cfg.lastUpdatedAt = timestamp
+  cfg.save()
+  return cfg
+}
 
 export function sideBetIdFromBetId(betId: BigInt): Bytes {
   return bigintToBytes(betId)

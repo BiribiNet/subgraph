@@ -28,7 +28,7 @@ export const TEST_ENGINE = Address.fromString('0x2f6bbd7df2e997788a6a3759edcd728
 export const TEST_BANK = Address.fromString('0xcccc000000000000000000000000000000000001');
 export const TEST_ASSET = Address.fromString('0xaaaa000000000000000000000000000000000001');
 export const DEFAULT_USER = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
-export const BRB_TOKEN = Address.fromString('0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf');
+export const BRB_TOKEN = Address.fromString('0xa8dedb784804f07e1748582ca309ef74acd8c040');
 
 /** Composite RouletteRound id: globalRound + marketId (default market 1). */
 export function testRoundId(globalRound: i32, marketId: i32 = 1): string {
@@ -47,6 +47,9 @@ export function mockVaultTokenMetadata(): void {
   ]);
   createMockedFunction(TEST_BANK, 'symbol', 'symbol():(string)').returns([
     ethereum.Value.fromString('bvTEST'),
+  ]);
+  createMockedFunction(TEST_BANK, 'minBet', 'minBet():(uint256)').returns([
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromString('5000000000000000000')),
   ]);
 }
 

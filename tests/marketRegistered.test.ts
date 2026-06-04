@@ -29,6 +29,9 @@ function mockTokenMetadata(): void {
   createMockedFunction(BANK, 'symbol', 'symbol():(string)').returns([
     ethereum.Value.fromString('bvUSDC'),
   ]);
+  createMockedFunction(BANK, 'minBet', 'minBet():(uint256)').returns([
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromString('5000000')),
+  ]);
 }
 
 function registerMarket(): void {
@@ -60,6 +63,7 @@ describe('MarketRegistered tests', () => {
     assert.fieldEquals('Market', '1', 'shareSymbol', 'bvUSDC');
     assert.fieldEquals('Market', '1', 'asset', ASSET.toHexString());
     assert.fieldEquals('Market', '1', 'bank', BANK.toHexString());
+    assert.fieldEquals('Market', '1', 'minBet', '5000000');
     assert.entityCount('BankAddress', 1);
     assert.fieldEquals('BankAddress', BANK.toHexString(), 'market', '1');
   });
@@ -69,6 +73,7 @@ describe('MarketRegistered tests', () => {
     createMockedFunction(ASSET, 'decimals', 'decimals():(uint8)').reverts();
     createMockedFunction(BANK, 'name', 'name():(string)').reverts();
     createMockedFunction(BANK, 'symbol', 'symbol():(string)').reverts();
+    createMockedFunction(BANK, 'minBet', 'minBet():(uint256)').reverts();
     registerMarket();
 
     assert.entityCount('Market', 1);
@@ -76,6 +81,7 @@ describe('MarketRegistered tests', () => {
     assert.fieldEquals('Market', '1', 'assetDecimals', '0');
     assert.fieldEquals('Market', '1', 'shareName', '');
     assert.fieldEquals('Market', '1', 'shareSymbol', '');
+    assert.fieldEquals('Market', '1', 'minBet', '0');
     assert.entityCount('BankAddress', 1);
   });
 });

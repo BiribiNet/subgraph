@@ -14,6 +14,8 @@ import {
   SideBetStakeLocked,
   PayoutBatchProcessed,
   FundsTransferred,
+  MinBetUpdated,
+  SideBetControllerUpdated,
 } from "../../generated/templates/BankVault/BankVault4626"
 import { UpkeepRegistered } from "../../generated/templates/BankVault/MergedEvents"
 import {
@@ -307,6 +309,24 @@ export function handleFundsTransferred(event: FundsTransferred): void {
     return
   }
   subtractGrossVaultBalance(market, event.params.amount)
+  market.save()
+}
+
+export function handleMinBetUpdated(event: MinBetUpdated): void {
+  const market = loadMarketByBank(event.address)
+  if (market == null) {
+    return
+  }
+  market.minBet = event.params.newMinBet
+  market.save()
+}
+
+export function handleSideBetControllerUpdated(event: SideBetControllerUpdated): void {
+  const market = loadMarketByBank(event.address)
+  if (market == null) {
+    return
+  }
+  market.sideBetController = event.params.newController
   market.save()
 }
 

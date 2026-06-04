@@ -44,6 +44,9 @@ function registerMarket(): void {
   createMockedFunction(BANK, 'symbol', 'symbol():(string)').returns([
     ethereum.Value.fromString('bvUSDC'),
   ]);
+  createMockedFunction(BANK, 'minBet', 'minBet():(uint256)').returns([
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromString('5000000')),
+  ]);
 
   const event = changetype<MarketRegistered>(newMockEvent());
   event.parameters = new Array<ethereum.EventParam>();
