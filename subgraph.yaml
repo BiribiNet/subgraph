@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf"
-      startBlock: 273225571
+      address: "0xa8dedb784804f07e1748582ca309ef74acd8c040"
+      startBlock: 273618022
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -45,8 +45,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x2f6bbd7df2e997788a6a3759edcd7282028d40bd"
-      startBlock: 273225571
+      address: "0x68b830aac2cb41811b957c7380560926dd87cdbd"
+      startBlock: 273618022
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -111,8 +111,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBJackpotFunder
-      address: "0x2a36366e71cc52e21607f71b0a9f14216bfb2510"
-      startBlock: 273225571
+      address: "0xc245ad88d401d08d674596d5a2c9f17011ed27c1"
+      startBlock: 273618022
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -154,8 +154,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferral
-      address: "0xb6a6a7c9fc32e30fb5af12ad9d6a5cd2a283ad94"
-      startBlock: 273225571
+      address: "0x5d3c2b1509477b316ed4f93ad4983b384f4f345b"
+      startBlock: 273618022
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -176,8 +176,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: SideBet
-      address: "0x1ccc659dcee5af5c42263d1c9a9768d13025a020"
-      startBlock: 273225571
+      address: "0x919320b2bc4fa4dd018a52fa3c8ac9b58a27cfab"
+      startBlock: 273618022
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

@@ -800,37 +800,12 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "address",
-        "name": "authority",
-        "type": "address"
-      }
-    ],
-    "name": "ForwarderAuthorityUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
         "internalType": "uint256",
-        "name": "lane",
+        "name": "coldSlippageBps",
         "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "previousCursor",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "newCursor",
-        "type": "uint32"
       }
     ],
-    "name": "LaneCursorAdvanced",
+    "name": "ColdSlippageBpsUpdated",
     "type": "event"
   },
   {
@@ -839,80 +814,212 @@
       {
         "indexed": false,
         "internalType": "uint32",
-        "name": "newMaxPayoutsPerCall",
+        "name": "marketId",
         "type": "uint32"
-      }
-    ],
-    "name": "MaxPayoutsPerCallUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "newScanLimit",
-        "type": "uint32"
-      }
-    ],
-    "name": "ScanLimitUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "lane",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "previousCursor",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "newCursor",
-        "type": "uint256"
-      }
-    ],
-    "name": "SideBetCursorAdvanced",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "lane",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "upkeepId",
-        "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "address",
-        "name": "forwarder",
+        "name": "asset",
         "type": "address"
       },
       {
         "indexed": false,
-        "internalType": "uint96",
+        "internalType": "uint8",
+        "name": "reason",
+        "type": "uint8"
+      }
+    ],
+    "name": "FundFromMarketSkipped",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "asset",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "assetSwapped",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "brbOut",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "brbToTreasury",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "brbBurned",
+        "type": "uint256"
+      }
+    ],
+    "name": "FundedFromMarket",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "amount",
-        "type": "uint96"
+        "type": "uint256"
       }
     ],
-    "name": "UpkeepRegistered",
+    "name": "JackpotBurnFailed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "treasury",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JackpotTreasuryTransferFailed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "pair",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "timestamp",
+        "type": "uint32"
+      }
+    ],
+    "name": "PairObservationUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "slippageBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "SlippageBpsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalBps",
+        "type": "uint256"
+      }
+    ],
+    "name": "SwapAssetBpsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "asset",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "TokenSwept",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "numerator",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "denominator",
+        "type": "uint256"
+      }
+    ],
+    "name": "TreasuryBrbSplitUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "twapWindowSeconds",
+        "type": "uint32"
+      }
+    ],
+    "name": "TwapWindowUpdated",
     "type": "event"
   },
   {
@@ -989,6 +1096,25 @@
       }
     ],
     "name": "ConfigUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "minMultiplierBps",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "maxMultiplierBps",
+        "type": "uint32"
+      }
+    ],
+    "name": "MultiplierBandUpdated",
     "type": "event"
   },
   {
@@ -1120,175 +1246,119 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "ratioPerAssetUnit",
-        "type": "uint256"
+        "internalType": "address",
+        "name": "authority",
+        "type": "address"
       }
     ],
-    "name": "BrbRatioUpdated",
+    "name": "ForwarderAuthorityUpdated",
     "type": "event"
   },
   {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lane",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
         "internalType": "uint32",
-        "name": "marketId",
+        "name": "previousCursor",
         "type": "uint32"
       },
       {
-        "indexed": true,
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "newCursor",
+        "type": "uint32"
+      }
+    ],
+    "name": "LaneCursorAdvanced",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "newMaxPayoutsPerCall",
+        "type": "uint32"
+      }
+    ],
+    "name": "MaxPayoutsPerCallUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "newScanLimit",
+        "type": "uint32"
+      }
+    ],
+    "name": "ScanLimitUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lane",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "previousCursor",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newCursor",
+        "type": "uint256"
+      }
+    ],
+    "name": "SideBetCursorAdvanced",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lane",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "upkeepId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
         "internalType": "address",
-        "name": "asset",
+        "name": "forwarder",
         "type": "address"
       },
       {
         "indexed": false,
-        "internalType": "uint8",
-        "name": "reason",
-        "type": "uint8"
-      }
-    ],
-    "name": "FundFromMarketSkipped",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "asset",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "assetSwapped",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "brbOut",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "brbToTreasury",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "brbBurned",
-        "type": "uint256"
-      }
-    ],
-    "name": "FundedFromMarket",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
+        "internalType": "uint96",
         "name": "amount",
-        "type": "uint256"
+        "type": "uint96"
       }
     ],
-    "name": "JackpotBurnFailed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "treasury",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "JackpotTreasuryTransferFailed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "slippageBps",
-        "type": "uint256"
-      }
-    ],
-    "name": "SlippageBpsUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "totalBps",
-        "type": "uint256"
-      }
-    ],
-    "name": "SwapAssetBpsUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "numerator",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "denominator",
-        "type": "uint256"
-      }
-    ],
-    "name": "TreasuryBrbSplitUpdated",
+    "name": "UpkeepRegistered",
     "type": "event"
   }
 ]

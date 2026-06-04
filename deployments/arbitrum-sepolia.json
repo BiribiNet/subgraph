@@ -1,26 +1,26 @@
 {
-  "startBlock": 273225571,
+  "startBlock": 273618022,
   "startBlocks": {
-    "brb": 273225571,
-    "roulette": 273225571,
-    "brbReferal": 273225571,
-    "sideBet": 273225571
+    "brb": 273618022,
+    "roulette": 273618022,
+    "stakedBRB": 273618022,
+    "brbReferal": 273618022,
+    "sideBet": 273618022,
+    "jackpotFunder": 273618022
   },
   "addresses": {
-    "brb": "0x0a06e95fb780ba06365c8a082e9be10a97d6f9bf",
-    "roulette": "0x2f6bbd7df2e997788a6a3759edcd7282028d40bd",
-    "registry": "0x2DeF6353F3D5B7623E11938E64fA8071C91F841B",
+    "brb": "0xa8dedb784804f07e1748582ca309ef74acd8c040",
+    "roulette": "0x68b830aac2cb41811b957c7380560926dd87cdbd",
+    "stakedBRB": "0xb4Ec1620424aCbF204dDe7C5FccfB792a8ddDc5B",
     "banks": [
-      "0xf92f56796fE6209D3A021a74A1Dca98dc7c0F954",
-      "0x1E74418a1eaE7E5296d625F5e3723f9d3203680f",
-      "0x7B2B80024434ED63f120F119856790528c2e23f9"
+      "0xb4Ec1620424aCbF204dDe7C5FccfB792a8ddDc5B",
+      "0x823AE56D93084AA5aA5991F699E74f855AA5d8e0",
+      "0xcF6759fD9497F1e7AE5EB0195d84F446da01b73A"
     ],
-    "brbReferal": "0xb6a6a7c9fc32e30fb5af12ad9d6a5cd2a283ad94",
-    "upkeepManager": "0xe451142bd2340e62f2cfe94132b0ae34a925d854",
-    "jackpotTreasury": "0xb52c19254602316613d8161983d2803f71f83814",
-    "jackpotFunder": "0x2a36366e71cc52e21607f71b0a9f14216bfb2510",
-    "sideBet": "0x1CCC659DCEe5af5c42263d1c9A9768d13025A020",
-    "scheduler": "0x1089D2c2F0019fA93a1897BcF3a3BE1d71A7C545",
-    "uniswapRouter": "0x9f90d323b48082f52ef3fe1530c5e14e2271bb84"
+    "brbReferal": "0x5d3c2b1509477b316ed4f93ad4983b384f4f345b",
+    "upkeepManager": "0xb62971bd323d48740cbc3cd6d0ce0e653131ccc9",
+    "jackpotTreasury": "0x4416181c11ee20481c466ed95fc8e997adbf5774",
+    "jackpotFunder": "0xc245ad88d401d08d674596d5a2c9f17011ed27c1",
+    "sideBet": "0x919320b2bC4fa4DD018a52fA3C8ac9B58a27CfAb"
   }
 }
