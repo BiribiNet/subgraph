@@ -82,6 +82,8 @@ export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: Bi
   }
   const grossRevenue = round.totalBets.minus(round.totalPayouts)
   const stakersShare = grossRevenue.minus(round.jackpotRevenue).minus(round.infraRevenue)
+  round.stakersRevenue = stakersShare.gt(ZERO) ? stakersShare : ZERO
+  round.save()
   const daily = getOrCreateDailyStats(timestamp)
   daily.revenue = daily.revenue.plus(grossRevenue)
   if (stakersShare.gt(ZERO)) {

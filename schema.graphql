@@ -385,6 +385,16 @@ type RouletteRound @entity(immutable: false) {
   jackpotRevenue: BigInt!
   "Infrastructure revenue share (2%)"
   infraRevenue: BigInt!
+  "Stakers revenue share (95%): grossRevenue - jackpotRevenue - infraRevenue (set on resolve)"
+  stakersRevenue: BigInt!
+  "BRB burned attributed to this round (0.5% deflationary share)"
+  roundBurnAmount: BigInt!
+  "Distinct bettors in this round (per market) — incremented on each user's first bet of the round"
+  uniqueBettors: BigInt!
+  "Failed payout batches in this round. Reserved: stays 0 until the engine emits a payout-failure event."
+  failedPayoutBatches: BigInt!
+  "Failed jackpot batches in this round. Reserved: stays 0 until the engine emits a jackpot-failure event."
+  failedJackpotBatches: BigInt!
   "Array of bets in this round"
   bets: [RouletteBet]! @derivedFrom(field: "round")
   "Array of payout transactions in this round"

@@ -49,6 +49,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - `RouletteBet.market` / `RouletteBet.marketRound` (nullable) — attributed at `BetRecorded` time.
 - `VaultDeposit.market`, `VaultWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
 - `RouletteRound` keeps cross-market global aggregates. **`GlobalState`** (singleton `0x…01`) = live ops (round pointer, jackpot pool, withdrawal queue, cross-market vault TVL) plus lifetime analytics (`totalWagered`, `totalBurned`, `totalPayouts`, …). Open wagers: **`Market.pendingBets`** per vault (not a mixed-unit global). Per-vault metrics otherwise live on `Market`.
+- Per-round revenue/activity on `RouletteRound`: `jackpotRevenue` (2.5%, on `JackpotFunded`), `infraRevenue` (2%, on `InfrastructureFeePaid`), `stakersRevenue` (95% = `grossRevenue − jackpotRevenue − infraRevenue`, set in `updateRoundRevenueAggregates` on resolve), `roundBurnAmount` (0.5% burn, accumulated in `brb.ts` via `findBurnRoundForGlobalRound`), and `uniqueBettors` (incremented on each user's first bet of the round, using the `isNewRoundForUser` signal in `processBetRecorded`). **`failedPayoutBatches` / `failedJackpotBatches` stay `0`** — no engine event currently reports failed batches per global round (the `BRBJackpotFunder` failure events carry no `globalRoundId`), so these are reserved counters until the contracts emit a suitable event.
 
 ### BRBpoints model (Phase 2A)
 

@@ -44,6 +44,13 @@ export function createNewRouletteRound(
   round.betCount = BigInt.fromI32(0)
   round.jackpotRevenue = ZERO
   round.infraRevenue = ZERO
+  round.stakersRevenue = ZERO
+  round.roundBurnAmount = ZERO
+  round.uniqueBettors = ZERO
+  // TRADE-OFF: no engine event currently reports failed payout/jackpot batches per round,
+  // so these counters stay 0 until the contracts emit such events (see CLAUDE.md / plan 1.6).
+  round.failedPayoutBatches = ZERO
+  round.failedJackpotBatches = ZERO
   round.firstBetAt = ZERO
   round.startedAt = startedAt
   return round

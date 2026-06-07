@@ -160,6 +160,9 @@ export function processBetRecorded(event: BetRecorded): void {
     }
 
     round.betCount = round.betCount.plus(BigInt.fromI32(1))
+    if (isNewRoundForUser) {
+      round.uniqueBettors = round.uniqueBettors.plus(BigInt.fromI32(1))
+    }
     round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
     round.save()
 

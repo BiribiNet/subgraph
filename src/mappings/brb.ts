@@ -77,6 +77,8 @@ export function handleTransfer(event: Transfer): void {
       const burnRound = findBurnRoundForGlobalRound(globalState.lastRoundPaid)
       if (burnRound != null) {
         burn.round = burnRound.id
+        burnRound.roundBurnAmount = burnRound.roundBurnAmount.plus(event.params.value)
+        burnRound.save()
       }
     }
     burn.save()
