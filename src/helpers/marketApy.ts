@@ -27,7 +27,7 @@ function createMarketSnapshotIfNeeded(
   snapshot.totalShares = market.totalShares
   snapshot.timestamp = timestamp
   snapshot.blockNumber = blockNumber
-  snapshot.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares)
+  snapshot.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares, market.assetDecimals)
   snapshot.stakerCount = market.stakerCount
   snapshot.apy7Day = market.apy7Day
   snapshot.apy30Day = market.apy30Day
@@ -180,5 +180,5 @@ export function calculateMarketAPYs(
     market.apyLifetimeBaselineTimestamp
   )
 
-  market.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares)
+  market.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares, market.assetDecimals)
 }

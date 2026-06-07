@@ -26,20 +26,25 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - The **referral tracking** (BRBR earnings, conversion history)
 - The **BRBP points & tier system** (leaderboard, tier progression)
 
-### Protocol Smart Contracts (Arbitrum Sepolia, 2026-05-19 redeploy — multi-market)
+### Protocol Smart Contracts (Arbitrum Sepolia, multi-market redeploy)
+
+> Source of truth for these addresses: `subgraph.yaml` / `networks.json` /
+> `deployments/arbitrum-sepolia.json` (all data sources start at **block 273618006**).
+> Keep this table in sync with those configs whenever the protocol is redeployed.
 
 | Contract | Address | Key Events to Index |
 |---|---|---|
-| **RouletteEngine** (hub) | `0x0ba41d10c05e970ceeeef4f1d7f2fe2f45c1f888` | `BetRecorded`, `RoundLocked`, `GlobalRoundSealed`, `VrfRequested`, `VRFResult`, `RoundResolved`, `PayoutProgress`, `JackpotFunded`, `InfrastructureFeePaid`, `MarketRegistered`, `MinJackpotConditionUpdated`, `Initialized`, `Upgraded` |
-| **BRB Token (ERC-20)** | `0x6499456948fa1409a753b8ef40dc18dccd563d01` | `Transfer`, `Approval` (deflationary: 0.5% burned per round) |
-| **BankVault4626 (USDC bank)** | `0x3861523245933a342debab87daa8298f3640c57c` | `Deposit`, `Withdraw`, `WithdrawalRequested/Processed/Ejected`, `BetPlaced`, `Transfer`, `Approval`, `Role*`, `UpkeepRegistered` |
-| **BankVault4626** (template, future markets) | dynamic — spawned by `MarketRegistered` | same as the USDC bank |
-| **BRBReferral** (legacy, deprecated) | `0x48e85e0f774f0d0d44519b13a959d9faa78e831b` | `Transfer`, `Approval` |
-| **BRBJackpotFunder** | `0x60ce672feaf39f35a3f6e5b3e099f46b90aee9fc` | `FundedFromMarket`, `FundFromMarketSkipped`, `SwapAssetBpsUpdated`, `TreasuryBrbSplitUpdated`, `BrbRatioUpdated`, `SlippageBpsUpdated` |
-| **JackpotTreasury** | `0xbbe4d51cf721277d52d916291f6de4fa972e5e22` | `EngineSet` (observability only) |
-| **MarketRegistry** | `0x9a328b11c7189a8ba2af6186643f93204b516987` | not indexed — market lifecycle driven by `RouletteEngine.MarketRegistered` |
-| **UpkeepManager** | `0x924b24ca118fa0fbe1ace279d9af2821952015d3` | not indexed (out of scope) |
-| **UpkeepScheduler** | `0x59558e58429d3e77e9f8bdaa888d30c8f2af4a05` | not indexed (out of scope) |
+| **RouletteEngine** (hub) | `0x68b830aac2cb41811b957c7380560926dd87cdbd` | `BetRecorded`, `RoundLocked`, `GlobalRoundSealed`, `VrfRequested`, `VRFResult`, `RoundResolved`, `PayoutProgress`, `JackpotFunded`, `InfrastructureFeePaid`, `MarketRegistered`, `MinJackpotConditionUpdated`, `Initialized`, `Upgraded` |
+| **BRB Token (ERC-20)** | `0xa8dedb784804f07e1748582ca309ef74acd8c040` | `Transfer`, `Approval` (deflationary: 0.5% burned per round) |
+| **BankVault4626 (USDC bank, default)** | `0xb4Ec1620424aCbF204dDe7C5FccfB792a8ddDc5B` | `Deposit`, `Withdraw`, `WithdrawalRequested/Processed/Ejected`, `BetPlaced`, `Transfer`, `Approval`, `Role*`, `UpkeepRegistered` |
+| **BankVault4626** (template — all markets) | dynamic — spawned by `MarketRegistered`. Deployed banks: `0xb4Ec1620…`, `0x823AE56D…`, `0xcF6759fD…` | same as the USDC bank |
+| **BRBReferral** (legacy, deprecated) | `0x5d3c2b1509477b316ed4f93ad4983b384f4f345b` | `Transfer`, `Approval` |
+| **BRBJackpotFunder** | `0xc245ad88d401d08d674596d5a2c9f17011ed27c1` | `FundedFromMarket`, `FundFromMarketSkipped`, `SwapAssetBpsUpdated`, `TreasuryBrbSplitUpdated`, `BrbRatioUpdated`, `SlippageBpsUpdated` |
+| **SideBet (BRBGAME)** | `0x919320b2bC4fa4DD018a52fA3C8ac9B58a27CfAb` | `SideBetPlaced`, `SideBetSettled`, `Config*`, `SideBetJackpotFunded`, `SideBetInfrastructureFeePaid`, `Role*` |
+| **JackpotTreasury** | `0x4416181c11ee20481c466ed95fc8e997adbf5774` | not a data source — BRB transfers tracked via `JACKPOT_TREASURY_ADDRESS` in `src/helpers/constant.ts` (keep in sync) |
+| **MarketRegistry** | not a data source — auto-discovered via `RouletteEngine.REGISTRY()` | not indexed — market lifecycle driven by `RouletteEngine.MarketRegistered` |
+| **UpkeepManager** | `0xb62971bd323d48740cbc3cd6d0ce0e653131ccc9` | not indexed (out of scope) |
+| **UpkeepScheduler** | not a static data source (address not pinned here) | not indexed (out of scope) |
 
 ### Multi-market data model (Phase 1C)
 

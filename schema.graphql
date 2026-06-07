@@ -62,7 +62,7 @@ type Market @entity(immutable: false) {
   totalAssets: BigInt!
   "ERC-4626 total shares"
   totalShares: BigInt!
-  "Asset per share (totalAssets / totalShares)"
+  "Display-ready assets per whole share, normalized for the 18-dec share token vs assetDecimals (so a 1:1 USDC vault reads ~1.0, not 1e-12)"
   sharePrice: BigDecimal!
   "Distinct depositors with shares > 0 (this vault only)"
   stakerCount: BigInt!

@@ -9,7 +9,7 @@ export function syncMarketTotalAssets(market: Market): void {
   } else {
     market.totalAssets = ZERO
   }
-  market.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares)
+  market.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares, market.assetDecimals)
 }
 
 export function addGrossVaultBalance(market: Market, amount: BigInt): void {

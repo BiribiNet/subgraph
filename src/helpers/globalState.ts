@@ -43,14 +43,28 @@ export function getOrCreateGlobalState(): GlobalState {
   return globalState
 }
 
-export function calculateSharePrice(totalAssets: BigInt, totalShares: BigInt): BigDecimal {
+// BankVault4626 share tokens are minted in 18 decimals on-chain for every
+// market, regardless of the underlying asset's decimals.
+const SHARE_TOKEN_DECIMALS = 18
+
+// Returns the display-ready "assets per whole share" price: the value of one
+// whole share (10^18 raw shares) expressed in whole asset units. Because shares
+// are 18-dec and the asset can be fewer (USDC = 6), the raw totalAssets /
+// totalShares ratio must be rescaled by 10^(18 - assetDecimals); otherwise a
+// 1:1 USDC vault reads as ~1e-12 instead of 1.0. No-op for 18-dec assets (BRB).
+export function calculateSharePrice(
+  totalAssets: BigInt,
+  totalShares: BigInt,
+  assetDecimals: i32
+): BigDecimal {
   if (totalShares.gt(ZERO)) {
-    const PRECISION = BigInt.fromI32(10).pow(18)
+    const shareUnit = BigInt.fromI32(10).pow(u8(SHARE_TOKEN_DECIMALS))
+    const assetUnit = BigInt.fromI32(10).pow(u8(assetDecimals))
     return totalAssets
-      .times(PRECISION)
+      .times(shareUnit)
       .toBigDecimal()
       .div(totalShares.toBigDecimal())
-      .div(PRECISION.toBigDecimal())
+      .div(assetUnit.toBigDecimal())
   }
   return BigDecimal.fromString("1")
 }
