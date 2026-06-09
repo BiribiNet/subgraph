@@ -52,6 +52,21 @@ describe('Multi-market roulette lifecycle', () => {
     assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'lockAt', '1000360');
   });
 
+  test('RoundCountdownStarted creates the GlobalRound when it precedes BetRecorded in the tx', () => {
+    // Real on-chain log order: RoundCountdownStarted is logIndex 0 of the
+    // first-bet tx, BEFORE BetRecorded — the entity must be created here, not
+    // dropped (the old load + early-return left lockAt unset on every round).
+    emitRoundCountdownStarted(1, 1_000_360, 1_000_000);
+
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'status', ROUND_STATUS_BETTING);
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'lockAt', '1000360');
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'firstBetAt', '1000000');
+
+    emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
+
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'lockAt', '1000360');
+  });
+
   test('RoundCountdownStarted self-heals GlobalState.roundDuration from lockAt', () => {
     // The engine never emits RoundDurationUpdated for its initialize() value,
     // so roundDuration would otherwise stay at its seeded 0 forever.

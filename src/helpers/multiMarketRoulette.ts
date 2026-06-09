@@ -200,15 +200,18 @@ export function processRoundCountdownStarted(event: RoundCountdownStarted): void
     }
   }
 
-  const gr = GlobalRound.load(globalRoundIdBytes(event.params.roundId))
-  if (gr == null) {
-    log.error("GlobalRound not found for RoundCountdownStarted: {}", [event.params.roundId.toString()])
-    return
-  }
+  // RoundCountdownStarted is the FIRST log of the first-bet tx (before
+  // BetRecorded), so the GlobalRound entity does not exist yet at this point —
+  // create it like processRoundLocked does instead of dropping the event
+  // (a load + early-return left triggerMarket/lockAt unset on every round).
+  const gr = getOrCreateGlobalRound(event.params.roundId, event.block.timestamp)
   const triggerMarketId = event.params.triggerMarketId.toI32()
   const trigger = requireMarket(triggerMarketId)
   gr.triggerMarket = trigger.id
   gr.lockAt = event.params.lockAt
+  if (gr.firstBetAt.equals(ZERO)) {
+    gr.firstBetAt = event.block.timestamp
+  }
   gr.save()
 }
 
