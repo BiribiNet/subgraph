@@ -23,6 +23,21 @@ import {
 } from './helpers';
 import { ROUND_STATUS_BETTING, ROUND_STATUS_NO_MORE_BETS, ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
 
+function emitRoundCountdownStarted(roundId: i32, lockAt: i32, timestamp: i32): void {
+  const ev = changetype<RoundCountdownStarted>(newMockEvent());
+  ev.address = TEST_ENGINE;
+  ev.parameters = new Array<ethereum.EventParam>();
+  ev.parameters.push(
+    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(roundId)))
+  );
+  ev.parameters.push(new ethereum.EventParam('triggerMarketId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+  ev.parameters.push(
+    new ethereum.EventParam('lockAt', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(lockAt)))
+  );
+  ev.block.timestamp = BigInt.fromI32(timestamp);
+  handleRoundCountdownStarted(ev);
+}
+
 describe('Multi-market roulette lifecycle', () => {
   beforeEach(() => {
     clearStore();
@@ -31,22 +46,28 @@ describe('Multi-market roulette lifecycle', () => {
 
   test('RoundCountdownStarted sets lockAt but keeps BETTING status', () => {
     emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
-
-    const ev = changetype<RoundCountdownStarted>(newMockEvent());
-    ev.address = TEST_ENGINE;
-    ev.parameters = new Array<ethereum.EventParam>();
-    ev.parameters.push(
-      new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1)))
-    );
-    ev.parameters.push(new ethereum.EventParam('triggerMarketId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    ev.parameters.push(
-      new ethereum.EventParam('lockAt', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1_000_360)))
-    );
-    ev.block.timestamp = BigInt.fromI32(1_000_000);
-    handleRoundCountdownStarted(ev);
+    emitRoundCountdownStarted(1, 1_000_360, 1_000_000);
 
     assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'status', ROUND_STATUS_BETTING);
     assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'lockAt', '1000360');
+  });
+
+  test('RoundCountdownStarted self-heals GlobalState.roundDuration from lockAt', () => {
+    // The engine never emits RoundDurationUpdated for its initialize() value,
+    // so roundDuration would otherwise stay at its seeded 0 forever.
+    emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundDuration', '0');
+
+    emitRoundCountdownStarted(1, 1_000_360, 1_000_000);
+
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundDuration', '360');
+  });
+
+  test('RoundCountdownStarted leaves roundDuration unchanged when lockAt is not after the block timestamp', () => {
+    emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
+    emitRoundCountdownStarted(1, 1_000_000, 1_000_000);
+
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundDuration', '0');
   });
 
   test('BetRecorded creates GlobalRound on first bet', () => {

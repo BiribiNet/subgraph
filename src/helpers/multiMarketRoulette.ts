@@ -186,6 +186,20 @@ export function processBetRecorded(event: BetRecorded): void {
 }
 
 export function processRoundCountdownStarted(event: RoundCountdownStarted): void {
+  // Self-heal GlobalState.roundDuration: lockAt = block.timestamp + ROUND_DURATION
+  // in the same tx, and the engine never emits RoundDurationUpdated for its
+  // initialize() value — this is the only event-based source of the duration.
+  // Runs before the GlobalRound guard: the duration is valid regardless.
+  const lockAt = event.params.lockAt
+  if (lockAt.gt(event.block.timestamp)) {
+    const globalState = getOrCreateGlobalState()
+    const duration = lockAt.minus(event.block.timestamp)
+    if (globalState.roundDuration.notEqual(duration)) {
+      globalState.roundDuration = duration
+      globalState.save()
+    }
+  }
+
   const gr = GlobalRound.load(globalRoundIdBytes(event.params.roundId))
   if (gr == null) {
     log.error("GlobalRound not found for RoundCountdownStarted: {}", [event.params.roundId.toString()])
