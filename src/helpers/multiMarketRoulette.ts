@@ -186,15 +186,32 @@ export function processBetRecorded(event: BetRecorded): void {
 }
 
 export function processRoundCountdownStarted(event: RoundCountdownStarted): void {
-  const gr = GlobalRound.load(globalRoundIdBytes(event.params.roundId))
-  if (gr == null) {
-    log.error("GlobalRound not found for RoundCountdownStarted: {}", [event.params.roundId.toString()])
-    return
+  // Self-heal GlobalState.roundDuration: lockAt = block.timestamp + ROUND_DURATION
+  // in the same tx, and the engine never emits RoundDurationUpdated for its
+  // initialize() value — this is the only event-based source of the duration.
+  // Runs before the GlobalRound guard: the duration is valid regardless.
+  const lockAt = event.params.lockAt
+  if (lockAt.gt(event.block.timestamp)) {
+    const globalState = getOrCreateGlobalState()
+    const duration = lockAt.minus(event.block.timestamp)
+    if (globalState.roundDuration.notEqual(duration)) {
+      globalState.roundDuration = duration
+      globalState.save()
+    }
   }
+
+  // RoundCountdownStarted is the FIRST log of the first-bet tx (before
+  // BetRecorded), so the GlobalRound entity does not exist yet at this point —
+  // create it like processRoundLocked does instead of dropping the event
+  // (a load + early-return left triggerMarket/lockAt unset on every round).
+  const gr = getOrCreateGlobalRound(event.params.roundId, event.block.timestamp)
   const triggerMarketId = event.params.triggerMarketId.toI32()
   const trigger = requireMarket(triggerMarketId)
   gr.triggerMarket = trigger.id
   gr.lockAt = event.params.lockAt
+  if (gr.firstBetAt.equals(ZERO)) {
+    gr.firstBetAt = event.block.timestamp
+  }
   gr.save()
 }
 
