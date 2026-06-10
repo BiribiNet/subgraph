@@ -43,22 +43,22 @@ export function getOrCreateGlobalState(): GlobalState {
   return globalState
 }
 
-// BankVault4626 share tokens are minted in 18 decimals on-chain for every
-// market, regardless of the underlying asset's decimals.
-const SHARE_TOKEN_DECIMALS = 18
+// BankVault4626 mints shares with the ERC-4626 anti-inflation decimal offset:
+// share decimals = asset decimals + 6. Verified on-chain on Arbitrum Sepolia
+// (`decimals()`): USDC bank 0xb4Ec1620… = 12, DAI bank 0x823AE56D… = 24,
+// BRB bank 0xcF6759fD… = 24. Shares are NOT a fixed 18 decimals.
+const SHARE_DECIMALS_OFFSET = 6
 
 // Returns the display-ready "assets per whole share" price: the value of one
-// whole share (10^18 raw shares) expressed in whole asset units. Because shares
-// are 18-dec and the asset can be fewer (USDC = 6), the raw totalAssets /
-// totalShares ratio must be rescaled by 10^(18 - assetDecimals); otherwise a
-// 1:1 USDC vault reads as ~1e-12 instead of 1.0. No-op for 18-dec assets (BRB).
+// whole share (10^(assetDecimals + 6) raw shares) expressed in whole asset
+// units. A freshly seeded 1:1 vault reads exactly 1.0 for every market.
 export function calculateSharePrice(
   totalAssets: BigInt,
   totalShares: BigInt,
   assetDecimals: i32
 ): BigDecimal {
   if (totalShares.gt(ZERO)) {
-    const shareUnit = BigInt.fromI32(10).pow(u8(SHARE_TOKEN_DECIMALS))
+    const shareUnit = BigInt.fromI32(10).pow(u8(assetDecimals + SHARE_DECIMALS_OFFSET))
     const assetUnit = BigInt.fromI32(10).pow(u8(assetDecimals))
     return totalAssets
       .times(shareUnit)
