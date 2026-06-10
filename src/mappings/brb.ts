@@ -9,6 +9,7 @@ import { marketRoundId, isKnownBank, loadMarketByBank } from "../helpers/market"
 import { getOrCreateDailyStats } from "../helpers/aggregation"
 import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
 import { addGrossVaultBalance } from "../helpers/vault-ledger"
+import { calculateMarketAPYs } from "../helpers/marketApy"
 import { isBankInboundExcludedFromDonation } from "../helpers/tx-activity"
 import { findBurnRoundForGlobalRound } from "../helpers/round-sync"
 
@@ -98,6 +99,7 @@ export function handleTransfer(event: Transfer): void {
       if (market != null) {
         market.brbDonations = market.brbDonations.plus(event.params.value)
         addGrossVaultBalance(market, event.params.value)
+        calculateMarketAPYs(market, event.block.timestamp, event.block.number)
         market.save()
       }
     }
