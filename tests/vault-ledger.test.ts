@@ -132,6 +132,46 @@ describe('Vault ledger', () => {
     assert.fieldEquals('Market', '1', 'totalAssets', '800000000000000000');
   });
 
+  test('Game revenue via BetsReleased refreshes APY without any deposit', () => {
+    // Baseline: 1 asset backing 1 whole share (24-dec, ERC-4626 +6 offset) at t=1_000_000.
+    const dep = changetype<Deposit>(newMockEvent());
+    dep.address = TEST_BANK;
+    dep.parameters = new Array<ethereum.EventParam>();
+    dep.parameters.push(
+      new ethereum.EventParam('sender', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
+    );
+    dep.parameters.push(
+      new ethereum.EventParam('owner', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
+    );
+    dep.parameters.push(
+      new ethereum.EventParam('assets', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('1000000000000000000')))
+    );
+    dep.parameters.push(
+      new ethereum.EventParam('shares', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('1000000000000000000000000')))
+    );
+    dep.block.timestamp = BigInt.fromI32(1_000_000);
+    handleDeposit(dep);
+
+    // A lost bet releases into the vault two days later: +10% assets, same shares.
+    emitBetPlaced('100000000000000000', 1_000_100);
+    const release = changetype<BetsReleased>(newMockEvent());
+    release.address = TEST_BANK;
+    release.parameters = new Array<ethereum.EventParam>();
+    release.parameters.push(
+      new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('100000000000000000')))
+    );
+    release.parameters.push(
+      new ethereum.EventParam('newLockedTotal', ethereum.Value.fromUnsignedBigInt(BigInt.zero()))
+    );
+    release.block.timestamp = BigInt.fromI32(1_172_800);
+    handleBetsReleased(release);
+
+    assert.fieldEquals('Market', '1', 'totalAssets', '1100000000000000000');
+    // 10% growth over 2 days, annualized: 0.1 * (31536000 / 172800) * 100 = 1825%.
+    assert.fieldEquals('Market', '1', 'apyLifetime', '1825');
+    assert.fieldEquals('Market', '1', 'lastApySnapshotTimestamp', '1172800');
+  });
+
   test('FundsTransferred decreases gross', () => {
     const dep = changetype<Deposit>(newMockEvent());
     dep.address = TEST_BANK;

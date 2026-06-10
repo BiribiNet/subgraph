@@ -270,6 +270,7 @@ export function handleBetsReleased(event: BetsReleased): void {
   }
   releasePendingBets(market, event.params.amount)
   setLockedBetLiquidity(market, event.params.newLockedTotal)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
@@ -281,9 +282,12 @@ export function handleSideBetStakeLocked(event: SideBetStakeLocked): void {
   addGrossVaultBalance(market, event.params.stake)
   setLockedBetLiquidity(market, event.params.newLockedTotal)
   market.lockedSideBetLiquidity = market.lockedSideBetLiquidity.plus(event.params.payoutReserve)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
+// No APY recalc here: gross and locked rise by the same amount, so totalAssets
+// (and the share price) are unchanged — keep the hottest vault path BigDecimal-free.
 export function handleBetPlaced(event: BetPlaced): void {
   const market = loadMarketByBank(event.address)
   if (market == null) {
@@ -300,6 +304,7 @@ export function handlePayoutBatchProcessed(event: PayoutBatchProcessed): void {
     return
   }
   subtractGrossVaultBalance(market, event.params.totalPaid)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
@@ -309,6 +314,7 @@ export function handleFundsTransferred(event: FundsTransferred): void {
     return
   }
   subtractGrossVaultBalance(market, event.params.amount)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
@@ -336,8 +342,8 @@ export function handleTransfer(event: VaultShareTransfer): void {
     recordUserMarketSbrbShares(event.params.from, market, event.params.value, false)
     recordUserMarketSbrbShares(event.params.to, market, event.params.value, true)
   }
-  updateUserSBRBBalance(event.params.from, event.params.value, false, market)
-  updateUserSBRBBalance(event.params.to, event.params.value, true, market)
+  updateUserSBRBBalance(event.params.from, event.params.value, false)
+  updateUserSBRBBalance(event.params.to, event.params.value, true)
 }
 
 export function handleApproval(event: Approval): void {
