@@ -270,6 +270,7 @@ export function handleBetsReleased(event: BetsReleased): void {
   }
   releasePendingBets(market, event.params.amount)
   setLockedBetLiquidity(market, event.params.newLockedTotal)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
@@ -281,6 +282,7 @@ export function handleSideBetStakeLocked(event: SideBetStakeLocked): void {
   addGrossVaultBalance(market, event.params.stake)
   setLockedBetLiquidity(market, event.params.newLockedTotal)
   market.lockedSideBetLiquidity = market.lockedSideBetLiquidity.plus(event.params.payoutReserve)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
@@ -291,6 +293,7 @@ export function handleBetPlaced(event: BetPlaced): void {
   }
   addGrossVaultBalance(market, event.params.amount)
   addLockedBetLiquidity(market, event.params.amount)
+  // totalAssets-neutral (gross and locked move together) — APY recompute deferred to BetsReleased
   market.save()
 }
 
@@ -300,6 +303,7 @@ export function handlePayoutBatchProcessed(event: PayoutBatchProcessed): void {
     return
   }
   subtractGrossVaultBalance(market, event.params.totalPaid)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 
@@ -309,6 +313,7 @@ export function handleFundsTransferred(event: FundsTransferred): void {
     return
   }
   subtractGrossVaultBalance(market, event.params.amount)
+  calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
 }
 

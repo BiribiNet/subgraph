@@ -9,6 +9,11 @@ import {
   Deposit,
   WithdrawalRequested,
   WithdrawalProcessed,
+  BetPlaced,
+  BetsReleased,
+  PayoutBatchProcessed,
+  FundsTransferred,
+  SideBetStakeLocked,
 } from '../generated/templates/BankVault/BankVault4626';
 import { BankAddress, Market, RouletteRound } from '../generated/schema';
 import { getOrCreateGlobalRound } from '../src/helpers/globalRound';
@@ -20,6 +25,11 @@ import {
   handleDeposit,
   handleWithdrawalRequested,
   handleWithdrawalProcessed,
+  handleBetPlaced,
+  handleBetsReleased,
+  handlePayoutBatchProcessed,
+  handleFundsTransferred,
+  handleSideBetStakeLocked,
 } from '../src/mappings/bank-vault';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
@@ -251,6 +261,138 @@ export function emitWithdrawalProcessed(
   event.block.timestamp = BigInt.fromI32(timestamp);
   event.block.number = BigInt.fromI32(timestamp / 100);
   handleWithdrawalProcessed(event);
+}
+
+export function emitBetPlaced(
+  amount: string,
+  timestamp: i32 = 1_000_000,
+  logIndex: i32 = 0
+): void {
+  setupTestMarket();
+  const event = changetype<BetPlaced>(newMockEvent());
+  event.address = TEST_BANK;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('user', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount)))
+  );
+  event.parameters.push(new ethereum.EventParam('data', ethereum.Value.fromBytes(Bytes.empty())));
+  event.parameters.push(
+    new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1)))
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handleBetPlaced(event);
+}
+
+export function emitBetsReleased(
+  amount: string,
+  newLockedTotal: string,
+  timestamp: i32 = 1_000_000,
+  logIndex: i32 = 0
+): void {
+  setupTestMarket();
+  const event = changetype<BetsReleased>(newMockEvent());
+  event.address = TEST_BANK;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam(
+      'newLockedTotal',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromString(newLockedTotal))
+    )
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handleBetsReleased(event);
+}
+
+export function emitPayoutBatchProcessed(
+  totalPaid: string,
+  timestamp: i32 = 1_000_000,
+  payoutCount: i32 = 1,
+  logIndex: i32 = 0
+): void {
+  setupTestMarket();
+  const event = changetype<PayoutBatchProcessed>(newMockEvent());
+  event.address = TEST_BANK;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam(
+      'payoutCount',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(payoutCount))
+    )
+  );
+  event.parameters.push(
+    new ethereum.EventParam('totalPaid', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(totalPaid)))
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handlePayoutBatchProcessed(event);
+}
+
+export function emitFundsTransferred(
+  amount: string,
+  timestamp: i32 = 1_000_000,
+  logIndex: i32 = 0
+): void {
+  setupTestMarket();
+  const event = changetype<FundsTransferred>(newMockEvent());
+  event.address = TEST_BANK;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('recipient', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount)))
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handleFundsTransferred(event);
+}
+
+export function emitSideBetStakeLocked(
+  player: string,
+  stake: string,
+  payoutReserve: string,
+  newLockedTotal: string,
+  timestamp: i32 = 1_000_000,
+  logIndex: i32 = 0
+): void {
+  setupTestMarket();
+  const event = changetype<SideBetStakeLocked>(newMockEvent());
+  event.address = TEST_BANK;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('player', ethereum.Value.fromAddress(Address.fromString(player)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('stake', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(stake)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam(
+      'payoutReserve',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromString(payoutReserve))
+    )
+  );
+  event.parameters.push(
+    new ethereum.EventParam(
+      'newLockedTotal',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromString(newLockedTotal))
+    )
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handleSideBetStakeLocked(event);
 }
 
 export function withBlock<T extends ethereum.Event>(event: T, timestamp: i32, blockNumber: i32): T {

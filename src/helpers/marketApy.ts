@@ -35,13 +35,28 @@ function createMarketSnapshotIfNeeded(
   snapshot.save()
 }
 
+// Days without vault events have no snapshot, so the exact target day can be
+// missing — scan a few days further back. Annualization stays correct because
+// calculateAPYInternal uses the actual snapshot timestamp.
+const MAX_SNAPSHOT_LOOKBACK_DAYS: i32 = 6
+
 function getMarketSnapshotFromDaysAgo(
   marketId: string,
   currentTimestamp: BigInt,
   daysAgo: BigInt
 ): MarketAPYSnapshot | null {
-  const targetTimestamp = currentTimestamp.minus(daysAgo.times(SECONDS_PER_DAY))
-  return MarketAPYSnapshot.load(marketSnapshotId(marketId, targetTimestamp))
+  const targetDay = currentTimestamp.div(SECONDS_PER_DAY).minus(daysAgo)
+  for (let lookback: i32 = 0; lookback <= MAX_SNAPSHOT_LOOKBACK_DAYS; lookback++) {
+    const day = targetDay.minus(BigInt.fromI32(lookback))
+    if (day.lt(ZERO)) {
+      break
+    }
+    const snapshot = MarketAPYSnapshot.load(marketId + "-" + day.toString())
+    if (snapshot != null && snapshot.totalShares.gt(ZERO) && snapshot.totalAssets.gt(ZERO)) {
+      return snapshot
+    }
+  }
+  return null
 }
 
 function calculateAPYInternal(
@@ -96,8 +111,17 @@ export function calculateMarketAPYs(
     return
   }
 
-  const timeSinceLastSnapshot = currentTimestamp.minus(market.lastApySnapshotTimestamp)
-  if (timeSinceLastSnapshot.ge(SECONDS_PER_DAY) || market.lastApySnapshotTimestamp.equals(ZERO)) {
+  // Donations or bet events can fire before the first staker deposit; baselining
+  // here would freeze the lifetime baseline at totalShares = 0 forever.
+  if (market.totalShares.equals(ZERO) && market.apyLifetimeBaselineTimestamp.equals(ZERO)) {
+    return
+  }
+
+  // Compare UTC day ids (not a 24h delta) so the first event of each new day
+  // produces that day's snapshot even when <24h elapsed since the previous one.
+  const currentDay = currentTimestamp.div(SECONDS_PER_DAY)
+  const lastSnapshotDay = market.lastApySnapshotTimestamp.div(SECONDS_PER_DAY)
+  if (market.lastApySnapshotTimestamp.equals(ZERO) || currentDay.gt(lastSnapshotDay)) {
     createMarketSnapshotIfNeeded(market, currentTimestamp, blockNumber)
     market.lastApySnapshotTimestamp = currentTimestamp
   }
