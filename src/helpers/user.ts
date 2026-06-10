@@ -1,5 +1,5 @@
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
-import { User, Market } from "../../generated/schema"
+import { User } from "../../generated/schema"
 import { ZERO_ADDRESS } from "./constant"
 import { ONE, ZERO } from "./number"
 import { recomputeAndSaveUserPoints } from "./brb-points"
@@ -68,11 +68,13 @@ export function updateUserBRBBalance(userAddress: Bytes, amount: BigInt, isIncre
   user.save()
 }
 
+// Per-market stakerCount transitions live in recordUserMarketSbrbShares
+// (user-market-stats.ts) — this global balance mixes share units across vaults
+// and must not drive per-vault counters.
 export function updateUserSBRBBalance(
   userAddress: Bytes,
   amount: BigInt,
-  isIncrease: boolean,
-  market: Market | null
+  isIncrease: boolean
 ): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
@@ -80,10 +82,6 @@ export function updateUserSBRBBalance(
   const user = getOrCreateUser(userAddress)
 
   if (isIncrease) {
-    if (user.sbrbBalance.equals(ZERO) && market != null) {
-      market.stakerCount = market.stakerCount.plus(ONE)
-      market.save()
-    }
     user.sbrbBalance = user.sbrbBalance.plus(amount)
   } else {
     if (user.sbrbBalance.lt(amount)) {
@@ -91,12 +89,6 @@ export function updateUserSBRBBalance(
       user.sbrbBalance = ZERO
     } else {
       user.sbrbBalance = user.sbrbBalance.minus(amount)
-    }
-    if (user.sbrbBalance.equals(ZERO) && market != null) {
-      if (market.stakerCount.gt(ZERO)) {
-        market.stakerCount = market.stakerCount.minus(ONE)
-      }
-      market.save()
     }
   }
 
