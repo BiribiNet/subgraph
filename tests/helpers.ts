@@ -38,7 +38,7 @@ export const TEST_ENGINE = Address.fromString('0x2f6bbd7df2e997788a6a3759edcd728
 export const TEST_BANK = Address.fromString('0xcccc000000000000000000000000000000000001');
 export const TEST_ASSET = Address.fromString('0xaaaa000000000000000000000000000000000001');
 export const DEFAULT_USER = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
-export const BRB_TOKEN = Address.fromString('0xa8dedb784804f07e1748582ca309ef74acd8c040');
+export const BRB_TOKEN = Address.fromString('0xf1e2dcbfb055ba9873d8b02d1c8b99b416d1d61b');
 
 /** Composite RouletteRound id: globalRound + marketId (default market 1). */
 export function testRoundId(globalRound: i32, marketId: i32 = 1): string {
