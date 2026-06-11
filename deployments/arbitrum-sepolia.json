@@ -1,26 +1,37 @@
 {
-  "startBlock": 273618006,
+  "startBlock": 275797856,
   "startBlocks": {
-    "brb": 273618006,
-    "roulette": 273618006,
-    "stakedBRB": 273618006,
-    "brbReferal": 273618006,
-    "sideBet": 273618006,
-    "jackpotFunder": 273618006
+    "brb": 275797856,
+    "roulette": 275797856,
+    "stakedBRB": 275797856,
+    "brbReferal": 275797856,
+    "sideBet": 275797856,
+    "jackpotFunder": 275797856
   },
   "addresses": {
-    "brb": "0xa8dedb784804f07e1748582ca309ef74acd8c040",
-    "roulette": "0x68b830aac2cb41811b957c7380560926dd87cdbd",
-    "stakedBRB": "0xb4Ec1620424aCbF204dDe7C5FccfB792a8ddDc5B",
+    "brb": "0xf1e2dcbfb055ba9873d8b02d1c8b99b416d1d61b",
+    "roulette": "0x4cf6a900fcdd3a33b2bb1df22b8718dd24e897f8",
+    "stakedBRB": "0x1B0370FcCeD7074B93709c82370d83513d2CBF3B",
     "banks": [
-      "0xb4Ec1620424aCbF204dDe7C5FccfB792a8ddDc5B",
-      "0x823AE56D93084AA5aA5991F699E74f855AA5d8e0",
-      "0xcF6759fD9497F1e7AE5EB0195d84F446da01b73A"
+      "0x1B0370FcCeD7074B93709c82370d83513d2CBF3B",
+      "0x3Fd333FFA46FD4654eD290EDaE24d6AAf870dBDe",
+      "0xC707F6f51CeDFf3F06833B37C508E23d3B3A607F"
     ],
-    "brbReferal": "0x5d3c2b1509477b316ed4f93ad4983b384f4f345b",
-    "upkeepManager": "0xb62971bd323d48740cbc3cd6d0ce0e653131ccc9",
-    "jackpotTreasury": "0x4416181c11ee20481c466ed95fc8e997adbf5774",
-    "jackpotFunder": "0xc245ad88d401d08d674596d5a2c9f17011ed27c1",
-    "sideBet": "0x919320b2bC4fa4DD018a52fA3C8ac9B58a27CfAb"
-  }
+    "brbReferal": "0xb80c7602af2d9288a1a0ae4c02944d9179d51439",
+    "upkeepManager": "0x9d8756b67dd1c0465bd4e38595563b97ea903577",
+    "jackpotTreasury": "0xa1aba5cfb684838963f5491fa4b9079ef7346dd0",
+    "jackpotFunder": "0x9c3f57c49ba23a0e79235368affc9936d37fede9",
+    "sideBet": "0xA775ADA93B7B0DcF16F7233a128A91d1ACC93219"
+  },
+  "uniswap": {
+    "factory": "0xb1a1f9958488233b339e73763232953837ce1e34",
+    "weth": "0x904d9585b6a1d13a07794f2af102a025becbf911",
+    "router": "0xf89aca501fdc766b5f7b308bdb7d23f7c62ee4d8"
+  },
+  "deployer": "0xbbbbedc42dc53842141be8f70df9efe4d08538a4",
+  "registry": "0x06de2b57bc12cef9c6c16ea7915226b1259ffd11",
+  "scheduler": "0xa3bb37368a407b5412f605c0291b73784a619379",
+  "dai": "0x826f2374a718d8f6e1bd889ef28ffafc84549453",
+  "goldskySubgraphUrl": "https://api.goldsky.com/api/public/project_cmmy4l6c3g8oy01t5berz7ioa/subgraphs/biribi/prod/gn",
+  "subgraphVersion": "0.1.43"
 }

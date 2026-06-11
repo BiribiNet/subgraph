@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0xa8dedb784804f07e1748582ca309ef74acd8c040"
-      startBlock: 273618006
+      address: "0xf1e2dcbfb055ba9873d8b02d1c8b99b416d1d61b"
+      startBlock: 275797856
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -45,8 +45,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x68b830aac2cb41811b957c7380560926dd87cdbd"
-      startBlock: 273618006
+      address: "0x4cf6a900fcdd3a33b2bb1df22b8718dd24e897f8"
+      startBlock: 275797856
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -121,8 +121,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBJackpotFunder
-      address: "0xc245ad88d401d08d674596d5a2c9f17011ed27c1"
-      startBlock: 273618006
+      address: "0x9c3f57c49ba23a0e79235368affc9936d37fede9"
+      startBlock: 275797856
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -171,8 +171,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferral
-      address: "0x5d3c2b1509477b316ed4f93ad4983b384f4f345b"
-      startBlock: 273618006
+      address: "0xb80c7602af2d9288a1a0ae4c02944d9179d51439"
+      startBlock: 275797856
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -193,8 +193,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: SideBet
-      address: "0x919320b2bc4fa4dd018a52fa3c8ac9b58a27cfab"
-      startBlock: 273618006
+      address: "0xa775ada93b7b0dcf16f7233a128a91d1acc93219"
+      startBlock: 275797856
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -279,7 +279,7 @@ templates:
           handler: handleWithdrawalProcessed
         - event: BetsReleased(uint256,uint256)
           handler: handleBetsReleased
-        - event: SideBetStakeLocked(indexed address,uint256,uint256,uint256)
+        - event: SideBetStakeLocked(address,uint256,uint256,uint256)
           handler: handleSideBetStakeLocked
         - event: BetPlaced(address,uint256,bytes,uint256)
           handler: handleBetPlaced
