@@ -190,21 +190,36 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
   const assetsPaid = event.params.assetsPaid
   const sharesBurned = event.params.sharesBurned
 
+  // Fallback decrement when the request row is missing (e.g. pre-migration
+  // rows): keep the clamped assetsPaid subtraction.
+  let pendingDecrement = assetsPaid
+
   const openReqId = user.openWithdrawalRequestId
   if (openReqId) {
     const req = LargeWithdrawalRequest.load(openReqId)
     if (req) {
+      // Subtract exactly what handleWithdrawalRequested added (the estimate) —
+      // assetsPaid is 0 for cancellations and can differ from the estimate for
+      // real processing, both of which permanently drift the aggregate.
+      pendingDecrement = req.amount
       req.processedAt = event.block.timestamp
+      if (assetsPaid.equals(ZERO) && sharesBurned.equals(ZERO)) {
+        // cancelWithdrawal() emits WithdrawalProcessed(owner, bps, receiver, 0, 0):
+        // nothing was paid out — the request left the queue as a cancellation.
+        // processedAt doubles as "when the request was closed on-chain" (there
+        // is no cancelledAt field); consumers check isCancelled first.
+        req.isCancelled = true
+      }
       req.save()
     }
     user.openWithdrawalRequestId = null
     user.save()
   }
 
-  if (globalState.totalPendingLargeWithdrawals.lt(assetsPaid)) {
+  if (globalState.totalPendingLargeWithdrawals.lt(pendingDecrement)) {
     globalState.totalPendingLargeWithdrawals = ZERO
   } else {
-    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(assetsPaid)
+    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(pendingDecrement)
   }
 
   if (assetsPaid.gt(ZERO) || sharesBurned.gt(ZERO)) {
@@ -286,6 +301,8 @@ export function handleSideBetStakeLocked(event: SideBetStakeLocked): void {
   market.save()
 }
 
+// No APY recalc here: gross and locked rise by the same amount, so totalAssets
+// (and the share price) are unchanged — keep the hottest vault path BigDecimal-free.
 export function handleBetPlaced(event: BetPlaced): void {
   const market = loadMarketByBank(event.address)
   if (market == null) {
@@ -293,7 +310,6 @@ export function handleBetPlaced(event: BetPlaced): void {
   }
   addGrossVaultBalance(market, event.params.amount)
   addLockedBetLiquidity(market, event.params.amount)
-  // totalAssets-neutral (gross and locked move together) — APY recompute deferred to BetsReleased
   market.save()
 }
 
@@ -341,8 +357,8 @@ export function handleTransfer(event: VaultShareTransfer): void {
     recordUserMarketSbrbShares(event.params.from, market, event.params.value, false)
     recordUserMarketSbrbShares(event.params.to, market, event.params.value, true)
   }
-  updateUserSBRBBalance(event.params.from, event.params.value, false, market)
-  updateUserSBRBBalance(event.params.to, event.params.value, true, market)
+  updateUserSBRBBalance(event.params.from, event.params.value, false)
+  updateUserSBRBBalance(event.params.to, event.params.value, true)
 }
 
 export function handleApproval(event: Approval): void {

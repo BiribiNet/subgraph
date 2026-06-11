@@ -34,10 +34,11 @@ describe('Staking Statistics Tests', () => {
   });
 
   test('deposit updates vault totals on Market and stable class aggregate', () => {
-    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000', 1_000_000);
+    // Shares carry the ERC-4626 +6 decimal offset: 1e18 assets mint 1e24 shares at 1:1.
+    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000000000', 1_000_000);
 
     assert.fieldEquals('Market', '1', 'totalAssets', '1000000000000000000');
-    assert.fieldEquals('Market', '1', 'totalShares', '1000000000000000000');
+    assert.fieldEquals('Market', '1', 'totalShares', '1000000000000000000000000');
     assert.fieldEquals('Market', '1', 'sharePrice', '1');
     assert.fieldEquals('Market', '1', 'assetClass', 'STABLE');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'stableVaultTotalAssets', '1000000000000000000');
@@ -156,39 +157,39 @@ describe('APY Snapshot Tests', () => {
   });
 
   test('First deposit creates APY baseline on Market', () => {
-    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000', 1_000_000);
+    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000000000', 1_000_000);
 
     assert.fieldEquals('Market', '1', 'apyLifetimeBaselineTimestamp', '1000000');
     assert.fieldEquals('Market', '1', 'apyLifetimeBaselineTotalAssets', '1000000000000000000');
-    assert.fieldEquals('Market', '1', 'apyLifetimeBaselineTotalShares', '1000000000000000000');
+    assert.fieldEquals('Market', '1', 'apyLifetimeBaselineTotalShares', '1000000000000000000000000');
   });
 
   test('Daily snapshot is created on first deposit', () => {
     const timestamp = 1_000_000;
-    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000', timestamp);
+    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000000000', timestamp);
 
     const snapshotId = marketSnapshotId(timestamp);
     assert.entityCount('MarketAPYSnapshot', 1);
     assert.fieldEquals('MarketAPYSnapshot', snapshotId, 'totalAssets', '1000000000000000000');
-    assert.fieldEquals('MarketAPYSnapshot', snapshotId, 'totalShares', '1000000000000000000');
+    assert.fieldEquals('MarketAPYSnapshot', snapshotId, 'totalShares', '1000000000000000000000000');
   });
 
   test('Snapshot not created twice on same day', () => {
-    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000', 1_000_000);
-    emitDeposit(USER_ADDRESS_2, '2000000000000000000', '2000000000000000000', 1_010_000);
+    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000000000', 1_000_000);
+    emitDeposit(USER_ADDRESS_2, '2000000000000000000', '2000000000000000000000000', 1_010_000);
 
     assert.entityCount('MarketAPYSnapshot', 1);
   });
 
   test('New snapshot created on different day', () => {
-    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000', 1_000_000);
-    emitDeposit(USER_ADDRESS_2, '2000000000000000000', '2000000000000000000', 1_090_000);
+    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000000000', 1_000_000);
+    emitDeposit(USER_ADDRESS_2, '2000000000000000000', '2000000000000000000000000', 1_090_000);
 
     assert.entityCount('MarketAPYSnapshot', 2);
   });
 
   test('APY remains 0 when no time has passed', () => {
-    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000', 1_000_000);
+    emitDeposit(DEFAULT_USER, '1000000000000000000', '1000000000000000000000000', 1_000_000);
 
     assert.fieldEquals('Market', '1', 'apy7Day', '0');
     assert.fieldEquals('Market', '1', 'apy30Day', '0');

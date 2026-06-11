@@ -1,5 +1,6 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts"
 import { UserMarketStats, Market } from "../../generated/schema"
+import { ZERO_ADDRESS } from "./constant"
 import { ZERO, ONE } from "./number"
 import { getOrCreateUser } from "./user"
 
@@ -97,19 +98,36 @@ export function recordUserMarketStake(
   stats.save()
 }
 
+// Single owner of Market.stakerCount: a market gains a staker when this user's
+// per-market share balance leaves zero, and loses one when it returns to zero.
+// The global user.sbrbBalance must not drive this — it mixes share units across
+// vaults, so multi-vault stakers were only ever counted in their first market.
 export function recordUserMarketSbrbShares(
   userAddress: Bytes,
   market: Market,
   amount: BigInt,
   isIncrease: boolean
 ): void {
+  if (userAddress.toHexString() == ZERO_ADDRESS) {
+    return
+  }
   const stats = getOrCreateUserMarketStats(userAddress, market)
+  const sharesBefore = stats.sbrbShares
   if (isIncrease) {
     stats.sbrbShares = stats.sbrbShares.plus(amount)
   } else if (stats.sbrbShares.lt(amount)) {
     stats.sbrbShares = ZERO
   } else {
     stats.sbrbShares = stats.sbrbShares.minus(amount)
+  }
+  if (sharesBefore.equals(ZERO) && stats.sbrbShares.gt(ZERO)) {
+    market.stakerCount = market.stakerCount.plus(ONE)
+    market.save()
+  } else if (sharesBefore.gt(ZERO) && stats.sbrbShares.equals(ZERO)) {
+    if (market.stakerCount.gt(ZERO)) {
+      market.stakerCount = market.stakerCount.minus(ONE)
+    }
+    market.save()
   }
   stats.save()
 }
