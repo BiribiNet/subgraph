@@ -4,11 +4,12 @@ import { newMockEvent, createMockedFunction } from 'matchstick-as';
 import { BetRecorded } from '../generated/RouletteEngine/Game';
 import { Transfer as BrbTransfer } from '../generated/BRBToken/BRB';
 import { handleTransfer as handleBrbTransfer } from '../src/mappings/brb';
-import { ZERO_ADDRESS } from '../src/helpers/constant';
+import { ZERO_ADDRESS, BRB_TOKEN_ADDRESS } from '../src/helpers/constant';
 import {
   Deposit,
   WithdrawalRequested,
   WithdrawalProcessed,
+  Transfer as VaultShareTransfer,
   BetPlaced,
   BetsReleased,
   PayoutBatchProcessed,
@@ -25,6 +26,7 @@ import {
   handleDeposit,
   handleWithdrawalRequested,
   handleWithdrawalProcessed,
+  handleTransfer as handleVaultShareTransfer,
   handleBetPlaced,
   handleBetsReleased,
   handlePayoutBatchProcessed,
@@ -37,8 +39,12 @@ export const GLOBAL_STATE_ID = '0x0000000000000000000000000000000000000001';
 export const TEST_ENGINE = Address.fromString('0x2f6bbd7df2e997788a6a3759edcd7282028d40bd');
 export const TEST_BANK = Address.fromString('0xcccc000000000000000000000000000000000001');
 export const TEST_ASSET = Address.fromString('0xaaaa000000000000000000000000000000000001');
+export const TEST_BANK_2 = Address.fromString('0xcccc000000000000000000000000000000000002');
+export const TEST_ASSET_2 = Address.fromString('0xaaaa000000000000000000000000000000000002');
 export const DEFAULT_USER = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
-export const BRB_TOKEN = Address.fromString('0xa8dedb784804f07e1748582ca309ef74acd8c040');
+// Mirrors src/helpers/constant.ts so a protocol redeploy cannot silently
+// desync the BRB classification/donation tests from the indexed address.
+export const BRB_TOKEN: Address = BRB_TOKEN_ADDRESS;
 
 /** Composite RouletteRound id: globalRound + marketId (default market 1). */
 export function testRoundId(globalRound: i32, marketId: i32 = 1): string {
@@ -86,6 +92,63 @@ export function setupTestMarket(marketId: i32 = 1): void {
     lookup.market = market.id;
     lookup.save();
   }
+}
+
+/** Registers market 2 with its own bank/asset pair — for multi-vault scenarios. */
+export function setupSecondTestMarket(): void {
+  createMockedFunction(TEST_ASSET_2, 'symbol', 'symbol():(string)').returns([
+    ethereum.Value.fromString('USDX'),
+  ]);
+  createMockedFunction(TEST_ASSET_2, 'decimals', 'decimals():(uint8)').returns([
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(18)),
+  ]);
+  createMockedFunction(TEST_BANK_2, 'name', 'name():(string)').returns([
+    ethereum.Value.fromString('Biribi Test Vault 2'),
+  ]);
+  createMockedFunction(TEST_BANK_2, 'symbol', 'symbol():(string)').returns([
+    ethereum.Value.fromString('bvTEST2'),
+  ]);
+  createMockedFunction(TEST_BANK_2, 'minBet', 'minBet():(uint256)').returns([
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromString('5000000000000000000')),
+  ]);
+
+  const market = getOrCreateMarket(
+    2,
+    changetype<Bytes>(TEST_ASSET_2),
+    changetype<Bytes>(TEST_BANK_2),
+    changetype<Bytes>(TEST_ENGINE),
+    BigInt.fromI32(1_000_000),
+    BigInt.fromI32(10_000)
+  );
+  market.assetDecimals = 18;
+  market.save();
+}
+
+/** Simulates a vault share (sBRB) Transfer on the given bank — mint/burn via ZERO_ADDRESS. */
+export function emitVaultShareTransfer(
+  from: string,
+  to: string,
+  value: string,
+  timestamp: i32,
+  logIndex: i32 = 0,
+  bank: Address = TEST_BANK
+): void {
+  const event = changetype<VaultShareTransfer>(newMockEvent());
+  event.address = bank;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString(from)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('to', ethereum.Value.fromAddress(Address.fromString(to)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value)))
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(timestamp);
+  event.block.number = BigInt.fromI32(timestamp / 100);
+  handleVaultShareTransfer(event);
 }
 
 /** Same as setupTestMarket but with BRB as the vault underlying asset (donation undo on deposit). */

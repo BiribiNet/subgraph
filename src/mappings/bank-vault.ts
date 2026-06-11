@@ -301,6 +301,8 @@ export function handleSideBetStakeLocked(event: SideBetStakeLocked): void {
   market.save()
 }
 
+// No APY recalc here: gross and locked rise by the same amount, so totalAssets
+// (and the share price) are unchanged — keep the hottest vault path BigDecimal-free.
 export function handleBetPlaced(event: BetPlaced): void {
   const market = loadMarketByBank(event.address)
   if (market == null) {
@@ -308,7 +310,6 @@ export function handleBetPlaced(event: BetPlaced): void {
   }
   addGrossVaultBalance(market, event.params.amount)
   addLockedBetLiquidity(market, event.params.amount)
-  // totalAssets-neutral (gross and locked move together) — APY recompute deferred to BetsReleased
   market.save()
 }
 
@@ -356,8 +357,8 @@ export function handleTransfer(event: VaultShareTransfer): void {
     recordUserMarketSbrbShares(event.params.from, market, event.params.value, false)
     recordUserMarketSbrbShares(event.params.to, market, event.params.value, true)
   }
-  updateUserSBRBBalance(event.params.from, event.params.value, false, market)
-  updateUserSBRBBalance(event.params.to, event.params.value, true, market)
+  updateUserSBRBBalance(event.params.from, event.params.value, false)
+  updateUserSBRBBalance(event.params.to, event.params.value, true)
 }
 
 export function handleApproval(event: Approval): void {
