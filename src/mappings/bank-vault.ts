@@ -190,21 +190,36 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
   const assetsPaid = event.params.assetsPaid
   const sharesBurned = event.params.sharesBurned
 
+  // Fallback decrement when the request row is missing (e.g. pre-migration
+  // rows): keep the clamped assetsPaid subtraction.
+  let pendingDecrement = assetsPaid
+
   const openReqId = user.openWithdrawalRequestId
   if (openReqId) {
     const req = LargeWithdrawalRequest.load(openReqId)
     if (req) {
+      // Subtract exactly what handleWithdrawalRequested added (the estimate) —
+      // assetsPaid is 0 for cancellations and can differ from the estimate for
+      // real processing, both of which permanently drift the aggregate.
+      pendingDecrement = req.amount
       req.processedAt = event.block.timestamp
+      if (assetsPaid.equals(ZERO) && sharesBurned.equals(ZERO)) {
+        // cancelWithdrawal() emits WithdrawalProcessed(owner, bps, receiver, 0, 0):
+        // nothing was paid out — the request left the queue as a cancellation.
+        // processedAt doubles as "when the request was closed on-chain" (there
+        // is no cancelledAt field); consumers check isCancelled first.
+        req.isCancelled = true
+      }
       req.save()
     }
     user.openWithdrawalRequestId = null
     user.save()
   }
 
-  if (globalState.totalPendingLargeWithdrawals.lt(assetsPaid)) {
+  if (globalState.totalPendingLargeWithdrawals.lt(pendingDecrement)) {
     globalState.totalPendingLargeWithdrawals = ZERO
   } else {
-    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(assetsPaid)
+    globalState.totalPendingLargeWithdrawals = globalState.totalPendingLargeWithdrawals.minus(pendingDecrement)
   }
 
   if (assetsPaid.gt(ZERO) || sharesBurned.gt(ZERO)) {
