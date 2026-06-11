@@ -4,7 +4,7 @@ import { newMockEvent, createMockedFunction } from 'matchstick-as';
 import { BetRecorded } from '../generated/RouletteEngine/Game';
 import { Transfer as BrbTransfer } from '../generated/BRBToken/BRB';
 import { handleTransfer as handleBrbTransfer } from '../src/mappings/brb';
-import { ZERO_ADDRESS } from '../src/helpers/constant';
+import { ZERO_ADDRESS, BRB_TOKEN_ADDRESS } from '../src/helpers/constant';
 import {
   Deposit,
   WithdrawalRequested,
@@ -42,7 +42,9 @@ export const TEST_ASSET = Address.fromString('0xaaaa0000000000000000000000000000
 export const TEST_BANK_2 = Address.fromString('0xcccc000000000000000000000000000000000002');
 export const TEST_ASSET_2 = Address.fromString('0xaaaa000000000000000000000000000000000002');
 export const DEFAULT_USER = '0xbbbbedc42dc53842141be8f70df9efe4d08538a4';
-export const BRB_TOKEN = Address.fromString('0xa8dedb784804f07e1748582ca309ef74acd8c040');
+// Mirrors src/helpers/constant.ts so a protocol redeploy cannot silently
+// desync the BRB classification/donation tests from the indexed address.
+export const BRB_TOKEN: Address = BRB_TOKEN_ADDRESS;
 
 /** Composite RouletteRound id: globalRound + marketId (default market 1). */
 export function testRoundId(globalRound: i32, marketId: i32 = 1): string {
