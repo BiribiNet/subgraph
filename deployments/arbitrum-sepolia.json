@@ -33,5 +33,5 @@
   "scheduler": "0xa3bb37368a407b5412f605c0291b73784a619379",
   "dai": "0x826f2374a718d8f6e1bd889ef28ffafc84549453",
   "goldskySubgraphUrl": "https://api.goldsky.com/api/public/project_cmmy4l6c3g8oy01t5berz7ioa/subgraphs/biribi/prod/gn",
-  "subgraphVersion": "0.1.43"
+  "subgraphVersion": "0.1.44"
 }
