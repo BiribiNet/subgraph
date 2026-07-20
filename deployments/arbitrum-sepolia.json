@@ -1,12 +1,12 @@
 {
-  "startBlock": 284788469,
+  "startBlock": 284788460,
   "startBlocks": {
-    "brb": 284788469,
-    "roulette": 284788469,
-    "stakedBRB": 284788469,
-    "brbReferal": 284788469,
-    "sideBet": 284788469,
-    "jackpotFunder": 284788469
+    "brb": 284788460,
+    "roulette": 284788460,
+    "stakedBRB": 284788460,
+    "brbReferal": 284788460,
+    "sideBet": 284788460,
+    "jackpotFunder": 284788460
   },
   "addresses": {
     "brb": "0xcd97563e22017462f35ba1e266e13f8f756a53c9",

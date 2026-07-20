@@ -11,7 +11,7 @@ dataSources:
     source:
       abi: BRB
       address: "0xcd97563e22017462f35ba1e266e13f8f756a53c9"
-      startBlock: 284788469
+      startBlock: 284788460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -46,7 +46,7 @@ dataSources:
     source:
       abi: Game
       address: "0x7eb8110d9e84d3c32fa6468d13ea2bc81544acf1"
-      startBlock: 284788469
+      startBlock: 284788460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -120,7 +120,7 @@ dataSources:
     source:
       abi: BRBJackpotFunder
       address: "0xd990413247611013161a7287d262664df8da7309"
-      startBlock: 284788469
+      startBlock: 284788460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -170,7 +170,7 @@ dataSources:
     source:
       abi: BRBReferral
       address: "0x5b28b914881e069e72de8183d5b7aec662bf2905"
-      startBlock: 284788469
+      startBlock: 284788460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -192,7 +192,7 @@ dataSources:
     source:
       abi: SideBet
       address: "0xa0dcb8fced50eed13899af86de70fce42897e8b1"
-      startBlock: 284788469
+      startBlock: 284788460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
