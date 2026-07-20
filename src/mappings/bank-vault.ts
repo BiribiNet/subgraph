@@ -17,7 +17,6 @@ import {
   MinBetUpdated,
   SideBetControllerUpdated,
 } from "../../generated/templates/BankVault/BankVault4626"
-import { UpkeepRegistered } from "../../generated/templates/BankVault/MergedEvents"
 import {
   VaultDeposit,
   VaultWithdrawal,
@@ -25,7 +24,6 @@ import {
   WithdrawTransaction,
   TokenApproval,
   ContractUpgrade,
-  UpkeepRegistration,
   Market,
   GlobalState,
 } from "../../generated/schema"
@@ -402,20 +400,4 @@ export function handleRoleAdminChanged(event: RoleAdminChanged): void {
     event.params.role,
     event.params.newAdminRole
   )
-}
-
-export function handleUpkeepRegistered(event: UpkeepRegistered): void {
-  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
-  const entity = new UpkeepRegistration(id)
-  entity.registrationType = "LANE"
-  entity.upkeepId = event.params.upkeepId
-  entity.forwarder = event.params.forwarder
-  entity.gasLimit = BigInt.fromI32(0)
-  entity.linkAmount = event.params.amount
-  entity.checkDataLength = event.params.lane
-  entity.upkeepType = "payout"
-  entity.blockNumber = event.block.number
-  entity.timestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-  entity.save()
 }

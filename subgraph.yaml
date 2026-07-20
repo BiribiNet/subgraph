@@ -10,8 +10,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRB
-      address: "0xf1e2dcbfb055ba9873d8b02d1c8b99b416d1d61b"
-      startBlock: 275797856
+      address: "0xcd97563e22017462f35ba1e266e13f8f756a53c9"
+      startBlock: 284788469
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -45,8 +45,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: Game
-      address: "0x4cf6a900fcdd3a33b2bb1df22b8718dd24e897f8"
-      startBlock: 275797856
+      address: "0x7eb8110d9e84d3c32fa6468d13ea2bc81544acf1"
+      startBlock: 284788469
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -77,8 +77,6 @@ dataSources:
           handler: handleBetRecorded
         - event: RoundCountdownStarted(uint64,uint32,uint256)
           handler: handleRoundCountdownStarted
-        - event: RoundLocked(uint32,uint64,uint64)
-          handler: handleRoundLocked
         - event: VrfRequested(uint64,uint256,uint256)
           handler: handleVrfRequested
         - event: VRFResult(uint64,uint8,uint8)
@@ -121,8 +119,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBJackpotFunder
-      address: "0x9c3f57c49ba23a0e79235368affc9936d37fede9"
-      startBlock: 275797856
+      address: "0xd990413247611013161a7287d262664df8da7309"
+      startBlock: 284788469
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -171,8 +169,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBReferral
-      address: "0xb80c7602af2d9288a1a0ae4c02944d9179d51439"
-      startBlock: 275797856
+      address: "0x5b28b914881e069e72de8183d5b7aec662bf2905"
+      startBlock: 284788469
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -193,8 +191,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: SideBet
-      address: "0xa775ada93b7b0dcf16f7233a128a91d1acc93219"
-      startBlock: 275797856
+      address: "0xa0dcb8fced50eed13899af86de70fce42897e8b1"
+      startBlock: 284788469
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -259,7 +257,6 @@ templates:
         - TokenApproval
         - ContractRole
         - RoleHolder
-        - UpkeepRegistration
         - MarketAPYSnapshot
         - DailyStat
         - HourlyVolumeSnapshot
@@ -301,6 +298,4 @@ templates:
           handler: handleRoleRevoked
         - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
           handler: handleRoleAdminChanged
-        - event: UpkeepRegistered(uint256,uint256,address,uint96)
-          handler: handleUpkeepRegistered
       file: ./src/mappings/bank-vault.ts

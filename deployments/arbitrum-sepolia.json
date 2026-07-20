@@ -1,37 +1,41 @@
 {
-  "startBlock": 275797856,
+  "startBlock": 284788469,
   "startBlocks": {
-    "brb": 275797856,
-    "roulette": 275797856,
-    "stakedBRB": 275797856,
-    "brbReferal": 275797856,
-    "sideBet": 275797856,
-    "jackpotFunder": 275797856
+    "brb": 284788469,
+    "roulette": 284788469,
+    "stakedBRB": 284788469,
+    "brbReferal": 284788469,
+    "sideBet": 284788469,
+    "jackpotFunder": 284788469
   },
   "addresses": {
-    "brb": "0xf1e2dcbfb055ba9873d8b02d1c8b99b416d1d61b",
-    "roulette": "0x4cf6a900fcdd3a33b2bb1df22b8718dd24e897f8",
-    "stakedBRB": "0x1B0370FcCeD7074B93709c82370d83513d2CBF3B",
+    "brb": "0xcd97563e22017462f35ba1e266e13f8f756a53c9",
+    "roulette": "0x7eb8110d9e84d3c32fa6468d13ea2bc81544acf1",
+    "registry": "0xbb93ae01f205ba4c9c9b32def71dc8f76c67f672",
+    "scheduler": "0xad1f181ad88aee13a6643104941ecea2b963c2d7",
+    "stakedBRB": "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec",
     "banks": [
-      "0x1B0370FcCeD7074B93709c82370d83513d2CBF3B",
-      "0x3Fd333FFA46FD4654eD290EDaE24d6AAf870dBDe",
-      "0xC707F6f51CeDFf3F06833B37C508E23d3B3A607F"
+      "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec",
+      "0xBE100446eEE90392BC154F6d8d80B88f01Da91a7",
+      "0x1759B09798f3DA7FE0D129E66c0a87722a954030"
     ],
-    "brbReferal": "0xb80c7602af2d9288a1a0ae4c02944d9179d51439",
-    "upkeepManager": "0x9d8756b67dd1c0465bd4e38595563b97ea903577",
-    "jackpotTreasury": "0xa1aba5cfb684838963f5491fa4b9079ef7346dd0",
-    "jackpotFunder": "0x9c3f57c49ba23a0e79235368affc9936d37fede9",
-    "sideBet": "0xA775ADA93B7B0DcF16F7233a128A91d1ACC93219"
+    "brbReferal": "0x5b28b914881e069e72de8183d5b7aec662bf2905",
+    "automationReceiver": "0xfda0edcbcf2c6360279cf10ec079d56d43795a86",
+    "creExecutionAuthority": "0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68",
+    "jackpotTreasury": "0x89658247ab5a1d93830aececc6674170d0d7081c",
+    "jackpotFunder": "0xd990413247611013161a7287d262664df8da7309",
+    "sideBet": "0xA0DCb8FCEd50EeD13899Af86DE70FcE42897E8B1",
+    "uniswapRouter": "0xeeda8616872ef6ea2f41a4a40ab240253cd5c4ac"
   },
-  "uniswap": {
-    "factory": "0xb1a1f9958488233b339e73763232953837ce1e34",
-    "weth": "0x904d9585b6a1d13a07794f2af102a025becbf911",
-    "router": "0xf89aca501fdc766b5f7b308bdb7d23f7c62ee4d8"
+  "vrf": {
+    "coordinator": "0x5CE8D5A2BC84beb22a398CCA51996F7930313D61",
+    "linkToken": "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
+    "subscriptionId": "91478276944701169124973572614879929312810262634334161093796665773446386878274"
   },
-  "deployer": "0xbbbbedc42dc53842141be8f70df9efe4d08538a4",
-  "registry": "0x06de2b57bc12cef9c6c16ea7915226b1259ffd11",
-  "scheduler": "0xa3bb37368a407b5412f605c0291b73784a619379",
-  "dai": "0x826f2374a718d8f6e1bd889ef28ffafc84549453",
-  "goldskySubgraphUrl": "https://api.goldsky.com/api/public/project_cmmy4l6c3g8oy01t5berz7ioa/subgraphs/biribi/prod/gn",
-  "subgraphVersion": "0.1.43"
+  "markets": {
+    "usdc": { "marketId": 1, "asset": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d", "bank": "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec" },
+    "dai": { "marketId": 2, "asset": "0xa64617abdca4477b17020a763f24bfe27046a752", "bank": "0xBE100446eEE90392BC154F6d8d80B88f01Da91a7" },
+    "brb": { "marketId": 3, "asset": "0xcd97563e22017462f35ba1e266e13f8f756a53c9", "bank": "0x1759B09798f3DA7FE0D129E66c0a87722a954030" }
+  },
+  "deployedAt": "2026-07-06T19:30:00Z"
 }

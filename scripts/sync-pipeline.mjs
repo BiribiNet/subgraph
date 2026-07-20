@@ -27,6 +27,31 @@ import semver from "semver";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 config({ path: join(root, ".env") });
 
+/** Must match turbo.yaml webhook url placeholder (string replace — not a regex). */
+const WEBHOOK_SECRET_PLACEHOLDER = "${WEBHOOK_SECRET}";
+
+function injectWebhookSecret(turbo, secret) {
+  if (!turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) return turbo;
+  const out = turbo.replaceAll(WEBHOOK_SECRET_PLACEHOLDER, secret);
+  if (out.includes(WEBHOOK_SECRET_PLACEHOLDER)) {
+    throw new Error(
+      "sync:pipeline: failed to substitute WEBHOOK_SECRET in turbo YAML",
+    );
+  }
+  return out;
+}
+
+function requireWebhookSecret(turbo) {
+  if (!turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) return null;
+  const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
+  if (!webhookSecret) {
+    throw new Error(
+      "sync:pipeline: set WEBHOOK_SECRET in .env for turbo apply (or use GOLDSKY_SYNC_FILES_ONLY=1).",
+    );
+  }
+  return webhookSecret;
+}
+
 const DEPLOY_JSON = process.env.DEPLOY_JSON;
 if (!DEPLOY_JSON) {
   console.error("sync:pipeline: set DEPLOY_JSON to the deployment JSON path.");
@@ -243,6 +268,16 @@ let turbo = turboTemplate.replace(abiPlaceholder, sqlAbiLiteral);
 const inList = turboAddresses.map((x) => `        '${x}'`).join(",\n");
 turbo = turbo.replace(addressPlaceholder, inList);
 
+const webhookSecretForWrite = process.env.WEBHOOK_SECRET?.trim();
+if (turbo.includes(WEBHOOK_SECRET_PLACEHOLDER) && webhookSecretForWrite) {
+  turbo = injectWebhookSecret(turbo, webhookSecretForWrite);
+  console.log("Injected WEBHOOK_SECRET into turbo.applied.yaml");
+} else if (turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) {
+  console.warn(
+    "sync:pipeline: turbo.applied.yaml still contains ${WEBHOOK_SECRET}; set WEBHOOK_SECRET in .env before goldsky turbo apply.",
+  );
+}
+
 writeFileSync(turboAppliedPath, turbo, "utf8");
 console.log(
   "Wrote turbo.applied.yaml (resolved ABI + addresses; turbo.yaml template unchanged)",
@@ -424,23 +459,10 @@ try {
   execSync("yarn build", { cwd: root, stdio: "inherit" });
 
   let turboPipelineFile = "turbo.applied.yaml";
-  if (turbo.includes("${WEBHOOK_SECRET}")) {
-    const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
-    if (!webhookSecret) {
-      throw new Error(
-        "sync:pipeline: set WEBHOOK_SECRET in .env for turbo apply (or use GOLDSKY_SYNC_FILES_ONLY=1).",
-      );
-    }
-    const appliedPath = turboAppliedPath;
-    const yamlDoubleQuotedSecret =
-      /\$\{WEBHOOK_SECRET\}"/.test(turbo) || /\?secret=\$\{WEBHOOK_SECRET\}"/.test(turbo);
-    const turboWithSecret = yamlDoubleQuotedSecret
-      ? turbo.replace(
-          /\$\{WEBHOOK_SECRET\}/g,
-          webhookSecret.replace(/\\/g, "\\\\").replace(/"/g, '\\"'),
-        )
-      : turbo.replace(/\$\{WEBHOOK_SECRET\}/g, webhookSecret);
-    writeFileSync(appliedPath, turboWithSecret, "utf8");
+  if (turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) {
+    const webhookSecret = requireWebhookSecret(turbo);
+    turbo = injectWebhookSecret(turbo, webhookSecret);
+    writeFileSync(turboAppliedPath, turbo, "utf8");
     turboPipelineFile = "turbo.applied.yaml";
     console.log("Wrote turbo.applied.yaml with webhook secret for Goldsky.");
   }

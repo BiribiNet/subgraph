@@ -9,13 +9,11 @@ import {
   MarketRegistered,
   JackpotFunded,
   InfrastructureFeePaid,
-  RoundLocked,
   Upgraded
 } from "../../generated/RouletteEngine/Game"
 import { RouletteRound, ContractUpgrade, GlobalRound, RouletteBet, GlobalState } from "../../generated/schema"
 import {
   ROUND_STATUS_BETTING,
-  ROUND_STATUS_NO_MORE_BETS,
   ROUND_STATUS_VRF,
   ROUND_STATUS_PAYOUT,
   ROUND_STATUS_CLEAN
@@ -202,7 +200,7 @@ export function processRoundCountdownStarted(event: RoundCountdownStarted): void
 
   // RoundCountdownStarted is the FIRST log of the first-bet tx (before
   // BetRecorded), so the GlobalRound entity does not exist yet at this point —
-  // create it like processRoundLocked does instead of dropping the event
+  // create it instead of dropping the event
   // (a load + early-return left triggerMarket/lockAt unset on every round).
   const gr = getOrCreateGlobalRound(event.params.roundId, event.block.timestamp)
   const triggerMarketId = event.params.triggerMarketId.toI32()
@@ -215,15 +213,11 @@ export function processRoundCountdownStarted(event: RoundCountdownStarted): void
   gr.save()
 }
 
-export function processRoundLocked(event: RoundLocked): void {
-  const gr = getOrCreateGlobalRound(event.params.globalRoundId, event.block.timestamp)
-  gr.status = ROUND_STATUS_NO_MORE_BETS
-  gr.endedAt = event.block.timestamp
-  gr.save()
-
-  lockAllParticipatingMarketRounds(event.params.globalRoundId)
-}
-
+/**
+ * The engine no longer emits a separate RoundLocked event: the TriggerVrf job locks
+ * the round and requests VRF in one transaction, so VrfRequested IS the lock signal.
+ * Betting is also rejected on-chain once lockAt elapsed, ahead of this event.
+ */
 export function processVrfRequested(event: VrfRequested): void {
   const globalState = getOrCreateGlobalState()
   const resolvingRoundId = event.params.newRoundId
@@ -232,14 +226,14 @@ export function processVrfRequested(event: VrfRequested): void {
   globalState.roundTransitionInProgress = true
   globalState.save()
 
-  const gr = GlobalRound.load(globalRoundIdBytes(resolvingRoundId))
-  if (gr != null) {
-    gr.status = ROUND_STATUS_VRF
-    gr.requestId = event.params.requestId
-    gr.vrfTxHash = event.transaction.hash
-    gr.endedAt = event.block.timestamp
-    gr.save()
-  }
+  const gr = getOrCreateGlobalRound(resolvingRoundId, event.block.timestamp)
+  gr.status = ROUND_STATUS_VRF
+  gr.requestId = event.params.requestId
+  gr.vrfTxHash = event.transaction.hash
+  gr.endedAt = event.block.timestamp
+  gr.save()
+
+  lockAllParticipatingMarketRounds(resolvingRoundId)
 }
 
 export function processVRFResult(event: VRFResult): void {

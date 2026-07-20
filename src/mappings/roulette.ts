@@ -10,7 +10,6 @@ import {
   MarketRegistered,
   JackpotFunded,
   InfrastructureFeePaid,
-  RoundLocked,
   ReferralSet,
   WithdrawalQueueBatchSizeUpdated,
   MaxWithdrawalQueueLengthUpdated,
@@ -33,7 +32,6 @@ import { processReferralSet } from "../helpers/referral-engine"
 import {
   processBetRecorded,
   processRoundCountdownStarted,
-  processRoundLocked,
   processVrfRequested,
   processVRFResult,
   processRoundResolved,
@@ -50,10 +48,6 @@ export function handleBetRecorded(event: BetRecorded): void {
 
 export function handleRoundCountdownStarted(event: RoundCountdownStarted): void {
   processRoundCountdownStarted(event)
-}
-
-export function handleRoundLocked(event: RoundLocked): void {
-  processRoundLocked(event)
 }
 
 export function handleVrfRequested(event: VrfRequested): void {

@@ -8,8 +8,8 @@ import {
   test,
 } from 'matchstick-as';
 
-import { PayoutProgress, RoundLocked, RoundCountdownStarted } from '../generated/RouletteEngine/Game';
-import { handlePayoutProgress, handleRoundLocked, handleRoundCountdownStarted } from '../src/mappings/roulette';
+import { PayoutProgress, VrfRequested, RoundCountdownStarted } from '../generated/RouletteEngine/Game';
+import { handlePayoutProgress, handleVrfRequested, handleRoundCountdownStarted } from '../src/mappings/roulette';
 import {
   CORNER_BET_DATA,
   DEFAULT_USER,
@@ -21,7 +21,7 @@ import {
   setupTestMarket,
   testRoundId,
 } from './helpers';
-import { ROUND_STATUS_BETTING, ROUND_STATUS_NO_MORE_BETS, ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
+import { ROUND_STATUS_BETTING, ROUND_STATUS_NO_MORE_BETS, ROUND_STATUS_VRF, ROUND_STATUS_PAYOUT } from '../src/helpers/constant';
 
 function emitRoundCountdownStarted(roundId: i32, lockAt: i32, timestamp: i32): void {
   const ev = changetype<RoundCountdownStarted>(newMockEvent());
@@ -95,20 +95,25 @@ describe('Multi-market roulette lifecycle', () => {
     assert.fieldEquals('DailyStat', '11', 'betCount', '1');
   });
 
-  test('RoundLocked updates GlobalRound status', () => {
+  test('VrfRequested locks market rounds and moves GlobalRound to VRF (no separate RoundLocked event)', () => {
+    // The engine's TriggerVrf job locks the round and requests VRF in one tx,
+    // so VrfRequested is now the lock signal for market rounds.
     emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
 
-    const ev = changetype<RoundLocked>(newMockEvent());
+    const ev = changetype<VrfRequested>(newMockEvent());
     ev.address = TEST_ENGINE;
     ev.parameters = new Array<ethereum.EventParam>();
-    ev.parameters.push(new ethereum.EventParam('marketId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    ev.parameters.push(new ethereum.EventParam('roundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
-    ev.parameters.push(new ethereum.EventParam('globalRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    ev.parameters.push(new ethereum.EventParam('newRoundId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1))));
+    ev.parameters.push(new ethereum.EventParam('requestId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(777))));
+    ev.parameters.push(new ethereum.EventParam('timestamp', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1_000_200))));
     ev.block.timestamp = BigInt.fromI32(1_000_200);
-    handleRoundLocked(ev);
+    handleVrfRequested(ev);
 
-    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'status', ROUND_STATUS_NO_MORE_BETS);
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'status', ROUND_STATUS_VRF);
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'requestId', '777');
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(1), 'endedAt', '1000200');
     assert.fieldEquals('RouletteRound', testRoundId(1), 'status', ROUND_STATUS_NO_MORE_BETS);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'roundTransitionInProgress', 'true');
   });
 
   test('PayoutProgress updates round payout totals and status', () => {

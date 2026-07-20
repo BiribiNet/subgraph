@@ -171,6 +171,16 @@
   },
   {
     "inputs": [],
+    "name": "StaleJackpotChunk",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "StalePayoutChunk",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "UUPSUnauthorizedCallContext",
     "type": "error"
   },
@@ -543,31 +553,6 @@
       }
     ],
     "name": "RoundDurationUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "uint32",
-        "name": "marketId",
-        "type": "uint32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "roundId",
-        "type": "uint64"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "globalRoundId",
-        "type": "uint64"
-      }
-    ],
-    "name": "RoundLocked",
     "type": "event"
   },
   {
@@ -1510,6 +1495,35 @@
         "internalType": "uint32",
         "name": "",
         "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "roundId",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "lane",
+        "type": "uint32"
+      }
+    ],
+    "name": "payoutShardCursor",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
