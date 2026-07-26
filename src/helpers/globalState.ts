@@ -39,6 +39,7 @@ export function getOrCreateGlobalState(): GlobalState {
     globalState.totalDeposited = ZERO
     globalState.totalWithdrawn = ZERO
     globalState.roundDuration = ZERO
+    globalState.failedAutomationCalls = ZERO
   }
   return globalState
 }

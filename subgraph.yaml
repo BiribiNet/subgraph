@@ -179,12 +179,15 @@ dataSources:
         - BRBReferalTransfer
         - User
         - BRBPointsConfig
+        - TokenApproval
       abis:
         - name: BRBReferral
           file: ./abis/BRBReferral.json
       eventHandlers:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
       file: ./src/mappings/referral.ts
   - name: SideBet
     kind: ethereum/contract
@@ -207,6 +210,7 @@ dataSources:
         - UserMarketStats
         - ContractRole
         - RoleHolder
+        - ContractUpgrade
       abis:
         - name: SideBet
           file: ./abis/SideBet.json
@@ -235,7 +239,101 @@ dataSources:
           handler: handleRoleRevoked
         - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
           handler: handleRoleAdminChanged
+        - event: Upgraded(indexed address)
+          handler: handleSideBetUpgraded
       file: ./src/mappings/side-bet.ts
+  - name: AutomationReceiver
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: AutomationReceiver
+      address: "0xfda0edcbcf2c6360279cf10ec079d56d43795a86"
+      startBlock: 284788460
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - AutomationCall
+        - AutomationCallAllowance
+        - GlobalState
+        - GlobalRound
+      abis:
+        - name: AutomationReceiver
+          file: ./abis/AutomationReceiver.json
+      eventHandlers:
+        - event: CallExecuted(indexed address,indexed bytes4,bytes)
+          handler: handleCallExecuted
+        - event: CallFailed(indexed address,indexed bytes4,bytes)
+          handler: handleCallFailed
+        - event: CallAllowedSet(indexed address,indexed bytes4,bool)
+          handler: handleCallAllowedSet
+      file: ./src/mappings/automation-receiver.ts
+  - name: UpkeepScheduler
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: UpkeepScheduler
+      address: "0xad1f181ad88aee13a6643104941ecea2b963c2d7"
+      startBlock: 284788460
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - SchedulerState
+        - SchedulerLaneCursor
+        - ContractRole
+        - RoleHolder
+      abis:
+        - name: UpkeepScheduler
+          file: ./abis/UpkeepScheduler.json
+      eventHandlers:
+        - event: ScanLimitUpdated(uint32)
+          handler: handleScanLimitUpdated
+        - event: MaxPayoutsPerCallUpdated(uint32)
+          handler: handleMaxPayoutsPerCallUpdated
+        - event: ForwarderAuthorityUpdated(address)
+          handler: handleForwarderAuthorityUpdated
+        - event: LaneCursorAdvanced(uint256,uint32,uint32)
+          handler: handleLaneCursorAdvanced
+        - event: SideBetCursorAdvanced(uint256,uint256,uint256)
+          handler: handleSideBetCursorAdvanced
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+      file: ./src/mappings/upkeep-scheduler.ts
+  - name: CreExecutionAuthority
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: CreExecutionAuthority
+      address: "0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68"
+      startBlock: 284788460
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - CreExecutorApproval
+        - ContractRole
+        - RoleHolder
+      abis:
+        - name: CreExecutionAuthority
+          file: ./abis/CreExecutionAuthority.json
+      eventHandlers:
+        - event: ExecutorApprovalUpdated(indexed address,bool)
+          handler: handleExecutorApprovalUpdated
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+      file: ./src/mappings/cre-authority.ts
 templates:
   - name: BankVault
     kind: ethereum/contract

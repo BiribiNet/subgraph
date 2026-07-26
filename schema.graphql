@@ -168,6 +168,8 @@ type GlobalRound @entity(immutable: false) {
   forceResolved: Boolean!
   "Markets with bets this round"
   participantMarketCount: BigInt!
+  "AutomationReceiver.CallFailed count while this round was current (a failed performUpkeep does not revert the CRE report — see AutomationCall for details)"
+  failedAutomationCalls: BigInt!
   "Per-market slices"
   marketRounds: [RouletteRound!]! @derivedFrom(field: "globalRound")
 }
@@ -391,9 +393,9 @@ type RouletteRound @entity(immutable: false) {
   roundBurnAmount: BigInt!
   "Distinct bettors in this round (per market) — incremented on each user's first bet of the round"
   uniqueBettors: BigInt!
-  "Failed payout batches in this round. Reserved: stays 0 until the engine emits a payout-failure event."
+  "Failed payout batches in this round. Reserved: stays 0 — no engine event attributes a failure to a (round, market) pair; failed automation calls are tracked on GlobalRound.failedAutomationCalls + AutomationCall."
   failedPayoutBatches: BigInt!
-  "Failed jackpot batches in this round. Reserved: stays 0 until the engine emits a jackpot-failure event."
+  "Failed jackpot batches in this round. Reserved: stays 0 — see failedPayoutBatches."
   failedJackpotBatches: BigInt!
   "Array of bets in this round"
   bets: [RouletteBet]! @derivedFrom(field: "round")
@@ -525,6 +527,8 @@ type GlobalState @entity(immutable: false) {
   jackpotFunder: Bytes
   "Active JackpotTreasury address (engine config — JackpotTreasuryUpdated); null until set"
   jackpotTreasury: Bytes
+  "Lifetime AutomationReceiver.CallFailed count (CRE automation health)"
+  failedAutomationCalls: BigInt!
 }
 
 # Daily snapshot for per-market APY calculations
@@ -766,6 +770,8 @@ type ContractRole @entity(immutable: false) {
   contractName: String!
   "bytes32 role identifier"
   role: Bytes!
+  "Human-readable role name (keccak reverse lookup, null for unknown roles)"
+  roleName: String
   "Role that administers members of this role (RoleAdminChanged)"
   adminRole: Bytes!
   "Current and past assignments"
@@ -801,29 +807,70 @@ type ContractUpgrade @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-"Chainlink upkeep registration"
-type UpkeepRegistration @entity(immutable: true) {
+# === Chainlink CRE automation ===
+# UpkeepManager registrations no longer exist (contract deleted in the CRE
+# migration) — automation health is tracked through the AutomationReceiver /
+# UpkeepScheduler / CreExecutionAuthority events below.
+
+"An upkeep call relayed by AutomationReceiver (CallExecuted / CallFailed). A failed call does NOT revert the CRE report — this entity is the only on-chain trace."
+type AutomationCall @entity(immutable: true) {
+  "txHash-logIndex"
   id: Bytes!
-  "Registration type: CLEANING or STANDARD"
-  registrationType: String!
-  "Chainlink upkeep ID"
-  upkeepId: BigInt!
-  "Forwarder address"
-  forwarder: Bytes!
-  "Gas limit"
-  gasLimit: BigInt!
-  "LINK amount funded"
-  linkAmount: BigInt!
-  "Check data length (STANDARD only)"
-  checkDataLength: BigInt
-  "Upkeep type"
-  upkeepType: String!
-  "Block number"
+  "Call target (e.g. the UpkeepScheduler)"
+  target: Bytes!
+  "4-byte function selector of the relayed call"
+  selector: Bytes!
+  "False for CallFailed"
+  success: Boolean!
+  "Revert reason bytes (CallFailed only)"
+  reason: Bytes
   blockNumber: BigInt!
-  "Block timestamp"
   timestamp: BigInt!
-  "Transaction hash"
   transactionHash: Bytes!
+}
+
+"Allowlisted (target, selector) pair on the AutomationReceiver (CallAllowedSet)"
+type AutomationCallAllowance @entity(immutable: false) {
+  "target ++ selector"
+  id: Bytes!
+  target: Bytes!
+  selector: Bytes!
+  allowed: Boolean!
+  updatedAt: BigInt!
+}
+
+"CreExecutionAuthority executor approval (ExecutorApprovalUpdated)"
+type CreExecutorApproval @entity(immutable: false) {
+  "executor address"
+  id: Bytes!
+  executor: Bytes!
+  approved: Boolean!
+  updatedAt: BigInt!
+}
+
+"UpkeepScheduler configuration (singleton per scheduler address)"
+type SchedulerState @entity(immutable: false) {
+  "scheduler address"
+  id: Bytes!
+  "Bets scanned per checkUpkeep pass"
+  scanLimit: BigInt
+  "Payouts batched per performUpkeep call"
+  maxPayoutsPerCall: BigInt
+  "CreExecutionAuthority gating performUpkeep callers"
+  forwarderAuthority: Bytes
+  updatedAt: BigInt!
+}
+
+"Per-lane scheduler cursors (LaneCursorAdvanced / SideBetCursorAdvanced)"
+type SchedulerLaneCursor @entity(immutable: false) {
+  "lane index as bytes"
+  id: Bytes!
+  lane: BigInt!
+  "Roulette payout scan cursor"
+  payoutCursor: BigInt!
+  "SideBet settlement cursor (bet id)"
+  sideBetCursorBetId: BigInt!
+  updatedAt: BigInt!
 }
 
 # === Side Bet (Phase 3) ===
