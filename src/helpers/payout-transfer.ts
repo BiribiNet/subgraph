@@ -11,6 +11,7 @@ import { JACKPOT_TREASURY_ADDRESS, ROUND_STATUS_PAYOUT } from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "./aggregation"
 import { getOrCreateGlobalState } from "./globalState"
+import { ZERO } from "./number"
 import { findBetInGlobalRound, findBetInMarketRound, isKnownBank, loadMarketByBank } from "./market"
 import { updateUserRouletteStats } from "./user"
 import { recordUserMarketWin } from "./user-market-stats"
@@ -91,7 +92,12 @@ export function tryRecordMarketPayoutTransfer(
     jackpotPayoutTx.transactionHash = transactionHash
     jackpotPayoutTx.save()
 
-    globalState.currentJackpot = globalState.currentJackpot.minus(value)
+    // Clamp at zero: `currentJackpot` is a counter started at the manifest
+    // startBlock, so it under-states the pool if the treasury already held BRB
+    // then. graph-ts BigInt is signed and would silently go negative.
+    globalState.currentJackpot = value.gt(globalState.currentJackpot)
+      ? ZERO
+      : globalState.currentJackpot.minus(value)
 
     globalState.totalJackpotsPaid = globalState.totalJackpotsPaid.plus(value)
     globalState.totalPayouts = globalState.totalPayouts.plus(value)
@@ -105,6 +111,8 @@ export function tryRecordMarketPayoutTransfer(
 
     const dailyStatsJackpotPayout = getOrCreateDailyStats(timestamp)
     dailyStatsJackpotPayout.totalPayouts = dailyStatsJackpotPayout.totalPayouts.plus(normalizedPayout)
+    // End-of-day pool snapshot — see the matching stamp in `brb.ts`.
+    dailyStatsJackpotPayout.jackpotPool = globalState.currentJackpot
     dailyStatsJackpotPayout.save()
     const hourlyJackpotPayout = getOrCreateHourlySnapshot(timestamp)
     hourlyJackpotPayout.totalPayouts = hourlyJackpotPayout.totalPayouts.plus(normalizedPayout)

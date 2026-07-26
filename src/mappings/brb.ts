@@ -54,17 +54,23 @@ export function handleTransfer(event: Transfer): void {
   const fromHex = event.params.from.toHexString()
   const toHex = event.params.to.toHexString()
 
-  if (fromHex == ZERO_ADDRESS) {
-    globalState.brbTotalSupply = globalState.brbTotalSupply.plus(event.params.value)
-    globalState.save()
-    return
-  }
-
+  // Credited before the mint short-circuit below: BRB reaches the treasury both
+  // as a BRBJackpotFunder transfer and (potentially) as a direct mint, and both
+  // grow the pool.
   if (event.params.to.equals(JACKPOT_TREASURY_ADDRESS)) {
     globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
     const dailyStatsJackpot = getOrCreateDailyStats(event.block.timestamp)
     dailyStatsJackpot.jackpotFunded = dailyStatsJackpot.jackpotFunded.plus(event.params.value)
+    // `jackpotPool` is an end-of-day snapshot, not an accumulator: stamp the
+    // post-mutation pool and let the last write of the day win.
+    dailyStatsJackpot.jackpotPool = globalState.currentJackpot
     dailyStatsJackpot.save()
+  }
+
+  if (fromHex == ZERO_ADDRESS) {
+    globalState.brbTotalSupply = globalState.brbTotalSupply.plus(event.params.value)
+    globalState.save()
+    return
   }
 
   if (toHex == ZERO_ADDRESS) {
@@ -105,6 +111,11 @@ export function handleTransfer(event: Transfer): void {
     }
   }
 
+  // Flush before tryRecordMarketPayoutTransfer: that helper loads and saves its
+  // own GlobalState copy, so saving here afterwards would clobber its jackpot
+  // and payout writes.
+  globalState.save()
+
   tryRecordMarketPayoutTransfer(
     event.params.from,
     event.params.to,
@@ -114,8 +125,6 @@ export function handleTransfer(event: Transfer): void {
     event.transaction.hash,
     event.logIndex
   )
-
-  globalState.save()
 }
 
 export function handleApproval(event: Approval): void {
