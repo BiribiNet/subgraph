@@ -310,6 +310,29 @@ for (const [name, key] of dsMap) {
 writeFileSync(join(root, "subgraph.yaml"), subgraph, "utf8");
 console.log("Patched subgraph.yaml addresses and start blocks");
 
+// src/helpers/constant.ts hardcodes two addresses the mappings compare against
+// (jackpot-payout detection + BRB market classification). Patch them from the
+// deployment JSON so a redeploy can never leave them stale.
+const constantPath = join(root, "src", "helpers", "constant.ts");
+let constantTs = readFileSync(constantPath, "utf8");
+const constantMap = [
+  ["JACKPOT_TREASURY_ADDRESS", addr("jackpotTreasury")],
+  ["BRB_TOKEN_ADDRESS", addr("brb")],
+];
+for (const [name, value] of constantMap) {
+  const constRe = new RegExp(
+    `(export const ${name} = Address\\.fromString\\(\\s*")0x[a-fA-F0-9]{40}("\\s*\\))`,
+  );
+  if (!constRe.test(constantTs)) {
+    throw new Error(
+      `sync:pipeline: cannot find ${name} in src/helpers/constant.ts`,
+    );
+  }
+  constantTs = constantTs.replace(constRe, `$1${value}$2`);
+}
+writeFileSync(constantPath, constantTs, "utf8");
+console.log("Patched src/helpers/constant.ts addresses");
+
 if (process.env.GOLDSKY_SYNC_FILES_ONLY === "1") {
   console.log("GOLDSKY_SYNC_FILES_ONLY=1 — skipping Goldsky CLI, codegen, deploy.");
   process.exit(0);

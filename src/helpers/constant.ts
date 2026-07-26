@@ -2,11 +2,11 @@ import { Address } from "@graphprotocol/graph-ts"
 
 /** Must match deployments/arbitrum-sepolia.json addresses.jackpotTreasury (sync-pipeline). */
 export const JACKPOT_TREASURY_ADDRESS = Address.fromString(
-  "0xa1aba5cfb684838963f5491fa4b9079ef7346dd0"
+  "0x89658247ab5a1d93830aececc6674170d0d7081c"
 )
 /** Must match deployments/arbitrum-sepolia.json addresses.brb (sync-pipeline). */
 export const BRB_TOKEN_ADDRESS = Address.fromString(
-  "0xf1e2dcbfb055ba9873d8b02d1c8b99b416d1d61b"
+  "0xcd97563e22017462f35ba1e266e13f8f756a53c9"
 )
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 // Constants for bet types (same as in roulette.ts)
