@@ -1,7 +1,7 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { DailyStat, DailyPlayer, HourlyVolumeSnapshot, HourlyPlayer, RouletteRound } from "../../generated/schema"
+import { DailyStat, DailyPlayer, GlobalState, HourlyVolumeSnapshot, HourlyPlayer, RouletteRound } from "../../generated/schema"
 import { ZERO } from "./number"
-import { getOrCreateGlobalState } from "./globalState"
+import { getOrCreateGlobalState, GLOBAL_STATE_ID } from "./globalState"
 
 const SECONDS_PER_DAY = BigInt.fromI32(86400)
 const SECONDS_PER_HOUR = BigInt.fromI32(3600)
@@ -20,7 +20,12 @@ export function getOrCreateDailyStats(timestamp: BigInt): DailyStat {
     stats.burnAmount = ZERO
     stats.jackpotFunded = ZERO
     stats.vaultSharePrice = BigDecimal.fromString("0")
-    stats.jackpotPool = ZERO
+    // Carry the standing pool forward so a day with no jackpot activity still
+    // reports the real pool size instead of 0. Loaded directly rather than via
+    // `getOrCreateGlobalState()`, which would side-effect a `GlobalRound` into
+    // existence while merely creating a daily bucket.
+    const currentState = GlobalState.load(GLOBAL_STATE_ID)
+    stats.jackpotPool = currentState == null ? ZERO : currentState.currentJackpot
     stats.roundsCompleted = ZERO
     stats.totalPayouts = ZERO
     stats.depositVolume = ZERO
