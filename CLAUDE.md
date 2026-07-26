@@ -29,22 +29,24 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 ### Protocol Smart Contracts (Arbitrum Sepolia, multi-market redeploy)
 
 > Source of truth for these addresses: `subgraph.yaml` / `networks.json` /
-> `deployments/arbitrum-sepolia.json` (all data sources start at **block 273618006**).
-> Keep this table in sync with those configs whenever the protocol is redeployed.
+> `deployments/arbitrum-sepolia.json` (2026-07-06 CRE redeploy — all data sources
+> start at **block 284788460**). Keep this table in sync with those configs
+> whenever the protocol is redeployed; `yarn test` runs `check-constants` to
+> guard the hardcoded addresses in `src/helpers/constant.ts`.
 
 | Contract | Address | Key Events to Index |
 |---|---|---|
-| **RouletteEngine** (hub) | `0x68b830aac2cb41811b957c7380560926dd87cdbd` | `BetRecorded`, `RoundLocked`, `GlobalRoundSealed`, `VrfRequested`, `VRFResult`, `RoundResolved`, `PayoutProgress`, `JackpotFunded`, `InfrastructureFeePaid`, `MarketRegistered`, `MinJackpotConditionUpdated`, `Initialized`, `Upgraded` |
-| **BRB Token (ERC-20)** | `0xa8dedb784804f07e1748582ca309ef74acd8c040` | `Transfer`, `Approval` (deflationary: 0.5% burned per round) |
-| **BankVault4626 (USDC bank, default)** | `0xb4Ec1620424aCbF204dDe7C5FccfB792a8ddDc5B` | `Deposit`, `Withdraw`, `WithdrawalRequested/Processed/Ejected`, `BetPlaced`, `Transfer`, `Approval`, `Role*`, `UpkeepRegistered` |
-| **BankVault4626** (template — all markets) | dynamic — spawned by `MarketRegistered`. Deployed banks: `0xb4Ec1620…`, `0x823AE56D…`, `0xcF6759fD…` | same as the USDC bank |
-| **BRBReferral** (legacy, deprecated) | `0x5d3c2b1509477b316ed4f93ad4983b384f4f345b` | `Transfer`, `Approval` |
-| **BRBJackpotFunder** | `0xc245ad88d401d08d674596d5a2c9f17011ed27c1` | `FundedFromMarket`, `FundFromMarketSkipped`, `SwapAssetBpsUpdated`, `TreasuryBrbSplitUpdated`, `BrbRatioUpdated`, `SlippageBpsUpdated` |
-| **SideBet (BRBGAME)** | `0x919320b2bC4fa4DD018a52fA3C8ac9B58a27CfAb` | `SideBetPlaced`, `SideBetSettled`, `Config*`, `SideBetJackpotFunded`, `SideBetInfrastructureFeePaid`, `Role*` |
-| **JackpotTreasury** | `0x4416181c11ee20481c466ed95fc8e997adbf5774` | not a data source — BRB transfers tracked via `JACKPOT_TREASURY_ADDRESS` in `src/helpers/constant.ts` (keep in sync) |
+| **RouletteEngine** (hub) | `0x7eb8110d9e84d3c32fa6468d13ea2bc81544acf1` | `BetRecorded`, `RoundCountdownStarted`, `VrfRequested` (also the lock signal — no `RoundLocked` since the CRE migration), `VRFResult`, `RoundResolved`, `PayoutProgress`, `JackpotFunded`, `InfrastructureFeePaid`, `MarketRegistered`, `ReferralSet`, config setters, `Initialized`, `Upgraded`, `Role*` |
+| **BRB Token (ERC-20)** | `0xcd97563e22017462f35ba1e266e13f8f756a53c9` | `Transfer`, `Approval` (deflationary: 0.5% burned per round) |
+| **BankVault4626** (template — all markets) | dynamic — spawned by `MarketRegistered`. Deployed banks: USDC `0x7A8C8E48…`, DAI `0xBE100446…`, BRB `0x1759B097…` | `Deposit`, `Withdraw` (no-op — BPS queue), `WithdrawalRequested/Processed` (bps), `BetPlaced`, `BetsReleased`, `PayoutBatchProcessed`, `MinBetUpdated`, `SideBetStakeLocked`, `SideBetControllerUpdated`, `Transfer`, `Approval`, `Role*` |
+| **BRBReferral** (legacy, deprecated) | `0x5b28b914881e069e72de8183d5b7aec662bf2905` | `Transfer`, `Approval` |
+| **BRBJackpotFunder** | `0xd990413247611013161a7287d262664df8da7309` | `FundedFromMarket`, `FundFromMarketSkipped`, TWAP config (`TwapWindowUpdated`, `PairObservationUpdated`, `SlippageBpsUpdated`, `ColdSlippageBpsUpdated`), failure incidents, `TokenSwept`, `Role*` |
+| **SideBet (BRBGAME)** | `0xA0DCb8FCEd50EeD13899Af86DE70FcE42897E8B1` | `SideBetPlaced`, `SideBetSettled`, `Config*`, `SideBetJackpotFunded`, `SideBetInfrastructureFeePaid`, `MultiplierBandUpdated`, `Upgraded`, `Role*` |
+| **UpkeepScheduler** | `0xad1f181ad88aee13a6643104941ecea2b963c2d7` | `ScanLimitUpdated`, `MaxPayoutsPerCallUpdated`, `ForwarderAuthorityUpdated`, `LaneCursorAdvanced`, `SideBetCursorAdvanced`, `Role*` |
+| **AutomationReceiver** (CRE) | `0xfda0edcbcf2c6360279cf10ec079d56d43795a86` | `CallExecuted`, `CallFailed` (the automation-health signal — a failed call does NOT revert the CRE report), `CallAllowedSet` |
+| **CreExecutionAuthority** | `0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68` | `ExecutorApprovalUpdated`, `Role*` |
+| **JackpotTreasury** | `0x89658247ab5a1d93830aececc6674170d0d7081c` | not a data source — BRB transfers tracked via `JACKPOT_TREASURY_ADDRESS` in `src/helpers/constant.ts` (patched by sync-pipeline, guarded by `check-constants`) |
 | **MarketRegistry** | not a data source — auto-discovered via `RouletteEngine.REGISTRY()` | not indexed — market lifecycle driven by `RouletteEngine.MarketRegistered` |
-| **UpkeepManager** | `0xb62971bd323d48740cbc3cd6d0ce0e653131ccc9` | not indexed (out of scope) |
-| **UpkeepScheduler** | not a static data source (address not pinned here) | not indexed (out of scope) |
 
 ### Multi-market data model (Phase 1C)
 
@@ -54,7 +56,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - `RouletteBet.market` / `RouletteBet.marketRound` (nullable) — attributed at `BetRecorded` time.
 - `VaultDeposit.market`, `VaultWithdrawal.market`, `LargeWithdrawalRequest.market`, `*Log.bank` (nullable) — resolved via `dataSource.address()` in the `bank-vault.ts` template handler.
 - `RouletteRound` keeps cross-market global aggregates. **`GlobalState`** (singleton `0x…01`) = live ops (round pointer, jackpot pool, withdrawal queue, cross-market vault TVL) plus lifetime analytics (`totalWagered`, `totalBurned`, `totalPayouts`, …). Open wagers: **`Market.pendingBets`** per vault (not a mixed-unit global). Per-vault metrics otherwise live on `Market`.
-- Per-round revenue/activity on `RouletteRound`: `jackpotRevenue` (2.5%, on `JackpotFunded`), `infraRevenue` (2%, on `InfrastructureFeePaid`), `stakersRevenue` (95% = `grossRevenue − jackpotRevenue − infraRevenue`, set in `updateRoundRevenueAggregates` on resolve), `roundBurnAmount` (0.5% burn, accumulated in `brb.ts` via `findBurnRoundForGlobalRound`), and `uniqueBettors` (incremented on each user's first bet of the round, using the `isNewRoundForUser` signal in `processBetRecorded`). **`failedPayoutBatches` / `failedJackpotBatches` stay `0`** — no engine event currently reports failed batches per global round (the `BRBJackpotFunder` failure events carry no `globalRoundId`), so these are reserved counters until the contracts emit a suitable event.
+- Per-round revenue/activity on `RouletteRound`: `jackpotRevenue` (2.5%, on `JackpotFunded`), `infraRevenue` (2%, on `InfrastructureFeePaid`), `stakersRevenue` (95% = `grossRevenue − jackpotRevenue − infraRevenue`, set in `updateRoundRevenueAggregates` on resolve), `roundBurnAmount` (0.5% burn, accumulated in `brb.ts` via `findBurnRoundForGlobalRound`), and `uniqueBettors` (incremented on each user's first bet of the round, using the `isNewRoundForUser` signal in `processBetRecorded`). **`failedPayoutBatches` / `failedJackpotBatches` stay `0`** — no event attributes a failure to a (round, market) pair. Failed automation calls ARE tracked since the CRE migration: `AutomationReceiver.CallFailed` creates an `AutomationCall` row and increments `GlobalState.failedAutomationCalls` + the current `GlobalRound.failedAutomationCalls`.
 
 ### BRBpoints model (Phase 2A)
 
