@@ -16,6 +16,7 @@ export function getOrCreateGlobalRound(roundNumber: BigInt, startedAt: BigInt): 
     gr.participantMarketCount = BigInt.fromI32(0)
     gr.firstBetAt = ZERO
     gr.lockAt = ZERO
+    gr.failedAutomationCalls = ZERO
   }
   return gr
 }

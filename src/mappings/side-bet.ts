@@ -13,8 +13,9 @@ import {
   RoleGranted,
   RoleRevoked,
   RoleAdminChanged,
+  Upgraded,
 } from "../../generated/SideBet/SideBet"
-import { SideBet, SideBetSettlement, Market } from "../../generated/schema"
+import { ContractUpgrade, SideBet, SideBetSettlement, Market } from "../../generated/schema"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import {
   createSideBetFromChain,
@@ -166,4 +167,15 @@ export function handleRoleAdminChanged(event: RoleAdminChanged): void {
     event.params.role,
     event.params.newAdminRole
   )
+}
+
+export function handleSideBetUpgraded(event: Upgraded): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const entity = new ContractUpgrade(id)
+  entity.contract = "SideBet"
+  entity.implementation = event.params.implementation
+  entity.blockNumber = event.block.number
+  entity.timestamp = event.block.timestamp
+  entity.transactionHash = event.transaction.hash
+  entity.save()
 }

@@ -1,5 +1,5 @@
-import { Transfer } from "../../generated/BRBReferral/BRBReferral"
-import { BRBReferalTransfer } from "../../generated/schema"
+import { Approval, Transfer } from "../../generated/BRBReferral/BRBReferral"
+import { BRBReferalTransfer, TokenApproval } from "../../generated/schema"
 import {
   getOrCreateUser,
   updateUserBrbrEarnings,
@@ -63,4 +63,17 @@ export function handleTransfer(event: Transfer): void {
   }
   updateUserBRBReferalBalance(to, value, true)
   updateUserLastActive(to, timestamp)
+}
+
+export function handleApproval(event: Approval): void {
+  const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
+  const approval = new TokenApproval(id)
+  approval.token = "BRBR"
+  approval.owner = event.params.owner
+  approval.spender = event.params.spender
+  approval.value = event.params.value
+  approval.blockNumber = event.block.number
+  approval.timestamp = event.block.timestamp
+  approval.transactionHash = event.transaction.hash
+  approval.save()
 }
