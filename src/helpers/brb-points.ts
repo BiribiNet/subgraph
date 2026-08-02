@@ -39,8 +39,13 @@ export function computeBrbPoints(user: User, cfg: BRBPointsConfig): BigInt {
   if (cfg.divisor.le(ZERO)) {
     return ZERO
   }
+  // Net current stake, not lifetime deposits: withdrawals MUST reduce voting weight,
+  // otherwise deposit -> withdraw -> redeposit cycling mints unbounded points for gas.
+  const netStaked = user.totalStaked.gt(user.totalUnstaked)
+    ? user.totalStaked.minus(user.totalUnstaked)
+    : ZERO
   const wagered = user.totalRouletteBets.times(cfg.wageredWeight)
-  const staked = user.totalStaked.times(cfg.stakedWeight)
+  const staked = netStaked.times(cfg.stakedWeight)
   const referral = user.totalBrbrEarned.times(cfg.referralWeight)
   const weighted = wagered.plus(staked).plus(referral)
   return weighted.div(cfg.divisor)

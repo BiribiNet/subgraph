@@ -56,10 +56,14 @@ export function handleTransfer(event: Transfer): void {
   credit.transactionHash = event.transaction.hash
   credit.save()
 
-  // Engine mint (from zero): BRBpoints referral weight is applied at BetRecorded with
-  // asset-decimal normalization. Non-mint transfers still update earnings directly.
+  // BRBpoints referral weight (`totalBrbrEarned`) is minted ONLY via the engine at
+  // BetRecorded, with asset-decimal normalization. A plain holder-to-holder transfer must
+  // NOT credit earnings: BRBReferal is an ordinary ERC20 with a public `transfer`, so two
+  // wallets could otherwise wash the same tokens back and forth to mint unbounded voting
+  // power (brbpPoints is the DAO voting oracle). Such transfers only move the token balance.
   if (from.toHexString() != ZERO_ADDRESS) {
-    updateUserBrbrEarnings(to, value, true, timestamp)
+    updateUserBRBReferalBalance(from, value, false)
+    updateUserLastActive(from, timestamp)
   }
   updateUserBRBReferalBalance(to, value, true)
   updateUserLastActive(to, timestamp)

@@ -74,6 +74,21 @@ describe('BRBpoints wagered component', () => {
     assert.fieldEquals('User', USER_A, 'brbpPoints', '6');
   });
 
+  test('stake-then-unstake cycling does not inflate points beyond the net position (C-7)', () => {
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), true, TS); // +1 staked → net 1 → 1 pt
+    assert.fieldEquals('User', USER_A, 'brbpPoints', '1');
+
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), false, TS); // unstake 1 → net 0 → 0 pt
+    assert.fieldEquals('User', USER_A, 'brbpPoints', '0');
+
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), true, TS); // re-stake 1 → net 1 → 1 pt (not 2)
+    assert.fieldEquals('User', USER_A, 'brbpPoints', '1');
+
+    // Lifetime cumulative counters still reflect the full history for display.
+    assert.fieldEquals('User', USER_A, 'totalStaked', '2000000000000000000');
+    assert.fieldEquals('User', USER_A, 'totalUnstaked', ONE_BRB);
+  });
+
   test('crosses into SILVER tier at >= 500 points', () => {
     // 200 BRB wagered → (200e18 * 3) / 1e18 = 600 points
     updateUserWageredStats(addr(USER_A), bi('200000000000000000000'), 18, true, TS);

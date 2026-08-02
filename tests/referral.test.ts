@@ -121,6 +121,25 @@ describe('BRBReferral Transfer handler', () => {
     assert.fieldEquals('User', otherReferrer, 'totalBrbrEarned', '3000000000000000000');
   });
 
+  test('holder-to-holder wash transfers do not mint BRBr earnings or voting power (C-6)', () => {
+    // Seed REFERRER via a mint (credits the token balance, not earnings).
+    emitTransfer(ZERO_ADDRESS, REFERRER, ONE_BRB, 0);
+    // Wash the same tokens back and forth between two colluding wallets.
+    emitTransfer(REFERRER, REFEREE, ONE_BRB, 1);
+    emitTransfer(REFEREE, REFERRER, ONE_BRB, 2);
+    emitTransfer(REFERRER, REFEREE, ONE_BRB, 3);
+
+    // Earnings (the BRBpoints voting-power component) stay at 0 for both wallets.
+    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', '0');
+    assert.fieldEquals('User', REFEREE, 'totalBrbrEarned', '0');
+    assert.fieldEquals('User', REFERRER, 'brbpPoints', '0');
+    assert.fieldEquals('User', REFEREE, 'brbpPoints', '0');
+
+    // Token balance is conserved: it moves with the transfers, sender is debited.
+    assert.fieldEquals('User', REFEREE, 'brbReferalBalance', ONE_BRB);
+    assert.fieldEquals('User', REFERRER, 'brbReferalBalance', '0');
+  });
+
   test('records the credit transfer value and recipient', () => {
     const id = emitTransfer(REFEREE, REFERRER, ONE_BRB, 0);
 
