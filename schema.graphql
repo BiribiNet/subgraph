@@ -635,6 +635,18 @@ type LargeWithdrawalRequest @entity(immutable: false) {
   transactionHash: Bytes!
 }
 
+"""
+Open (unprocessed) large-withdrawal request pointer, keyed per (user, bank).
+A user can hold a concurrent request in every vault they stake in, so tracking the
+open request on `User` alone was wrong: a second vault's request overwrote the first
+and mis-decremented `GlobalState.totalPendingLargeWithdrawals` on processing.
+id = user address bytes ++ bank address bytes.
+"""
+type OpenWithdrawalRequest @entity(immutable: false) {
+  id: Bytes!
+  request: LargeWithdrawalRequest!
+}
+
 "Per-market daily aggregates (id: `${day}-${marketId}`)"
 type MarketDailyStat @entity(immutable: false) {
   id: ID!
@@ -1050,7 +1062,10 @@ type UserDailyPoints @entity(immutable: false) {
 "Per-tx flags to exclude bets/deposits from donation accounting"
 type TxActivity @entity(immutable: false) {
   id: Bytes!
+  "Consumed by the BRB donation-exclusion path (bank-inbound transfers that are really bet funds)"
   betToBank: BigInt!
+  "Separate scratch consumed by the referral-credit path, so it does not race the donation path on the same tx"
+  betToBankForReferral: BigInt!
   depositToBank: BigInt!
   "Market id for the bet in this tx (0 if none)"
   betMarketId: Int!

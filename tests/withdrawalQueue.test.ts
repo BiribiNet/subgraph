@@ -12,9 +12,12 @@ import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import {
   GLOBAL_STATE_ID,
   DEFAULT_USER,
+  TEST_BANK,
+  TEST_BANK_2,
   emitDeposit,
   emitWithdrawalRequested,
   emitWithdrawalProcessed,
+  setupSecondTestMarket,
 } from './helpers';
 
 const HUNDRED_ASSETS = '100000000000000000000';
@@ -137,5 +140,29 @@ describe('Withdrawal Queue Lifecycle', () => {
     );
 
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPendingLargeWithdrawals', '0');
+  });
+
+  test('N-2: concurrent requests in two vaults are tracked and processed per (user, bank)', () => {
+    // Vault 1 gets a deposit so its request carries a non-zero estimate (100 assets @ 100% bps).
+    emitDeposit(DEFAULT_USER, HUNDRED_ASSETS, HUNDRED_ASSETS, 1_000_000);
+    setupSecondTestMarket();
+
+    // Open a request in each vault. Pre-fix, the second overwrote the single
+    // User.openWithdrawalRequestId, so processing vault 1 resolved the WRONG request and drifted
+    // the aggregate. Both open requests must now be tracked independently, keyed per (user, bank).
+    emitWithdrawalRequested(DEFAULT_USER, 10000, DEFAULT_USER, 1_000_050, 1, TEST_BANK);
+    emitWithdrawalRequested(DEFAULT_USER, 10000, DEFAULT_USER, 1_000_060, 2, TEST_BANK_2);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPendingLargeWithdrawals', HUNDRED_ASSETS);
+    assert.entityCount('OpenWithdrawalRequest', 2);
+
+    // Process vault 1: it must resolve vault 1's own request (estimate 100) → pending back to 0.
+    emitWithdrawalProcessed(DEFAULT_USER, 10000, DEFAULT_USER, EIGHTY_ASSETS, EIGHTY_ASSETS, 1_000_100, 3, TEST_BANK);
+
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPendingLargeWithdrawals', '0');
+    // Vault 1's request is the one that got resolved (proves we looked up the right request, not the
+    // overwritten one) and its per-(user, bank) pointer was removed; vault 2's request stays open.
+    assert.fieldEquals('LargeWithdrawalRequest', requestIdForLogIndex(1), 'processedAt', '1000100');
+    assert.fieldEquals('LargeWithdrawalRequest', requestIdForLogIndex(2), 'isCancelled', 'false');
+    assert.entityCount('OpenWithdrawalRequest', 1);
   });
 });

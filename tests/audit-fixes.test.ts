@@ -156,6 +156,48 @@ describe('Audit fix: first referred bet credits referrer BRBR', () => {
 
     assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', '1000000000000000000');
   });
+
+  test('N-3: BRB bet inflow + ReferralSet in one tx both consume without racing', () => {
+    // BetRecorded seeds the per-tx bet scratch. A BRB transfer of the bet funds into the bank
+    // consumes the donation-exclusion scratch; ReferralSet then consumes the referral scratch.
+    // Pre-fix both read the same `betToBank`, so whichever ran first drained the other — here the
+    // transfer ran first, zeroing the referral credit. Both must now succeed.
+    const base = changetype<ethereum.Event>(newMockEvent());
+    handleBetRecorded(buildBetRecorded(base.transaction, 0));
+
+    const transfer = changetype<BrbTransfer>(newMockEvent());
+    transfer.transaction = base.transaction;
+    transfer.address = BRB_TOKEN;
+    transfer.parameters = new Array<ethereum.EventParam>();
+    transfer.parameters.push(
+      new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
+    );
+    transfer.parameters.push(new ethereum.EventParam('to', ethereum.Value.fromAddress(TEST_BANK)));
+    transfer.parameters.push(
+      new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString('1000000000000000000')))
+    );
+    transfer.logIndex = BigInt.fromI32(1);
+    transfer.block.timestamp = BigInt.fromI32(1_000_000);
+    handleBrbTransfer(transfer);
+
+    const ev = changetype<ReferralSet>(newMockEvent());
+    ev.transaction = base.transaction;
+    ev.address = TEST_ENGINE;
+    ev.parameters = new Array<ethereum.EventParam>();
+    ev.parameters.push(
+      new ethereum.EventParam('player', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
+    );
+    ev.parameters.push(
+      new ethereum.EventParam('referrer', ethereum.Value.fromAddress(Address.fromString(REFERRER)))
+    );
+    ev.block.timestamp = BigInt.fromI32(1_000_000);
+    ev.logIndex = BigInt.fromI32(2);
+    handleReferralSet(ev);
+
+    // Donation excluded (transfer recognised as bet inflow) AND referrer still credited.
+    assert.fieldEquals('Market', '1', 'brbDonations', '0');
+    assert.fieldEquals('User', REFERRER, 'totalBrbrEarned', '1000000000000000000');
+  });
 });
 
 describe('Audit fix: BetsReleased clears pendingBets', () => {

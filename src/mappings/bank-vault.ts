@@ -1,4 +1,4 @@
-import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes, store } from "@graphprotocol/graph-ts"
 import {
   Deposit,
   Withdraw,
@@ -21,6 +21,7 @@ import {
   VaultDeposit,
   VaultWithdrawal,
   LargeWithdrawalRequest,
+  OpenWithdrawalRequest,
   WithdrawTransaction,
   TokenApproval,
   ContractUpgrade,
@@ -170,6 +171,17 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   request.transactionHash = event.transaction.hash
   request.save()
 
+  // Track the open request per (user, bank): a user may hold a concurrent request in each vault.
+  // The legacy single `User.openWithdrawalRequestId` pointer is kept for backward compatibility but
+  // is no longer authoritative for the pending-amount decrement (it was overwritten across vaults).
+  const openKey = event.params.owner.concat(event.address)
+  let open = OpenWithdrawalRequest.load(openKey)
+  if (open == null) {
+    open = new OpenWithdrawalRequest(openKey)
+  }
+  open.request = requestId
+  open.save()
+
   user.openWithdrawalRequestId = requestId
   user.save()
 
@@ -192,7 +204,11 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
   // rows): keep the clamped assetsPaid subtraction.
   let pendingDecrement = assetsPaid
 
-  const openReqId = user.openWithdrawalRequestId
+  // Resolve the open request per (user, bank) so a concurrent withdrawal in another vault cannot
+  // point us at the wrong request. `event.address` is the bank (BankVault4626 proxy).
+  const openKey = event.params.owner.concat(event.address)
+  const open = OpenWithdrawalRequest.load(openKey)
+  const openReqId = open ? open.request : null
   if (openReqId) {
     const req = LargeWithdrawalRequest.load(openReqId)
     if (req) {
@@ -210,6 +226,8 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
       }
       req.save()
     }
+    // The request left the queue: drop the per-(user, bank) pointer and clear the legacy field.
+    store.remove("OpenWithdrawalRequest", openKey.toHexString())
     user.openWithdrawalRequestId = null
     user.save()
   }

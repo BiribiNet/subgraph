@@ -7,6 +7,7 @@ export function getOrCreateTxActivity(txHash: Bytes): TxActivity {
   if (ctx == null) {
     ctx = new TxActivity(txHash)
     ctx.betToBank = ZERO
+    ctx.betToBankForReferral = ZERO
     ctx.depositToBank = ZERO
     ctx.betMarketId = 0
   }
@@ -15,7 +16,11 @@ export function getOrCreateTxActivity(txHash: Bytes): TxActivity {
 
 export function recordTxBetToBank(txHash: Bytes, amount: BigInt, marketId: i32): void {
   const ctx = getOrCreateTxActivity(txHash)
+  // Seed both scratch counters from the same bet inflow: the donation-exclusion path consumes
+  // `betToBank`, the referral-credit path consumes `betToBankForReferral`. Keeping them separate
+  // means the two consumers can no longer drain each other within the same transaction.
   ctx.betToBank = ctx.betToBank.plus(amount)
+  ctx.betToBankForReferral = ctx.betToBankForReferral.plus(amount)
   ctx.betMarketId = marketId
   ctx.save()
 }
@@ -47,11 +52,11 @@ export function isBankInboundExcludedFromDonation(txHash: Bytes, amount: BigInt)
 
 export function consumeTxBetForReferral(txHash: Bytes): BigInt {
   const ctx = TxActivity.load(txHash)
-  if (ctx == null || ctx.betToBank.equals(ZERO)) {
+  if (ctx == null || ctx.betToBankForReferral.equals(ZERO)) {
     return ZERO
   }
-  const amount = ctx.betToBank
-  ctx.betToBank = ZERO
+  const amount = ctx.betToBankForReferral
+  ctx.betToBankForReferral = ZERO
   ctx.save()
   return amount
 }
