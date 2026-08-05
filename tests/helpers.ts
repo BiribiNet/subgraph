@@ -122,6 +122,14 @@ export function setupSecondTestMarket(): void {
   );
   market.assetDecimals = 18;
   market.save();
+
+  const bankKey = changetype<Bytes>(TEST_BANK_2);
+  let lookup = BankAddress.load(bankKey);
+  if (lookup == null) {
+    lookup = new BankAddress(bankKey);
+    lookup.market = market.id;
+    lookup.save();
+  }
 }
 
 /** Simulates a vault share (sBRB) Transfer on the given bank — mint/burn via ZERO_ADDRESS. */
@@ -271,11 +279,12 @@ export function emitWithdrawalRequested(
   bps: i32,
   receiver: string,
   timestamp: i32,
-  logIndex: i32 = 0
+  logIndex: i32 = 0,
+  bank: Address = TEST_BANK
 ): void {
   setupTestMarket();
   const event = changetype<WithdrawalRequested>(newMockEvent());
-  event.address = TEST_BANK;
+  event.address = bank;
   event.parameters = new Array<ethereum.EventParam>();
   event.parameters.push(
     new ethereum.EventParam('owner', ethereum.Value.fromAddress(Address.fromString(owner)))
@@ -299,11 +308,12 @@ export function emitWithdrawalProcessed(
   assetsPaid: string,
   sharesBurned: string,
   timestamp: i32,
-  logIndex: i32 = 1
+  logIndex: i32 = 1,
+  bank: Address = TEST_BANK
 ): void {
   setupTestMarket();
   const event = changetype<WithdrawalProcessed>(newMockEvent());
-  event.address = TEST_BANK;
+  event.address = bank;
   event.parameters = new Array<ethereum.EventParam>();
   event.parameters.push(
     new ethereum.EventParam('owner', ethereum.Value.fromAddress(Address.fromString(owner)))

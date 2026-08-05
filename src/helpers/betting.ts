@@ -59,11 +59,30 @@ function max3(a: BigInt, b: BigInt, c: BigInt): BigInt {
   return m
 }
 
+// Fixed-array sizes for the per-number payout buckets (see createNewRouletteRound in rouletteRound.ts).
+// `number` originates from unvalidated on-chain betData, so an out-of-range index into these fixed
+// arrays would trap the WASM mapping and permanently halt indexing (freezing the DAO voting oracle).
+const STRAIGHT_STREET_SLOTS = 37 // valid straight/street numbers 0..36
+const DOZEN_COLUMN_SLOTS = 4 // valid dozen/column groups 1..3 (slot 0 unused)
+
+function isNumberSlotInRange(numI32: i32, slots: i32, betTypeInt: i32): boolean {
+  if (numI32 >= 0 && numI32 < slots) {
+    return true
+  }
+  log.warning("Skipping out-of-range bet number {} for betType {} (max slots {})", [
+    numI32.toString(),
+    betTypeInt.toString(),
+    slots.toString(),
+  ])
+  return false
+}
+
 export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, betType: BigInt, number: BigInt): void {
   const betTypeInt = betType.toI32()
   const numI32 = number.toI32()
 
   if (betTypeInt == BET_STRAIGHT) {
+    if (!isNumberSlotInRange(numI32, STRAIGHT_STREET_SLOTS, betTypeInt)) return
     const totals = round.straightBetsTotals
     const next = totals[numI32].plus(amount)
     totals[numI32] = next
@@ -72,6 +91,7 @@ export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: Big
       round.maxStraightBet = next
     }
   } else if (betTypeInt == BET_STREET) {
+    if (!isNumberSlotInRange(numI32, STRAIGHT_STREET_SLOTS, betTypeInt)) return
     const totals = round.streetBetsTotals
     const next = totals[numI32].plus(amount)
     totals[numI32] = next
@@ -92,11 +112,13 @@ export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: Big
   } else if (betTypeInt == BET_HIGH) {
     round.highBetsSum = round.highBetsSum.plus(amount)
   } else if (betTypeInt == BET_DOZEN) {
+    if (!isNumberSlotInRange(numI32, DOZEN_COLUMN_SLOTS, betTypeInt)) return
     const sums = round.dozenBetsSum
     const next = sums[numI32].plus(amount)
     sums[numI32] = next
     round.dozenBetsSum = sums
   } else if (betTypeInt == BET_COLUMN) {
+    if (!isNumberSlotInRange(numI32, DOZEN_COLUMN_SLOTS, betTypeInt)) return
     const sums = round.columnBetsSum
     const next = sums[numI32].plus(amount)
     sums[numI32] = next

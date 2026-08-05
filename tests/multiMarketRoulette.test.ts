@@ -93,6 +93,8 @@ describe('Multi-market roulette lifecycle', () => {
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '1');
     assert.fieldEquals('DailyStat', '11', 'volume', '10000000000000000000');
     assert.fieldEquals('DailyStat', '11', 'betCount', '1');
+    // N-1: the per-day unique-player increment must be persisted (was previously dropped → stuck at 0).
+    assert.fieldEquals('DailyStat', '11', 'uniquePlayers', '1');
   });
 
   test('VrfRequested locks market rounds and moves GlobalRound to VRF (no separate RoundLocked event)', () => {

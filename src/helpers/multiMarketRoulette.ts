@@ -78,6 +78,9 @@ function trackProtocolBetStats(
   if (trackDailyUniquePlayer(timestamp, player.toHexString())) {
     daily.uniquePlayers = daily.uniquePlayers.plus(BigInt.fromI32(1))
     globalState.totalPlayers = globalState.totalPlayers.plus(BigInt.fromI32(1))
+    // Persist the increment — getOrCreateDailyStats returns an unsaved instance, so without this
+    // save the per-day uniquePlayers count is silently discarded (stays 0 forever).
+    daily.save()
   }
 }
 
