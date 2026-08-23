@@ -70,12 +70,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@goldskycom/cli@npm:^13.3.3":
-  version: 13.3.3
-  resolution: "@goldskycom/cli@npm:13.3.3"
+"@goldskycom/cli@npm:^13.9.0":
+  version: 13.9.0
+  resolution: "@goldskycom/cli@npm:13.9.0"
   bin:
     goldsky: bin/goldsky
-  checksum: 10c0/1d84a990de186a0ab56427b6f2945a02a8944670456eb670a52424b174358c8fbc8b789a3dc1b77e01a79a8e41dd9b1c420db43af650e7ba7f4f833ead14e181
+  checksum: 10c0/18bf1d52578ce9c61ee50817324141ced3fb5dcbe89418213668e745a9d5a3d3b31f470ee456de2d27395b32a830327469af783d3236930a2c86769e3b556bec
   languageName: node
   linkType: hard
 
@@ -3398,7 +3398,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "subgraph@workspace:."
   dependencies:
-    "@goldskycom/cli": "npm:^13.3.3"
+    "@goldskycom/cli": "npm:^13.9.0"
     "@graphprotocol/graph-cli": "npm:^0.97.1"
     "@graphprotocol/graph-ts": "npm:^0.38.1"
     dotenv: "npm:^16.5.0"

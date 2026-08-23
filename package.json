@@ -15,7 +15,7 @@
     "check:constants": "node scripts/check-constants.mjs"
   },
   "devDependencies": {
-    "@goldskycom/cli": "^13.3.3",
+    "@goldskycom/cli": "^13.9.0",
     "@graphprotocol/graph-cli": "^0.97.1",
     "@graphprotocol/graph-ts": "^0.38.1",
     "dotenv": "^16.5.0",

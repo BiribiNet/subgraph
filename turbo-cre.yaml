@@ -57,7 +57,7 @@ transforms:
         _gs_op
       FROM decoded_events
       WHERE decoded IS NOT NULL
-        AND decoded.event_signature = 'RoundCountdownStarted(uint64,uint32,uint256)'
+        AND decoded.event_signature = 'RoundCountdownStarted'
     type: sql
 sinks:
   cre_schedule_webhook:
