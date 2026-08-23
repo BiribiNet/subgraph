@@ -7,7 +7,8 @@
 #
 # Consumer: cre-automation-starter Worker (POST /webhook)
 #   - Parses round_id + lock_at (+ trigger_market_id) from Goldsky JSON
-#   - Auth: Goldsky httpauth secret_name BIRIBI_CRE_SCHEDULE → x-webhook-secret header
+#   - Auth: Goldsky httpauth secret_name BIRIBI_CRE_SCHEDULE
+#     header Authorization, value "Bearer <WEBHOOK_SECRET>" (Worker is fail-closed Bearer-only)
 #   - Enqueues with delay until lockAt (+ WEBHOOK_LAG_SEC on the Worker)
 name: biribi-cre-countdown
 resource_size: s
@@ -61,11 +62,12 @@ transforms:
 sinks:
   cre_schedule_webhook:
     from: countdown_started
-    one_row_per_request: true
+    one_row_per_request: false
     type: webhook
     # Auth via Goldsky httpauth secret (x-webhook-secret header), not a query string — see:
     # https://docs.goldsky.com/turbo-pipelines/sinks/webhook#configuration
     # Create once: `yarn goldsky secret create` → httpauth → name BIRIBI_CRE_SCHEDULE
-    #   header: x-webhook-secret  value: same as Worker WEBHOOK_SECRET
+    #   header: Authorization
+    #   value:  Bearer <same secret as Worker WEBHOOK_SECRET>
     secret_name: BIRIBI_CRE_SCHEDULE
     url: ${CRE_WEBHOOK_URL}
