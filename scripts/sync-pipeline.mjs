@@ -1,6 +1,7 @@
 /**
- * Patch turbo.yaml (Goldsky _gs_log_decode ABI + contract addresses) and subgraph.yaml
- * from a deployment JSON, then optionally validate/apply turbo + deploy subgraph (tcg-vault style).
+ * Patch turbo.yaml + turbo-cre.yaml (Goldsky _gs_log_decode ABI + contract addresses)
+ * and subgraph.yaml from a deployment JSON, then optionally validate/apply turbo + deploy
+ * subgraph (tcg-vault style).
  *
  * Prerequisites: from ../contracts run `yarn update:subgraph:abis` (generates abis/MergedEvents.json).
  *
@@ -16,6 +17,9 @@
  *   GOLDSKY_SUBGRAPH_NAME    — default biribi
  *   GOLDSKY_SYNC_FILES_ONLY  — if 1, only patch YAML files (no goldsky CLI)
  *   WEBHOOK_SECRET           — required for full sync if turbo.yaml url contains ${WEBHOOK_SECRET}
+ *   CRE_WEBHOOK_URL          — required for full sync (turbo-cre.yaml ${CRE_WEBHOOK_URL})
+ *                            — CRE turbo uses Goldsky `secret_name: BIRIBI_CRE_SCHEDULE` (httpauth),
+ *                              header should be `x-webhook-secret` matching the Worker WEBHOOK_SECRET
  */
 import { config } from "dotenv";
 import { execSync } from "node:child_process";
@@ -29,27 +33,177 @@ config({ path: join(root, ".env") });
 
 /** Must match turbo.yaml webhook url placeholder (string replace — not a regex). */
 const WEBHOOK_SECRET_PLACEHOLDER = "${WEBHOOK_SECRET}";
+const CRE_WEBHOOK_URL_PLACEHOLDER = "${CRE_WEBHOOK_URL}";
+const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
+const rouletteAddressPlaceholder = "__SYNC_PIPELINE_ROULETTE_ADDRESS__";
+const abiPlaceholder = "__SYNC_PIPELINE_ABI__";
 
-function injectWebhookSecret(turbo, secret) {
-  if (!turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) return turbo;
-  const out = turbo.replaceAll(WEBHOOK_SECRET_PLACEHOLDER, secret);
-  if (out.includes(WEBHOOK_SECRET_PLACEHOLDER)) {
+function injectPlaceholder(turbo, placeholder, value, label) {
+  if (!turbo.includes(placeholder)) return turbo;
+  const out = turbo.replaceAll(placeholder, value);
+  if (out.includes(placeholder)) {
     throw new Error(
-      "sync:pipeline: failed to substitute WEBHOOK_SECRET in turbo YAML",
+      `sync:pipeline: failed to substitute ${label} in turbo YAML`,
     );
   }
   return out;
 }
 
-function requireWebhookSecret(turbo) {
-  if (!turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) return null;
-  const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
-  if (!webhookSecret) {
+/** @deprecated use injectPlaceholder */
+function injectSecretPlaceholder(turbo, placeholder, secret, label) {
+  return injectPlaceholder(turbo, placeholder, secret, label);
+}
+
+function requireEnvValue(turbo, placeholder, envKey) {
+  if (!turbo.includes(placeholder)) return null;
+  const value = process.env[envKey]?.trim();
+  if (!value) {
     throw new Error(
-      "sync:pipeline: set WEBHOOK_SECRET in .env for turbo apply (or use GOLDSKY_SYNC_FILES_ONLY=1).",
+      `sync:pipeline: set ${envKey} in .env for turbo apply (or use GOLDSKY_SYNC_FILES_ONLY=1).`,
     );
   }
-  return webhookSecret;
+  return value;
+}
+
+/** @deprecated use requireEnvValue */
+function requireEnvSecret(turbo, placeholder, envKey) {
+  return requireEnvValue(turbo, placeholder, envKey);
+}
+
+/**
+ * Resolve ABI + address placeholders (and optional webhook secret) into an applied turbo YAML.
+ * @param {'list' | 'single'} [addressMode='list'] — `list` fills `__SYNC_PIPELINE_ADDRESSES__`
+ *   (IN (...)); `single` fills `__SYNC_PIPELINE_ROULETTE_ADDRESS__` (equality).
+ * @param {string | null} [abiLiteral] — if set, replaces `__SYNC_PIPELINE_ABI__`; if null,
+ *   the template must already contain its ABI (CRE countdown uses an inline single-event ABI).
+ * @param {string | null} [secretPlaceholder] — if set, substitutes from `secretEnvKey` when present.
+ * @param {string | null} [urlPlaceholder] — if set, substitutes from `urlEnvKey` when present.
+ * @returns {{ content: string, appliedPath: string, missingSecret: boolean, missingUrl: boolean }}
+ */
+function writeTurboApplied({
+  templateName,
+  appliedName,
+  abiLiteral = null,
+  addressList,
+  addressMode = "list",
+  secretPlaceholder = null,
+  secretEnvKey = null,
+  secretLabel = null,
+  urlPlaceholder = null,
+  urlEnvKey = null,
+  urlLabel = null,
+}) {
+  const templatePath = join(root, templateName);
+  const appliedPath = join(root, appliedName);
+  if (!existsSync(templatePath)) {
+    throw new Error(`sync:pipeline: missing ${templateName}`);
+  }
+
+  let turbo = readFileSync(templatePath, "utf8");
+
+  if (abiLiteral !== null) {
+    if (!turbo.includes(abiPlaceholder)) {
+      throw new Error(
+        `sync:pipeline: ${templateName} must contain ${abiPlaceholder}`,
+      );
+    }
+    turbo = turbo.replace(abiPlaceholder, abiLiteral);
+  } else if (turbo.includes(abiPlaceholder)) {
+    throw new Error(
+      `sync:pipeline: ${templateName} still contains ${abiPlaceholder} but no abiLiteral was provided`,
+    );
+  }
+
+  if (addressMode === "single") {
+    if (!turbo.includes(rouletteAddressPlaceholder)) {
+      throw new Error(
+        `sync:pipeline: ${templateName} must contain ${rouletteAddressPlaceholder}`,
+      );
+    }
+    if (addressList.length !== 1) {
+      throw new Error(
+        `sync:pipeline: ${templateName} addressMode=single expects exactly 1 address`,
+      );
+    }
+    turbo = turbo.replaceAll(rouletteAddressPlaceholder, addressList[0]);
+  } else {
+    if (!turbo.includes(addressPlaceholder)) {
+      throw new Error(
+        `sync:pipeline: ${templateName} must contain ${addressPlaceholder}`,
+      );
+    }
+    turbo = turbo.replace(
+      addressPlaceholder,
+      addressList.map((x) => `        '${x}'`).join(",\n"),
+    );
+  }
+
+  let missingSecret = false;
+  if (secretPlaceholder && secretEnvKey && secretLabel) {
+    const envSecret = process.env[secretEnvKey]?.trim();
+    if (turbo.includes(secretPlaceholder) && envSecret) {
+      turbo = injectPlaceholder(
+        turbo,
+        secretPlaceholder,
+        envSecret,
+        secretLabel,
+      );
+      console.log(`Injected ${secretLabel} into ${appliedName}`);
+    } else if (turbo.includes(secretPlaceholder)) {
+      missingSecret = true;
+      console.warn(
+        `sync:pipeline: ${appliedName} still contains ${secretPlaceholder}; set ${secretEnvKey} in .env before goldsky turbo apply.`,
+      );
+    }
+  }
+
+  let missingUrl = false;
+  if (urlPlaceholder && urlEnvKey && urlLabel) {
+    const envUrl = process.env[urlEnvKey]?.trim();
+    if (turbo.includes(urlPlaceholder) && envUrl) {
+      turbo = injectPlaceholder(turbo, urlPlaceholder, envUrl, urlLabel);
+      console.log(`Injected ${urlLabel} into ${appliedName}`);
+    } else if (turbo.includes(urlPlaceholder)) {
+      missingUrl = true;
+      console.warn(
+        `sync:pipeline: ${appliedName} still contains ${urlPlaceholder}; set ${urlEnvKey} in .env before goldsky turbo apply.`,
+      );
+    }
+  }
+
+  writeFileSync(appliedPath, turbo, "utf8");
+  console.log(
+    `Wrote ${appliedName} (resolved ABI + addresses; ${templateName} unchanged)`,
+  );
+  return { content: turbo, appliedPath, missingSecret, missingUrl };
+}
+
+function validateAndApplyTurbo(pipelineFile) {
+  try {
+    execSync(`yarn goldsky turbo validate ${pipelineFile}`, {
+      cwd: root,
+      stdio: "inherit",
+      env: process.env,
+    });
+  } catch {
+    console.warn(`turbo validate failed for ${pipelineFile}; continuing to apply.`);
+  }
+
+  execSync(`yarn goldsky turbo apply ${pipelineFile}`, {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+  });
+}
+
+function cleanupAppliedTurbo(appliedName) {
+  const appliedTurbo = join(root, appliedName);
+  if (!existsSync(appliedTurbo)) return;
+  try {
+    unlinkSync(appliedTurbo);
+  } catch {
+    /* ignore */
+  }
 }
 
 const DEPLOY_JSON = process.env.DEPLOY_JSON;
@@ -247,41 +401,30 @@ console.log(
   `Merged ABI: ${abiArray.length} event fragment(s), ${minifiedAbi.length} chars (minified)`,
 );
 
-const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
-const abiPlaceholder = "__SYNC_PIPELINE_ABI__";
-const turboTemplatePath = join(root, "turbo.yaml");
-const turboAppliedPath = join(root, "turbo.applied.yaml");
+const mirrorTurbo = writeTurboApplied({
+  templateName: "turbo.yaml",
+  appliedName: "turbo.applied.yaml",
+  abiLiteral: sqlAbiLiteral,
+  addressList: turboAddresses,
+  secretPlaceholder: WEBHOOK_SECRET_PLACEHOLDER,
+  secretEnvKey: "WEBHOOK_SECRET",
+  secretLabel: "WEBHOOK_SECRET",
+});
 
-let turboTemplate = readFileSync(turboTemplatePath, "utf8");
-if (!turboTemplate.includes(abiPlaceholder)) {
-  throw new Error(
-    `sync:pipeline: turbo.yaml must contain ${abiPlaceholder} (keep turbo.yaml as the readable template).`,
-  );
-}
-if (!turboTemplate.includes(addressPlaceholder)) {
-  throw new Error(
-    `sync:pipeline: turbo.yaml must contain ${addressPlaceholder}.`,
-  );
-}
+const creTurbo = writeTurboApplied({
+  templateName: "turbo-cre.yaml",
+  appliedName: "turbo-cre.applied.yaml",
+  // ABI is inlined; auth is Goldsky secret_name (BIRIBI_CRE_SCHEDULE), not a URL query.
+  abiLiteral: null,
+  addressList: [addr("roulette")],
+  addressMode: "single",
+  urlPlaceholder: CRE_WEBHOOK_URL_PLACEHOLDER,
+  urlEnvKey: "CRE_WEBHOOK_URL",
+  urlLabel: "CRE_WEBHOOK_URL",
+});
 
-let turbo = turboTemplate.replace(abiPlaceholder, sqlAbiLiteral);
-const inList = turboAddresses.map((x) => `        '${x}'`).join(",\n");
-turbo = turbo.replace(addressPlaceholder, inList);
-
-const webhookSecretForWrite = process.env.WEBHOOK_SECRET?.trim();
-if (turbo.includes(WEBHOOK_SECRET_PLACEHOLDER) && webhookSecretForWrite) {
-  turbo = injectWebhookSecret(turbo, webhookSecretForWrite);
-  console.log("Injected WEBHOOK_SECRET into turbo.applied.yaml");
-} else if (turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) {
-  console.warn(
-    "sync:pipeline: turbo.applied.yaml still contains ${WEBHOOK_SECRET}; set WEBHOOK_SECRET in .env before goldsky turbo apply.",
-  );
-}
-
-writeFileSync(turboAppliedPath, turbo, "utf8");
-console.log(
-  "Wrote turbo.applied.yaml (resolved ABI + addresses; turbo.yaml template unchanged)",
-);
+let turbo = mirrorTurbo.content;
+const turboAppliedPath = mirrorTurbo.appliedPath;
 
 let subgraph = readFileSync(join(root, "subgraph.yaml"), "utf8");
 
@@ -481,30 +624,71 @@ try {
   execSync("yarn codegen", { cwd: root, stdio: "inherit" });
   execSync("yarn build", { cwd: root, stdio: "inherit" });
 
-  let turboPipelineFile = "turbo.applied.yaml";
-  if (turbo.includes(WEBHOOK_SECRET_PLACEHOLDER)) {
-    const webhookSecret = requireWebhookSecret(turbo);
-    turbo = injectWebhookSecret(turbo, webhookSecret);
-    writeFileSync(turboAppliedPath, turbo, "utf8");
-    turboPipelineFile = "turbo.applied.yaml";
-    console.log("Wrote turbo.applied.yaml with webhook secret for Goldsky.");
-  }
+  const turboPipelines = [
+    {
+      file: "turbo.applied.yaml",
+      content: turbo,
+      placeholder: WEBHOOK_SECRET_PLACEHOLDER,
+      envKey: "WEBHOOK_SECRET",
+      label: "WEBHOOK_SECRET",
+      appliedPath: turboAppliedPath,
+    },
+    {
+      file: "turbo-cre.applied.yaml",
+      content: creTurbo.content,
+      // Auth via Goldsky secret_name (BIRIBI_CRE_SCHEDULE); URL from CRE_WEBHOOK_URL.
+      placeholder: null,
+      urlPlaceholder: CRE_WEBHOOK_URL_PLACEHOLDER,
+      urlEnvKey: "CRE_WEBHOOK_URL",
+      urlLabel: "CRE_WEBHOOK_URL",
+      appliedPath: creTurbo.appliedPath,
+    },
+  ];
 
-  try {
-    execSync(`yarn goldsky turbo validate ${turboPipelineFile}`, {
-      cwd: root,
-      stdio: "inherit",
-      env: process.env,
-    });
-  } catch {
-    console.warn("turbo validate failed; continuing to apply.");
+  for (const pipeline of turboPipelines) {
+    let content = pipeline.content;
+    if (
+      pipeline.placeholder &&
+      content.includes(pipeline.placeholder)
+    ) {
+      const secret = requireEnvValue(
+        content,
+        pipeline.placeholder,
+        pipeline.envKey,
+      );
+      content = injectPlaceholder(
+        content,
+        pipeline.placeholder,
+        secret,
+        pipeline.label,
+      );
+      writeFileSync(pipeline.appliedPath, content, "utf8");
+      console.log(
+        `Wrote ${pipeline.file} with ${pipeline.label} for Goldsky.`,
+      );
+    }
+    if (
+      pipeline.urlPlaceholder &&
+      content.includes(pipeline.urlPlaceholder)
+    ) {
+      const url = requireEnvValue(
+        content,
+        pipeline.urlPlaceholder,
+        pipeline.urlEnvKey,
+      );
+      content = injectPlaceholder(
+        content,
+        pipeline.urlPlaceholder,
+        url,
+        pipeline.urlLabel,
+      );
+      writeFileSync(pipeline.appliedPath, content, "utf8");
+      console.log(
+        `Wrote ${pipeline.file} with ${pipeline.urlLabel} for Goldsky.`,
+      );
+    }
+    validateAndApplyTurbo(pipeline.file);
   }
-
-  execSync(`yarn goldsky turbo apply ${turboPipelineFile}`, {
-    cwd: root,
-    stdio: "inherit",
-    env: process.env,
-  });
 
   const fullName = `${baseName}/${nextVersion}`;
   execSync(
@@ -528,12 +712,6 @@ try {
   }
 } finally {
   writeFileSync(schemaPath, schemaOriginal, "utf8");
-  const appliedTurbo = join(root, "turbo.applied.yaml");
-  if (existsSync(appliedTurbo)) {
-    try {
-      unlinkSync(appliedTurbo);
-    } catch {
-      /* ignore */
-    }
-  }
+  cleanupAppliedTurbo("turbo.applied.yaml");
+  cleanupAppliedTurbo("turbo-cre.applied.yaml");
 }

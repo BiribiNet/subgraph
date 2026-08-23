@@ -1,0 +1,71 @@
+# Goldsky Turbo pipeline: RoundCountdownStarted → CRE round-watcher webhook.
+# Isolated from biribi-roulette-events so mirror backpressure cannot delay CRE wake-ups.
+# Roulette address + webhook URL are injected by scripts/sync-pipeline.mjs (do not edit manually).
+#   DEPLOY_JSON=./deployments/arbitrum-sepolia.json yarn sync:pipeline
+#
+# ABI is intentionally RoundCountdownStarted-only (not MergedEvents / full Game.json).
+#
+# Consumer: cre-automation-starter Worker (POST /webhook)
+#   - Parses round_id + lock_at (+ trigger_market_id) from Goldsky JSON
+#   - Auth: Goldsky httpauth secret_name BIRIBI_CRE_SCHEDULE → x-webhook-secret header
+#   - Enqueues with delay until lockAt (+ WEBHOOK_LAG_SEC on the Worker)
+name: biribi-cre-countdown
+resource_size: s
+use_dedicated_ip: false
+job: false
+sources:
+  raw_logs:
+    dataset_name: arbitrum_sepolia.raw_logs
+    # latest — never replay historical RoundCountdownStarted into the CRE queue
+    start_at: latest
+    type: dataset
+    version: 1.0.0
+transforms:
+  decoded_events:
+    primary_key: id
+    sql: |-
+      SELECT
+        id,
+        address,
+        _gs_log_decode(
+          '[{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint64","name":"roundId","type":"uint64"},{"indexed":false,"internalType":"uint32","name":"triggerMarketId","type":"uint32"},{"indexed":false,"internalType":"uint256","name":"lockAt","type":"uint256"}],"name":"RoundCountdownStarted","type":"event"}]',
+          topics,
+          data
+        ) as decoded,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index,
+        _gs_op
+      FROM raw_logs
+      WHERE address = '__SYNC_PIPELINE_ROULETTE_ADDRESS__'
+    type: sql
+  countdown_started:
+    primary_key: id
+    sql: |-
+      SELECT
+        id,
+        address,
+        decoded.event_params[1] AS round_id,
+        decoded.event_params[2] AS trigger_market_id,
+        decoded.event_params[3] AS lock_at,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index,
+        _gs_op
+      FROM decoded_events
+      WHERE decoded IS NOT NULL
+        AND decoded.event_signature = 'RoundCountdownStarted(uint64,uint32,uint256)'
+    type: sql
+sinks:
+  cre_schedule_webhook:
+    from: countdown_started
+    one_row_per_request: true
+    type: webhook
+    # Auth via Goldsky httpauth secret (x-webhook-secret header), not a query string — see:
+    # https://docs.goldsky.com/turbo-pipelines/sinks/webhook#configuration
+    # Create once: `yarn goldsky secret create` → httpauth → name BIRIBI_CRE_SCHEDULE
+    #   header: x-webhook-secret  value: same as Worker WEBHOOK_SECRET
+    secret_name: BIRIBI_CRE_SCHEDULE
+    url: ${CRE_WEBHOOK_URL}

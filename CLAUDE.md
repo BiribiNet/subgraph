@@ -508,8 +508,15 @@ curl -s 'https://api.thegraph.com/index-node/graphql' \
 
 **Goldsky / turbo:** `deployments/arbitrum-sepolia.json` →
 `DEPLOY_JSON=./deployments/arbitrum-sepolia.json yarn sync:pipeline` (patches `subgraph.yaml` +
-`turbo.applied.yaml`). Includes `addresses.banks[]` for turbo only — vaults are **not** static data
-sources (`MarketRegistered` → `BankVault` template).
+`turbo.applied.yaml` + `turbo-cre.applied.yaml`). Includes `addresses.banks[]` for the mirror turbo
+only — vaults are **not** static data sources (`MarketRegistered` → `BankVault` template).
+
+Two turbo pipelines:
+- `turbo.yaml` → `biribi-roulette-events` → `/api/mirror` (all protocol events)
+- `turbo-cre.yaml` → `biribi-cre-countdown` → `${CRE_WEBHOOK_URL}` (default:
+  `https://biribi-round-watcher.soft-thunder-4aae.workers.dev/webhook`; `RoundCountdownStarted`
+  only; `secret_name: BIRIBI_CRE_SCHEDULE` → `x-webhook-secret`; payload `round_id` + `lock_at`;
+  `start_at: latest`)
 
 **The Graph `networks.json`:** strict graph-cli format only — top-level network name → data source
 **`name`** from `subgraph.yaml` → `{ address, startBlock }`. No `_comment`, templates, or turbo-only
