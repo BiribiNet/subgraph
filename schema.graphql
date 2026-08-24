@@ -422,7 +422,7 @@ type RouletteBet @entity(immutable: false) {
   numbers: [BigInt!]!
   "Total bet amount for this user in this round"
   totalAmount: BigInt!
-  "Number of individual bets placed by this user in this round (e.g. 3 for a straight+red+dozen combo)"
+  "Number of BetRecorded placements by this user in this round — one per bet transaction, not per leg. The leg count of a placement is `amounts.length`. Kept per-placement so it stays comparable with RouletteRound.betCount, DailyStat.betCount and GlobalState.totalBets, which all count placements too."
   betCount: BigInt!
   "Actual payout received"
   actualPayout: BigInt!
@@ -738,10 +738,11 @@ type HourlyPlayer @entity(immutable: true) {
   id: ID!
 }
 
-type BRBBurn @entity(immutable: true) {
+"Mutable: the burn Transfer log lands before the RouletteEngine.JackpotFunded event that names the (round, market) it settles, so `round` is linked on that second event — see PendingBrbBurn."
+type BRBBurn @entity(immutable: false) {
   "Transaction hash + log index"
   id: Bytes!
-  "Round this burn belongs to"
+  "Round this burn belongs to (null for burns no roulette settlement claimed, e.g. side-bet funding)"
   round: RouletteRound
   "Amount burned"
   amount: BigInt!
@@ -751,6 +752,25 @@ type BRBBurn @entity(immutable: true) {
   blockNumber: BigInt!
   "Transaction hash"
   transactionHash: Bytes!
+}
+
+"""
+Per-transaction FIFO of BRB burns still waiting to be attributed to a round.
+
+BRBJackpotFunder burns before it emits FundedFromMarket, and RouletteEngine emits JackpotFunded
+after the funder call returns, so at Transfer time nothing on-chain has yet named the round or the
+market the burn belongs to. The burn is queued here and claimed by the next JackpotFunded of the
+same transaction, which carries both. Claiming only on the engine event is deliberate: side-bet
+funding emits SideBetJackpotFunded instead, so its burns stay unclaimed rather than inflating a
+roulette round's share.
+"""
+type PendingBrbBurn @entity(immutable: false) {
+  "Transaction hash"
+  id: Bytes!
+  "BRBBurn ids created in this transaction, in log order"
+  burnIds: [Bytes!]!
+  "Index of the next unclaimed entry in burnIds"
+  cursor: Int!
 }
 
 "Token approval event (BRB, sBRB, BRBR)"

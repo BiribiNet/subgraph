@@ -1,41 +1,31 @@
-import { BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
+import { BigInt, Bytes } from '@graphprotocol/graph-ts';
 import { assert, beforeEach, clearStore, describe, test } from 'matchstick-as';
 
-import { DEFAULT_USER, emitBetRecorded, setupTestMarket, testRoundId } from './helpers';
+import {
+  DEFAULT_USER,
+  emitBetRecorded,
+  encodeBetLegs,
+  setupTestMarket,
+  testRoundId,
+} from './helpers';
 
 function encodeMultiLegBetData(): Bytes {
-  const encoded = ethereum.encode(
-    ethereum.Value.fromTuple(
-      changetype<ethereum.Tuple>([
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(1), BigInt.fromI32(8)]),
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(7), BigInt.fromI32(0)]),
-        ethereum.Value.fromUnsignedBigIntArray([
-          BigInt.fromString('10000000000000000000'),
-          BigInt.fromString('5000000000000000000'),
-        ]),
-      ])
-    )
+  return encodeBetLegs(
+    [BigInt.fromI32(1), BigInt.fromI32(8)],
+    [BigInt.fromI32(7), BigInt.fromI32(0)],
+    [BigInt.fromString('10000000000000000000'), BigInt.fromString('5000000000000000000')]
   );
-  return encoded ? encoded : Bytes.empty();
 }
 
 // A straight leg on an out-of-range number (99) alongside a valid straight leg on 7.
 // `number` comes from unvalidated betData; pre-L-3-fix, indexing straightBetsTotals[99]
 // (a 37-slot array) trapped the WASM mapping. It must now skip the bad leg and index the rest.
 function encodeOutOfRangeStraightBetData(): Bytes {
-  const encoded = ethereum.encode(
-    ethereum.Value.fromTuple(
-      changetype<ethereum.Tuple>([
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(1), BigInt.fromI32(1)]),
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(99), BigInt.fromI32(7)]),
-        ethereum.Value.fromUnsignedBigIntArray([
-          BigInt.fromString('10000000000000000000'),
-          BigInt.fromString('3000000000000000000'),
-        ]),
-      ])
-    )
+  return encodeBetLegs(
+    [BigInt.fromI32(1), BigInt.fromI32(1)],
+    [BigInt.fromI32(99), BigInt.fromI32(7)],
+    [BigInt.fromString('10000000000000000000'), BigInt.fromString('3000000000000000000')]
   );
-  return encoded ? encoded : Bytes.empty();
 }
 
 describe('Multi-leg BetRecorded', () => {

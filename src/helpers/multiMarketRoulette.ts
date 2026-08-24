@@ -11,7 +11,15 @@ import {
   InfrastructureFeePaid,
   Upgraded
 } from "../../generated/RouletteEngine/Game"
-import { RouletteRound, ContractUpgrade, GlobalRound, RouletteBet, GlobalState } from "../../generated/schema"
+import {
+  BRBBurn,
+  ContractUpgrade,
+  GlobalRound,
+  GlobalState,
+  PendingBrbBurn,
+  RouletteBet,
+  RouletteRound,
+} from "../../generated/schema"
 import {
   ROUND_STATUS_BETTING,
   ROUND_STATUS_VRF,
@@ -48,19 +56,21 @@ import {
 } from "./round-sync"
 import { observeSideBetSpinsForRound } from "./side-bet-vrf"
 
+// Takes the caller's `GlobalRound` instance rather than loading its own: `store.get` hands back a
+// fresh object every call, so a second copy incremented here was silently discarded the moment the
+// caller saved its own — which is why `participantMarketCount` never left zero.
 function loadOrCreateMarketRound(
+  gr: GlobalRound,
   globalRoundId: BigInt,
   marketId: i32,
   timestamp: BigInt
 ): RouletteRound {
   const market = requireMarket(marketId)
-  const gr = getOrCreateGlobalRound(globalRoundId, timestamp)
   const roundKey = marketRoundId(globalRoundId, marketId)
   let round = RouletteRound.load(roundKey)
   if (round == null) {
     round = createNewRouletteRound(gr, market, timestamp)
     gr.participantMarketCount = gr.participantMarketCount.plus(BigInt.fromI32(1))
-    gr.save()
     market.save()
   }
   return round
@@ -89,9 +99,8 @@ export function processBetRecorded(event: BetRecorded): void {
   const globalRoundId = event.params.localRound
   const marketId = event.params.marketId.toI32()
   const globalState = getOrCreateGlobalState()
-  const grKey = globalRoundIdBytes(globalRoundId)
   const gr = getOrCreateGlobalRound(globalRoundId, event.block.timestamp)
-  const round = loadOrCreateMarketRound(globalRoundId, marketId, event.block.timestamp)
+  const round = loadOrCreateMarketRound(gr, globalRoundId, marketId, event.block.timestamp)
 
   if (round.firstBetAt.equals(ZERO)) {
     round.firstBetAt = event.block.timestamp
@@ -279,9 +288,12 @@ export function processRoundResolved(event: RoundResolved): void {
   gr.resolvedAt = event.block.timestamp
   gr.save()
 
-  finalizeMarketRoundsOnResolve(roundId, event.block.timestamp)
-
+  // Flush before finalizeMarketRoundsOnResolve: `updateRoundRevenueAggregates` loads and saves its
+  // own GlobalState copy to add the round's staker share, so saving this (older) copy afterwards
+  // wiped that write — which is why `totalStakerRevenue` read 0 while every round carried one.
   globalState.save()
+
+  finalizeMarketRoundsOnResolve(roundId, event.block.timestamp)
 
   const daily = getOrCreateDailyStats(event.block.timestamp)
   daily.roundsCompleted = daily.roundsCompleted.plus(BigInt.fromI32(1))
@@ -298,7 +310,13 @@ export function processPayoutProgress(event: PayoutProgress): void {
     round.status = ROUND_STATUS_PAYOUT
   }
   round.totalPayouts = round.totalPayouts.plus(event.params.paidAmount)
-  round.currentPayoutsCount = event.params.toCursor
+  // Payouts are sharded across lanes and every lane keeps its own cursor starting at 0, so the raw
+  // `toCursor` is a per-lane position, not a round total — assigning it made a three-row round
+  // report whatever its last lane happened to end on. The rows this batch settled are the span it
+  // covers.
+  round.currentPayoutsCount = round.currentPayoutsCount.plus(
+    event.params.toCursor.minus(event.params.fromCursor)
+  )
   round.save()
 
   const gr = GlobalRound.load(globalRoundIdBytes(event.params.globalRoundId))
@@ -315,11 +333,42 @@ export function processJackpotFunded(event: JackpotFunded): void {
     return
   }
   round.jackpotRevenue = round.jackpotRevenue.plus(event.params.amount)
+  // This event is the first thing in the transaction that names both the round and the market the
+  // funder just burned for, so it is where the queued burn gets its home.
+  round.roundBurnAmount = round.roundBurnAmount.plus(
+    claimBurnForRound(event.transaction.hash, round)
+  )
   round.save()
 
   const daily = getOrCreateDailyStats(event.block.timestamp)
   daily.jackpotFunded = daily.jackpotFunded.plus(event.params.amount)
   daily.save()
+}
+
+/**
+ * Claims this transaction's next unattributed BRB burn for `round` and returns its amount (zero if
+ * the funder burned nothing for this market — a skipped swap or a failed burn still emits
+ * JackpotFunded). Markets settle one after another within a transaction, each burning before it
+ * emits, so FIFO order pairs a burn with its own market.
+ */
+function claimBurnForRound(transactionHash: Bytes, round: RouletteRound): BigInt {
+  const pending = PendingBrbBurn.load(transactionHash)
+  if (pending == null) {
+    return ZERO
+  }
+  const burnIds = pending.burnIds
+  if (pending.cursor >= burnIds.length) {
+    return ZERO
+  }
+  const burn = BRBBurn.load(burnIds[pending.cursor])
+  pending.cursor += 1
+  pending.save()
+  if (burn == null) {
+    return ZERO
+  }
+  burn.round = round.id
+  burn.save()
+  return burn.amount
 }
 
 export function processInfrastructureFeePaid(event: InfrastructureFeePaid): void {

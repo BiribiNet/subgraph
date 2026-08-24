@@ -7,7 +7,11 @@ import {
   WithdrawTransaction,
   Market,
 } from "../../generated/schema"
-import { JACKPOT_TREASURY_ADDRESS, ROUND_STATUS_PAYOUT } from "./constant"
+import {
+  JACKPOT_TREASURY_ADDRESS,
+  ROUND_STATUS_NO_MORE_BETS,
+  ROUND_STATUS_PAYOUT,
+} from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "./aggregation"
 import { getOrCreateGlobalState } from "./globalState"
@@ -73,7 +77,15 @@ export function tryRecordMarketPayoutTransfer(
   if (currentRound == null || bet == null) {
     return
   }
-  if (currentRound.status != ROUND_STATUS_PAYOUT) {
+  // The bank's Transfer to the winner is logged before the engine's PayoutProgress that flips the
+  // market round to PAYOUT, so requiring PAYOUT here silently dropped the first batch of every
+  // round: the winner's own bet kept a short `actualPayout` and its PayoutTransaction row never
+  // existed. NO_MORE_BETS — set when VrfRequested locked the round — is the state a settlement
+  // transfer actually arrives in. Anything earlier is a stake moving the other way.
+  if (
+    currentRound.status != ROUND_STATUS_PAYOUT &&
+    currentRound.status != ROUND_STATUS_NO_MORE_BETS
+  ) {
     return
   }
 
