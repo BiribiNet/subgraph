@@ -677,7 +677,7 @@ type DailyStat @entity(immutable: false) {
   betCount: BigInt!
   "Number of unique players"
   uniquePlayers: BigInt!
-  "Revenue collected (gross house edge: totalBets - totalPayouts, before fee splits)"
+  "Revenue collected this day (gross house edge: totalBets - totalPayouts, before fee splits), normalized to 18 decimals across markets"
   revenue: BigInt!
   "BRB burned this day"
   burnAmount: BigInt!
@@ -693,11 +693,11 @@ type DailyStat @entity(immutable: false) {
   roundsCompleted: BigInt!
   "Total payouts"
   totalPayouts: BigInt!
-  "Total BRB deposited into sBRB vault"
+  "Assets deposited into vaults this day, normalized to 18 decimals across markets"
   depositVolume: BigInt!
   "Number of deposits"
   depositCount: BigInt!
-  "Total BRB withdrawn from sBRB vault"
+  "Assets withdrawn from vaults this day, normalized to 18 decimals across markets"
   withdrawalVolume: BigInt!
   "Number of withdrawals"
   withdrawalCount: BigInt!
@@ -715,15 +715,15 @@ type HourlyVolumeSnapshot @entity(immutable: false) {
   id: ID!
   "Hour number"
   hour: Int!
-  "Total volume this hour"
+  "Wagered this hour, normalized to 18 decimals across markets"
   volume: BigInt!
   "Number of bets"
   betCount: BigInt!
   "Number of unique players this hour"
   uniquePlayers: BigInt!
-  "Total BRB deposited into sBRB vault this hour"
+  "Assets deposited into vaults this hour, normalized to 18 decimals across markets"
   depositVolume: BigInt!
-  "Total BRB withdrawn from sBRB vault this hour"
+  "Assets withdrawn from vaults this hour, normalized to 18 decimals across markets"
   withdrawalVolume: BigInt!
   "Total BRB paid out to winners this hour"
   totalPayouts: BigInt!
