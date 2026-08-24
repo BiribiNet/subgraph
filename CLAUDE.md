@@ -64,7 +64,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 - `computeBrbPoints(user, cfg)` = `(user.totalRouletteBets * 3 + user.totalStaked * 1 + user.totalBrbrEarned * 2) / 1e18` with the default config — points are denominated in BRB-equivalent units.
 - `computeTier(points)` maps to `BRONZE / SILVER (≥ 500) / GOLD (≥ 2k) / PLATINUM (≥ 5k) / DIAMOND (≥ 15k) / LEGEND (≥ 50k)`. **These thresholds MUST match the frontend `BRBP_TIERS` array** in `frontend/hooks/use-biribi-points.ts`; the subgraph is the source of truth for `user.tier`.
 - `recomputeAndSaveUserPoints(user, timestamp)` runs after every `updateUserRouletteStats` / `updateUserStakingStats` / `updateUserBrbrEarnings` call — keeps `user.brbpPoints` and `user.tier` always in sync with the components.
-- `User.totalRouletteBets` mixes USDC + BRB across markets (no oracle normalization in Phase 2). Document this trade-off when consumers query the leaderboard.
+- `User.totalRouletteBets` and `User.totalStaked`/`totalUnstaked` are **decimal-normalized to 18** across markets, so 1 USDC and 1 BRB each count as one unit. What is still absent is **price** normalization: a unit of USDC and a unit of BRB score identically regardless of market value. Document that trade-off when consumers query the leaderboard, and do not confuse it with a decimals bug.
 
 ### Revenue Distribution (hardcoded per round)
 ```

@@ -115,16 +115,31 @@ export function updateUserBRBReferalBalance(userAddress: Bytes, amount: BigInt, 
   user.save()
 }
 
-export function updateUserStakingStats(userAddress: Bytes, amount: BigInt, isDeposit: boolean, timestamp: BigInt): void {
+/**
+ * Records staking volume for the BRBpoints "staked" component.
+ *
+ * `amount` arrives in the market's own decimals and MUST be normalized: these totals feed
+ * `computeBrbPoints`, which divides by a flat 1e18. Counting raw units made 10,000 USDC worth ~0
+ * points against 10,000 BRB worth 10,000 — i.e. the staking half of DAO voting weight was
+ * effectively reserved to the BRB vault. Mirrors what the wagered component already does.
+ */
+export function updateUserStakingStats(
+  userAddress: Bytes,
+  amount: BigInt,
+  assetDecimals: i32,
+  isDeposit: boolean,
+  timestamp: BigInt
+): void {
   if (userAddress.toHexString() == ZERO_ADDRESS) {
     return
   }
   const user = getOrCreateUser(userAddress)
+  const normalized = normalizeAmountTo18(amount, assetDecimals)
 
   if (isDeposit) {
-    user.totalStaked = user.totalStaked.plus(amount)
+    user.totalStaked = user.totalStaked.plus(normalized)
   } else {
-    user.totalUnstaked = user.totalUnstaked.plus(amount)
+    user.totalUnstaked = user.totalUnstaked.plus(normalized)
   }
 
   user.save()
