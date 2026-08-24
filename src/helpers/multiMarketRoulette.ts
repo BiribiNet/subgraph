@@ -18,6 +18,7 @@ import {
   ROUND_STATUS_PAYOUT,
   ROUND_STATUS_CLEAN
 } from "./constant"
+import { BRB_TOKEN_ADDRESS } from "./constant"
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateGlobalState } from "./globalState"
 import { createNewRouletteRound } from "./rouletteRound"
@@ -39,7 +40,7 @@ import { recordUserMarketWager } from "./user-market-stats"
 import { getOrCreateGlobalRound, globalRoundIdBytes } from "./globalRound"
 import { marketRoundId, requireMarket, getOrCreateMarket } from "./market"
 import { ZERO } from "./number"
-import { BankVault as BankVaultTemplate } from "../../generated/templates"
+import { BankVault as BankVaultTemplate, MarketAsset as MarketAssetTemplate } from "../../generated/templates"
 import { recordTxBetToBank } from "./tx-activity"
 import {
   finalizeMarketRoundsOnResolve,
@@ -344,6 +345,12 @@ export function processMarketRegistered(event: MarketRegistered): void {
   )
   market.save()
   BankVaultTemplate.create(event.params.bank)
+  // A winner is only ever named by the asset's own Transfer(bank -> winner); no engine or vault
+  // event carries (winner, amount). BRB already has a static data source, so spawning one here too
+  // would double-count it.
+  if (!event.params.asset.equals(BRB_TOKEN_ADDRESS)) {
+    MarketAssetTemplate.create(event.params.asset)
+  }
 }
 
 export function processGameUpgraded(event: Upgraded): void {

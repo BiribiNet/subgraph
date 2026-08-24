@@ -1,7 +1,11 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
-import { DailyStat, DailyPlayer, GlobalState, HourlyVolumeSnapshot, HourlyPlayer, RouletteRound } from "../../generated/schema"
+import { DailyStat, DailyPlayer, GlobalState, HourlyVolumeSnapshot, HourlyPlayer, Market, RouletteRound } from "../../generated/schema"
 import { ZERO } from "./number"
 import { getOrCreateGlobalState, GLOBAL_STATE_ID } from "./globalState"
+import { normalizeAmountTo18 } from "./user"
+
+/** Cross-market aggregates are denominated in 18 decimals, like `User.totalWagered`. */
+const NORMALIZED_DECIMALS: i32 = 18
 
 const SECONDS_PER_DAY = BigInt.fromI32(86400)
 const SECONDS_PER_HOUR = BigInt.fromI32(3600)
@@ -87,14 +91,24 @@ export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: Bi
   }
   const grossRevenue = round.totalBets.minus(round.totalPayouts)
   const stakersShare = grossRevenue.minus(round.jackpotRevenue).minus(round.infraRevenue)
+  // `RouletteRound` fields stay in the market's own units — one round, one asset, nothing mixes.
+  // `DailyStat` and `GlobalState` are cross-market singletons, so what lands there is normalized to
+  // 18 decimals like `totalWagered` already is. Without this a 6-decimal market contributed
+  // revenue 10^12 times too small next to an 18-decimal one, and any RTP or house-profit figure
+  // derived from the pair was meaningless.
   round.stakersRevenue = stakersShare.gt(ZERO) ? stakersShare : ZERO
   round.save()
+
+  const roundMarket = Market.load(round.market)
+  const assetDecimals = roundMarket != null ? roundMarket.assetDecimals : NORMALIZED_DECIMALS
+
   const daily = getOrCreateDailyStats(timestamp)
-  daily.revenue = daily.revenue.plus(grossRevenue)
+  daily.revenue = daily.revenue.plus(normalizeAmountTo18(grossRevenue, assetDecimals))
   if (stakersShare.gt(ZERO)) {
-    daily.stakersRevenue = daily.stakersRevenue.plus(stakersShare)
+    const normalizedStakersShare = normalizeAmountTo18(stakersShare, assetDecimals)
+    daily.stakersRevenue = daily.stakersRevenue.plus(normalizedStakersShare)
     const globalState = getOrCreateGlobalState()
-    globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(stakersShare)
+    globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(normalizedStakersShare)
     globalState.save()
   }
   daily.save()

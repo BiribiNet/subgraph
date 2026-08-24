@@ -13,8 +13,11 @@ import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "./aggregation"
 import { getOrCreateGlobalState } from "./globalState"
 import { ZERO } from "./number"
 import { findBetInGlobalRound, findBetInMarketRound, isKnownBank, loadMarketByBank } from "./market"
-import { updateUserRouletteStats } from "./user"
+import { normalizeAmountTo18, updateUserRouletteStats } from "./user"
 import { recordUserMarketWin } from "./user-market-stats"
+
+/** Jackpot payouts are denominated in BRB, never in the market's own asset. */
+const BRB_DECIMALS: i32 = 18
 
 /**
  * Records per-winner payout detail from an ERC-20 Transfer (market asset or BRB).
@@ -55,15 +58,13 @@ export function tryRecordMarketPayoutTransfer(
       }
     }
   } else if (from.equals(JACKPOT_TREASURY_ADDRESS)) {
+    // The treasury pays BRB whatever market the winning bet sat in, so the scale is BRB's, not
+    // the market asset's. Reading the market's decimals here inflated a jackpot win by 10^12 for
+    // a 6-decimal market.
+    assetDecimals = BRB_DECIMALS
     bet = findBetInGlobalRound(changetype<Bytes>(to), resolvingRoundId)
     if (bet != null) {
       currentRound = RouletteRound.load(bet.round)
-      if (currentRound != null) {
-        const marketEntity = Market.load(currentRound.market)
-        if (marketEntity != null) {
-          assetDecimals = marketEntity.assetDecimals
-        }
-      }
     }
   } else {
     return
@@ -78,7 +79,9 @@ export function tryRecordMarketPayoutTransfer(
 
   const payoutId = transactionHash.concat(bigintToBytes(logIndex))
   const wasAlreadyWinner = bet.won
-  const normalizedPayout = value
+  // Cross-market aggregates are denominated in 18 decimals, matching `totalWagered`. Per-market and
+  // per-bet amounts below stay in the asset's own units — those never mix.
+  const normalizedPayout = normalizeAmountTo18(value, assetDecimals)
   const payoutMarket = Market.load(bet.market)
 
   if (from.equals(JACKPOT_TREASURY_ADDRESS)) {
@@ -100,7 +103,7 @@ export function tryRecordMarketPayoutTransfer(
       : globalState.currentJackpot.minus(value)
 
     globalState.totalJackpotsPaid = globalState.totalJackpotsPaid.plus(value)
-    globalState.totalPayouts = globalState.totalPayouts.plus(value)
+    globalState.totalPayouts = globalState.totalPayouts.plus(normalizedPayout)
 
     updateUserRouletteStats(to, value, assetDecimals, true, !wasAlreadyWinner, timestamp)
     if (payoutMarket != null) {
@@ -135,7 +138,7 @@ export function tryRecordMarketPayoutTransfer(
       recordUserMarketWin(to, payoutMarket, value, !wasAlreadyWinner, timestamp)
     }
 
-    globalState.totalPayouts = globalState.totalPayouts.plus(value)
+    globalState.totalPayouts = globalState.totalPayouts.plus(normalizedPayout)
 
     const dailyStatsRegularPayout = getOrCreateDailyStats(timestamp)
     dailyStatsRegularPayout.totalPayouts = dailyStatsRegularPayout.totalPayouts.plus(normalizedPayout)

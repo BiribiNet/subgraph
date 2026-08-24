@@ -335,6 +335,33 @@ dataSources:
           handler: handleRoleAdminChanged
       file: ./src/mappings/cre-authority.ts
 templates:
+  - name: MarketAsset
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRB
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - GlobalState
+        - Market
+        - User
+        - UserMarketStats
+        - RouletteRound
+        - RouletteBet
+        - PayoutTransaction
+        - JackpotPayout
+        - DailyStat
+        - HourlyVolumeSnapshot
+      abis:
+        - name: BRB
+          file: ./abis/BRB.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleMarketAssetTransfer
+      file: ./src/mappings/market-asset.ts
   - name: BankVault
     kind: ethereum/contract
     network: arbitrum-sepolia
