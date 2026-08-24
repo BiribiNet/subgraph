@@ -142,6 +142,25 @@ describe('Withdrawal Queue Lifecycle', () => {
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPendingLargeWithdrawals', '0');
   });
 
+  test('H-15: estimate uses the requested vault shares, not the cross-vault sum', () => {
+    setupSecondTestMarket();
+
+    // Same holder in two vaults. `user.sbrbBalance` sums share balances whose decimals differ per
+    // asset, so reading it skewed the estimate by orders of magnitude.
+    emitDeposit(DEFAULT_USER, HUNDRED_ASSETS, HUNDRED_ASSETS, 1_000_000, 0, TEST_BANK);
+    emitDeposit(DEFAULT_USER, HUNDRED_ASSETS, HUNDRED_ASSETS, 1_000_010, 10, TEST_BANK_2);
+
+    emitWithdrawalRequested(DEFAULT_USER, 10000, DEFAULT_USER, 1_000_050, 1, TEST_BANK);
+
+    // 100% of the first vault's position — the second vault's shares must not inflate it.
+    assert.fieldEquals(
+      'GlobalState',
+      GLOBAL_STATE_ID,
+      'totalPendingLargeWithdrawals',
+      HUNDRED_ASSETS
+    );
+  });
+
   test('N-2: concurrent requests in two vaults are tracked and processed per (user, bank)', () => {
     // Vault 1 gets a deposit so its request carries a non-zero estimate (100 assets @ 100% bps).
     emitDeposit(DEFAULT_USER, HUNDRED_ASSETS, HUNDRED_ASSETS, 1_000_000);

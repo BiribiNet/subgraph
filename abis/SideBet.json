@@ -109,6 +109,11 @@
   },
   {
     "inputs": [],
+    "name": "RoundOutcomeAlreadyKnown",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "StakeLimitsNotSet",
     "type": "error"
   },
@@ -334,6 +339,19 @@
       }
     ],
     "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "settleTimeout",
+        "type": "uint64"
+      }
+    ],
+    "name": "SettleTimeoutUpdated",
     "type": "event"
   },
   {
@@ -1108,6 +1126,11 @@
             "internalType": "uint256",
             "name": "payoutAmount",
             "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "expired",
+            "type": "bool"
           }
         ],
         "internalType": "struct ISideBet.SettleRow[]",
@@ -1297,6 +1320,19 @@
   {
     "inputs": [
       {
+        "internalType": "uint64",
+        "name": "newSettleTimeout",
+        "type": "uint64"
+      }
+    ],
+    "name": "setSettleTimeout",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "components": [
           {
             "internalType": "uint256",
@@ -1312,6 +1348,11 @@
             "internalType": "uint256",
             "name": "payoutAmount",
             "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "expired",
+            "type": "bool"
           }
         ],
         "internalType": "struct ISideBet.SettleRow[]",
@@ -1364,7 +1405,7 @@
           }
         ],
         "internalType": "struct ISideBet.SettleVaultApply[]",
-        "name": "vaultApplies",
+        "name": "",
         "type": "tuple[]"
       }
     ],
@@ -1377,6 +1418,19 @@
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "settleTimeout",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

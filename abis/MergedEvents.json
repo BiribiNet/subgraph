@@ -180,6 +180,19 @@
     "inputs": [
       {
         "indexed": false,
+        "internalType": "uint32",
+        "name": "newLaneCount",
+        "type": "uint32"
+      }
+    ],
+    "name": "PayoutLaneCountUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
         "internalType": "uint64",
         "name": "globalRoundId",
         "type": "uint64"
@@ -1014,7 +1027,7 @@
       },
       {
         "indexed": false,
-        "internalType": "uint8",
+        "internalType": "enum ISideBet.SideBetType",
         "name": "betType",
         "type": "uint8"
       }
@@ -1090,6 +1103,19 @@
       }
     ],
     "name": "MultiplierBandUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "settleTimeout",
+        "type": "uint64"
+      }
+    ],
+    "name": "SettleTimeoutUpdated",
     "type": "event"
   },
   {
@@ -1202,7 +1228,7 @@
       },
       {
         "indexed": false,
-        "internalType": "uint8",
+        "internalType": "enum ISideBet.SideBetStatus",
         "name": "outcome",
         "type": "uint8"
       },
@@ -1492,19 +1518,6 @@
       }
     ],
     "name": "OwnershipTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "message",
-        "type": "string"
-      }
-    ],
-    "name": "SecurityWarning",
     "type": "event"
   }
 ]
