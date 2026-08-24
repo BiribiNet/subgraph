@@ -1,0 +1,40 @@
+name: Deploy subgraph to Goldsky
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy (blank = auto: one patch above the latest)"
+        required: false
+        type: string
+      prune:
+        description: "Delete superseded versions after the deploy"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: goldsky-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Release to Goldsky (deploy + tag prod + prune)
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          PRUNE: ${{ inputs.prune == false && '0' || '1' }}
+        run: node scripts/goldsky-release.mjs
