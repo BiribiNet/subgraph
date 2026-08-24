@@ -26,12 +26,26 @@ secret** so it is injected into the sandbox as an env var across sessions:
 
 ## 2. Deploy
 
+### From GitHub Actions (recommended)
+
+The repo ships `.github/workflows/deploy-goldsky.yml`: run the **“Deploy
+subgraph to Goldsky”** workflow (Actions → workflow_dispatch). It uses the
+`GOLDSKY_API_TOKEN` repository secret and calls `scripts/goldsky-release.mjs`,
+which codegens + builds, deploys the next patch version (or the `version`
+input), moves the `prod` tag, then deletes superseded versions (uncheck the
+`prune` input to keep them).
+
+### From a shell
+
 ```bash
 # codegen + build + deploy the bundle to Goldsky
 yarn deploy:api biribi/<version>
 
 # deploy and move the `prod` tag to this version in one go
 yarn deploy:api biribi/<version> --tag prod --description "referral indexing"
+
+# or the full release (auto version + prod tag + prune), same as CI
+GOLDSKY_API_TOKEN=... node scripts/goldsky-release.mjs
 ```
 
 `<version>` is your choice (e.g. `v2-referral`, `1.2.0`). On success the script
