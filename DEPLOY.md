@@ -78,3 +78,81 @@ populating BRBr / BRBpoints:
 
 Then point the frontend at the endpoint by setting `NEXT_PUBLIC_SUBGRAPH_URL`
 (see `frontend/.env.example`) to the deployment's GraphQL URL.
+
+---
+
+## 4. Re-indexing from `startBlock` (data-correcting deploys)
+
+Some fixes correct values that were written **wrongly into history**. Those only
+take effect for blocks indexed *after* the fix unless the subgraph is rebuilt
+from `startBlock`. As of the 2026-08 accounting work that applies to: non-BRB
+market payout attribution, cross-market decimal normalization, and the staking
+component of `brbpPoints`.
+
+`brbpPoints` is the one that makes this urgent rather than cosmetic: Snapshot
+reads it **at a proposal's snapshot block** via time-travel queries, so stale
+history means stale voting power.
+
+### ⚠️ Do not use the normal release path for this
+
+`scripts/goldsky-release.mjs` (and the `deploy-goldsky.yml` workflow) deploys
+**and moves the `prod` tag in the same run**, then prunes superseded versions by
+default. Every new Goldsky version indexes from `startBlock`, so moving the tag
+immediately would point the live endpoint at a version at ~0 % sync — empty
+leaderboards, zeroed stats, missing history — and the prune would delete the
+healthy version you would want to roll back to.
+
+### Two-phase procedure
+
+**Pre-flight** (all must pass before deploying):
+
+```bash
+yarn check:constants                # addresses + startBlocks match the deploy JSON
+yarn codegen && yarn build          # zero warnings
+npx graph test -v 0.6.0             # the -v pin is required; see note below
+```
+
+> The version pin is not optional: without it the CLI calls the GitHub "latest
+> release" API to fetch its binary, which fails behind a proxy. `yarn test` runs
+> `graph test` unpinned and is **not** a substitute for this step.
+
+**Phase 1 — deploy untagged.** `prod` keeps serving the old version, so there is
+no interruption:
+
+```bash
+yarn deploy:api biribi/<version>    # no --tag: goldsky-deploy defaults to no tags
+```
+
+**Phase 2 — wait for a full sync, then validate against the *new* version's
+endpoint** (not `prod`):
+
+1. Indexing health — `synced: true`, `health: healthy`, `fatalError: null`.
+2. Payout attribution repaired — a winner in a non-BRB market now has
+   `winCount > 0`. Query `users(where: { winCount_gt: 0 })` and confirm it
+   includes addresses active on the USDC/DAI vaults, which was impossible before.
+3. Decimal normalization repaired — `globalState.totalPayouts` and
+   `totalStakerRevenue` are the same order of magnitude as `totalWagered` (all
+   18-decimal). A ~10^12 gap means a regression.
+4. Staking weight repaired — a USDC staker appears in the `totalStaked` ranking.
+5. **Non-regression** — `totalRounds`, `totalBets` and `brbTotalSupply` must
+   match the old version. No fix touches those counters, so any difference is an
+   alarm, not an improvement.
+
+**Phase 3 — cut over** only once the above holds:
+
+```bash
+yarn prod:subgraph <version>        # moves the prod tag; atomic for readers
+```
+
+The frontend needs **no** env change: it queries `/api/subgraph` (same-origin
+proxy) → `SUBGRAPH_API_URL` → the `biribi/prod` tagged endpoint.
+
+**Do not prune** the previous version until the new one has served production
+for a while — it is the only rollback.
+
+### Governance caveat
+
+`brbpPoints` changes retroactively (upward) for USDC/DAI players. A Snapshot
+proposal open across the cutover would see voting weight move under it. Cut over
+outside any voting window, and announce it: a voter who sees their weight change
+without explanation will read it as manipulation, not as a correction.
