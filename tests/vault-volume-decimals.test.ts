@@ -1,6 +1,7 @@
 import { assert, beforeEach, clearStore, describe, test } from 'matchstick-as';
 
 import {
+  GLOBAL_STATE_ID,
   TEST_BANK_2,
   emitBetRecorded,
   emitDeposit,
@@ -59,6 +60,31 @@ describe('Cross-market vault volumes are decimal-normalized', () => {
 
     assert.fieldEquals('DailyStat', DAY_ID, 'withdrawalVolume', ONE_18DEC);
     assert.fieldEquals('HourlyVolumeSnapshot', HOUR_ID, 'withdrawalVolume', ONE_18DEC);
+  });
+
+  test('the all-time GlobalState totals are normalized too', () => {
+    // Same quantity as depositVolume at all-time scope, and it feeds the
+    // infrastructure overview card; leaving it raw would have made the two
+    // scopes disagree.
+    setupSecondTestMarket(6);
+
+    emitDeposit(PLAYER, ONE_USDC, ONE_USDC, TIMESTAMP, 0, TEST_BANK_2);
+    emitWithdrawalProcessed(
+      PLAYER, 10_000, PLAYER, ONE_USDC, ONE_USDC, TIMESTAMP, 1, TEST_BANK_2,
+    );
+
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalDeposited', ONE_18DEC);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalWithdrawn', ONE_18DEC);
+  });
+
+  test('the per-asset-class totals keep the market asset units', () => {
+    // `addVaultDepositTotals` splits BRB from stable precisely so nothing mixes
+    // there — those must NOT be normalized.
+    setupSecondTestMarket(6);
+
+    emitDeposit(PLAYER, ONE_USDC, ONE_USDC, TIMESTAMP, 0, TEST_BANK_2);
+
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'stableVaultTotalDeposits', ONE_USDC);
   });
 
   test('an 18-decimal deposit is unchanged by normalization', () => {

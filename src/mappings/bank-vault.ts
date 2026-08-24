@@ -132,7 +132,11 @@ export function handleDeposit(event: Deposit): void {
   hourlyDeposit.depositVolume = hourlyDeposit.depositVolume.plus(normalizedDeposit)
   hourlyDeposit.save()
 
-  globalState.totalDeposited = globalState.totalDeposited.plus(event.params.assets)
+  // All-time counterpart of DailyStat.depositVolume — also a flat cross-market
+  // sum, so it carries the same 18-decimal normalization. The per-asset-class
+  // totals in `addVaultDepositTotals` stay raw: they are split by class
+  // precisely so nothing mixes there.
+  globalState.totalDeposited = globalState.totalDeposited.plus(normalizedDeposit)
 
   market.save()
   globalState.save()
@@ -306,7 +310,7 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     hourlyWithdraw.withdrawalVolume = hourlyWithdraw.withdrawalVolume.plus(normalizedWithdrawal)
     hourlyWithdraw.save()
 
-    globalState.totalWithdrawn = globalState.totalWithdrawn.plus(assetsPaid)
+    globalState.totalWithdrawn = globalState.totalWithdrawn.plus(normalizedWithdrawal)
 
     market.save()
   }
