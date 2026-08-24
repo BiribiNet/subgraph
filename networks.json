@@ -19,6 +19,18 @@
     "SideBet": {
       "address": "0xa0dcb8fced50eed13899af86de70fce42897e8b1",
       "startBlock": 284788460
+    },
+    "AutomationReceiver": {
+      "address": "0xfda0edcbcf2c6360279cf10ec079d56d43795a86",
+      "startBlock": 284788460
+    },
+    "UpkeepScheduler": {
+      "address": "0xad1f181ad88aee13a6643104941ecea2b963c2d7",
+      "startBlock": 284788460
+    },
+    "CreExecutionAuthority": {
+      "address": "0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68",
+      "startBlock": 284788460
     }
   },
   "arbitrum-one": {
@@ -39,6 +51,18 @@
       "startBlock": 0
     },
     "SideBet": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    },
+    "AutomationReceiver": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    },
+    "UpkeepScheduler": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    },
+    "CreExecutionAuthority": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     }

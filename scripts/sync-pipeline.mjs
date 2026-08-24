@@ -10,7 +10,8 @@
  *
  * Env:
  *   DEPLOY_JSON              — path to JSON (required) see deployments/example-arbitrum-sepolia.json
- *                            — optional startBlocks.{brb,roulette,brbReferal,sideBet,jackpotFunder} override startBlock per data source
+ *                            — optional startBlocks.{brb,roulette,brbReferal,sideBet,jackpotFunder,
+ *                              automationReceiver,scheduler,creExecutionAuthority} override startBlock per data source
  *                            — addresses.banks[] (or addresses.markets.*.bank) appended to turbo `WHERE address IN` for vault events
  *                            — optional addresses.upkeepManager, sideBet, jackpotFunder appended to turbo `WHERE address IN`
  *                            — MergedEvents.json is extended with SideBet + BRBJackpotFunder events from abis/*.json
@@ -434,6 +435,9 @@ const dsMap = [
   ["BRBReferral", "brbReferal"],
   ["BRBJackpotFunder", "jackpotFunder"],
   ["SideBet", "sideBet"],
+  ["AutomationReceiver", "automationReceiver"],
+  ["UpkeepScheduler", "scheduler"],
+  ["CreExecutionAuthority", "creExecutionAuthority"],
 ];
 for (const [name, key] of dsMap) {
   const addrRe = new RegExp(
