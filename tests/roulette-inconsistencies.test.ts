@@ -3,6 +3,8 @@ import { assert, beforeEach, clearStore, describe, newMockEvent, test } from 'ma
 
 import { PayoutProgress, RoundResolved, VrfRequested } from '../generated/RouletteEngine/Game';
 import { Transfer as BrbTransfer } from '../generated/BRBToken/BRB';
+import { CallFailed } from '../generated/AutomationReceiver/AutomationReceiver';
+import { handleCallFailed } from '../src/mappings/automation-receiver';
 import {
   handlePayoutProgress,
   handleRoundResolved,
@@ -119,6 +121,32 @@ function emitRoundResolved(globalRoundId: i32): void {
   );
   event.block.timestamp = BigInt.fromI32(TIMESTAMP);
   handleRoundResolved(event);
+}
+
+function emitCallFailed(transactionHash: Bytes, logIndex: i32): void {
+  const event = changetype<CallFailed>(newMockEvent());
+  event.address = Address.fromString('0xfda0edcbcf2c6360279cf10ec079d56d43795a86');
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam(
+      'target',
+      ethereum.Value.fromAddress(Address.fromString('0xad1f181ad88aee13a6643104941ecea2b963c2d7'))
+    )
+  );
+  event.parameters.push(
+    new ethereum.EventParam(
+      'selector',
+      ethereum.Value.fromFixedBytes(Bytes.fromHexString('0x4585e33b'))
+    )
+  );
+  event.parameters.push(
+    new ethereum.EventParam('reason', ethereum.Value.fromBytes(Bytes.fromHexString('0xb1aeab08')))
+  );
+  event.transaction.hash = transactionHash;
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(TIMESTAMP);
+  event.block.number = BigInt.fromI32(10_000);
+  handleCallFailed(event);
 }
 
 describe('betData decoding', () => {
@@ -350,5 +378,33 @@ describe('payout attribution timing', () => {
     assert.entityCount('PayoutTransaction', 1);
     assert.fieldEquals('RouletteBet', betId, 'won', 'true');
     assert.fieldEquals('RouletteBet', betId, 'actualPayout', '2000000000000000000');
+  });
+});
+
+describe('GlobalState.currentGlobalRound', () => {
+  beforeEach(() => {
+    clearStore();
+    setupTestMarket();
+  });
+
+  test('points at a round that exists once the previous one resolved', () => {
+    createRoundForTests(20, TIMESTAMP, 1);
+    emitRoundResolved(20);
+
+    // Non-null in the schema: an unsaved next round made every query selecting through this
+    // pointer fail outright until that round's first bet created the entity.
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentRoundNumber', '21');
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(21), 'roundNumber', '21');
+  });
+
+  test('attributes a failed automation call to the round between two rounds', () => {
+    createRoundForTests(21, TIMESTAMP, 1);
+    emitRoundResolved(21);
+
+    // The scheduler keeps polling in the idle window before the next round's first bet.
+    emitCallFailed(Bytes.fromHexString('0xfa11'), 0);
+
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'failedAutomationCalls', '1');
+    assert.fieldEquals('GlobalRound', globalRoundIdHex(22), 'failedAutomationCalls', '1');
   });
 });

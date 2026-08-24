@@ -280,6 +280,12 @@ export function processRoundResolved(event: RoundResolved): void {
   globalState.roundTransitionInProgress = false
   const nextRoundId = roundId.plus(BigInt.fromI32(1))
   const nextGr = getOrCreateGlobalRound(nextRoundId, event.block.timestamp)
+  // `getOrCreateGlobalRound` does not persist, and `currentGlobalRound` is a non-null reference:
+  // leaving the next round unsaved pointed GlobalState at an entity that did not exist until that
+  // round's first bet. Any query selecting through it failed outright ("Null value resolved for
+  // non-null field"), and CallFailed in that window found no round to attribute itself to — 38 of
+  // the 58 lifetime failures were lost that way.
+  nextGr.save()
   globalState.currentGlobalRound = nextGr.id
   globalState.currentRoundNumber = nextRoundId
   globalState.totalRounds = globalState.totalRounds.plus(BigInt.fromI32(1))
