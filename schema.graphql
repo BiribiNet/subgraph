@@ -183,9 +183,9 @@ type User @entity(immutable: false) {
   sbrbBalance: BigInt!
   "BRBReferal Token Balance"
   brbReferalBalance: BigInt!
-  "Cumulative assets deposited across all vaults (mixed units in Phase 1 — prefer UserMarketStats.totalStaked per market)"
+  "Cumulative assets deposited across all vaults (18-decimal normalized; feeds brbpPoints. For market-native units use UserMarketStats.totalStaked)"
   totalStaked: BigInt!
-  "Cumulative assets withdrawn across all vaults (mixed units in Phase 1 — prefer UserMarketStats.totalUnstaked per market)"
+  "Cumulative assets withdrawn across all vaults (18-decimal normalized; feeds brbpPoints. For market-native units use UserMarketStats.totalUnstaked)"
   totalUnstaked: BigInt!
   "Cumulative deposit value (sum of all BRB deposited)"
   cumulativeDepositValue: BigInt!

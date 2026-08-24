@@ -103,7 +103,7 @@ export function handleDeposit(event: Deposit): void {
   deposit.transactionHash = event.transaction.hash
   deposit.save()
 
-  updateUserStakingStats(event.params.owner, event.params.assets, true, event.block.timestamp)
+  updateUserStakingStats(event.params.owner, event.params.assets, market.assetDecimals, true, event.block.timestamp)
   recordUserMarketStake(event.params.owner, market, event.params.assets, true, event.block.timestamp)
   updateUserLastActive(event.params.owner, event.block.timestamp)
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
@@ -259,7 +259,7 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     withdrawal.transactionHash = event.transaction.hash
     withdrawal.save()
 
-    updateUserStakingStats(event.params.owner, assetsPaid, false, event.block.timestamp)
+    updateUserStakingStats(event.params.owner, assetsPaid, market.assetDecimals, false, event.block.timestamp)
     recordUserMarketStake(event.params.owner, market, assetsPaid, false, event.block.timestamp)
     updateUserLastActive(event.params.owner, event.block.timestamp)
     updateUserWithdrawalCostBasis(event.params.owner, sharesBurned)

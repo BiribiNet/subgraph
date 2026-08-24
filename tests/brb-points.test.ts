@@ -57,6 +57,18 @@ describe('BRBpoints wagered component', () => {
     assert.fieldEquals('User', USER_B, 'brbpPoints', '3');
   });
 
+  test('H-12: stakes 1 USDC and 1 BRB equally after decimals normalization', () => {
+    updateUserStakingStats(addr(USER_A), bi(ONE_USDC), 6, true, TS); // 1 USDC
+    updateUserStakingStats(addr(USER_B), bi(ONE_BRB), 18, true, TS); // 1 BRB
+
+    // Counting raw units made a USDC stake worth ~0 points against an equivalent BRB stake,
+    // which reserved the staking half of DAO voting weight to the BRB vault.
+    assert.fieldEquals('User', USER_A, 'totalStaked', ONE_BRB);
+    assert.fieldEquals('User', USER_B, 'totalStaked', ONE_BRB);
+    assert.fieldEquals('User', USER_A, 'brbpPoints', '1');
+    assert.fieldEquals('User', USER_B, 'brbpPoints', '1');
+  });
+
   test('betCount counts distinct rounds, not individual bets', () => {
     updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // new round
     updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, false, TS); // same round
@@ -67,7 +79,7 @@ describe('BRBpoints wagered component', () => {
 
   test('combines wagered + staked + referral with their weights', () => {
     updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // x3 → 3
-    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), true, TS); // x1 → 1
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // x1 → 1
     updateUserBrbrEarnings(addr(USER_A), bi(ONE_BRB), true, TS); // x2 → 2
 
     // points = (1e18*3 + 1e18*1 + 1e18*2) / 1e18 = 6
@@ -75,13 +87,13 @@ describe('BRBpoints wagered component', () => {
   });
 
   test('stake-then-unstake cycling does not inflate points beyond the net position (C-7)', () => {
-    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), true, TS); // +1 staked → net 1 → 1 pt
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // +1 staked → net 1 → 1 pt
     assert.fieldEquals('User', USER_A, 'brbpPoints', '1');
 
-    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), false, TS); // unstake 1 → net 0 → 0 pt
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), 18, false, TS); // unstake 1 → net 0 → 0 pt
     assert.fieldEquals('User', USER_A, 'brbpPoints', '0');
 
-    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), true, TS); // re-stake 1 → net 1 → 1 pt (not 2)
+    updateUserStakingStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // re-stake 1 → net 1 → 1 pt (not 2)
     assert.fieldEquals('User', USER_A, 'brbpPoints', '1');
 
     // Lifetime cumulative counters still reflect the full history for display.
