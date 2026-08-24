@@ -21,6 +21,7 @@ import {
   createRoundForTests,
   emitBrbTransfer,
   emitDeposit,
+  emitSideBetStakeLocked,
   setupBrbTestMarket,
   setupTestMarket,
 } from './helpers';
@@ -102,6 +103,22 @@ describe('Pool liquidity via BRB transfer + deposit', () => {
     assert.fieldEquals('Market', '1', 'brbDonations', '500000000000000000');
     assert.fieldEquals('Market', '1', 'grossVaultBalance', '500000000000000000');
     assert.fieldEquals('Market', '1', 'totalAssets', '500000000000000000');
+  });
+
+  test('H-14: a BRB-market side-bet stake raises gross by the stake exactly once', () => {
+    setupBrbTestMarket();
+    const stake = '500000000000000000';
+
+    // The vault pulls the stake, so the token emits Transfer into the bank first — counted as a
+    // donation and added to gross. SideBetStakeLocked then added the same stake again, doubling
+    // grossVaultBalance and with it totalAssets, sharePrice and every APY snapshot.
+    emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), stake, 1_000_000);
+    assert.fieldEquals('Market', '1', 'brbDonations', stake);
+
+    emitSideBetStakeLocked(DEFAULT_USER, stake, '5000000000000000000', '5000000000000000000', 1_000_000, 1);
+
+    assert.fieldEquals('Market', '1', 'grossVaultBalance', stake);
+    assert.fieldEquals('Market', '1', 'brbDonations', '0');
   });
 
   test('Deposit increases Market.totalAssets and GlobalState vault totals', () => {

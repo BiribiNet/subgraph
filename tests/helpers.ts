@@ -245,16 +245,22 @@ export function emitBetRecorded(
   handleBetRecorded(event);
 }
 
+/**
+ * Deposit plus the share mint the vault performs alongside it. The mint matters: per-market share
+ * balances (`UserMarketStats.sbrbShares`) are what the withdrawal estimate reads, and omitting it
+ * used to leave that balance at 0.
+ */
 export function emitDeposit(
   owner: string,
   assets: string,
   shares: string,
   timestamp: i32,
-  logIndex: i32 = 0
+  logIndex: i32 = 0,
+  bank: Address = TEST_BANK
 ): void {
   setupTestMarket();
   const event = changetype<Deposit>(newMockEvent());
-  event.address = TEST_BANK;
+  event.address = bank;
   event.parameters = new Array<ethereum.EventParam>();
   event.parameters.push(
     new ethereum.EventParam('sender', ethereum.Value.fromAddress(Address.fromString(owner)))
@@ -272,6 +278,7 @@ export function emitDeposit(
   event.block.timestamp = BigInt.fromI32(timestamp);
   event.block.number = BigInt.fromI32(timestamp / 100);
   handleDeposit(event);
+  emitVaultShareTransfer(ZERO_ADDRESS, owner, shares, timestamp, logIndex + 1, bank);
 }
 
 export function emitWithdrawalRequested(

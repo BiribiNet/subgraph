@@ -27,6 +27,7 @@ import {
   ContractUpgrade,
   Market,
   GlobalState,
+  UserMarketStats,
 } from "../../generated/schema"
 import { updateUserStakingStats, updateUserSBRBBalance, getOrCreateUser, updateUserDepositCostBasis, updateUserWithdrawalCostBasis, updateUserLastActive } from "../helpers/user"
 import { bigintToBytes } from "../helpers/bigintToBytes"
@@ -55,6 +56,7 @@ import { BRB_TOKEN_ADDRESS } from "../helpers/constant"
 import {
   recordUserMarketStake,
   recordUserMarketSbrbShares,
+  userMarketStatsId,
 } from "../helpers/user-market-stats"
 
 function undoBrbDonationIfNeeded(market: Market, globalState: GlobalState, assets: BigInt): void {
@@ -139,9 +141,16 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
 
   let estimatedAssets = ZERO
   const bps = BigInt.fromI32(event.params.bps)
-  let sharesHeld = user.sbrbBalance
-  if (sharesHeld.equals(ZERO)) {
-    sharesHeld = user.cumulativeDepositShares
+  // Per-market shares, not `user.sbrbBalance`: that sums share balances across vaults whose share
+  // decimals differ (asset decimals + 6), so a USDC position mixed with a BRB one skewed the estimate
+  // by up to 10^12. The schema flags the same hazard on the field itself. The old
+  // `cumulativeDepositShares` fallback was dropped because it is cross-vault in exactly the same way.
+  let sharesHeld = ZERO
+  if (market != null) {
+    const stats = UserMarketStats.load(userMarketStatsId(event.params.owner, market.id))
+    if (stats != null) {
+      sharesHeld = stats.sbrbShares
+    }
   }
   if (
     market != null &&
@@ -310,11 +319,19 @@ export function handleSideBetStakeLocked(event: SideBetStakeLocked): void {
   if (market == null) {
     return
   }
+  const globalState = getOrCreateGlobalState()
+  // On a BRB market the stake already arrived as an ERC-20 Transfer into the bank, which `brb.ts`
+  // counted as a donation and added to gross — so adding it again here doubled it, inflating
+  // totalAssets, sharePrice and every APY snapshot in favour of the BRB vault. A TxActivity scratch
+  // cannot fix this: the token emits Transfer during the pull, strictly before this event, so the
+  // earlier handler can never see a flag written here. Undo retroactively, exactly as deposits do.
+  undoBrbDonationIfNeeded(market, globalState, event.params.stake)
   addGrossVaultBalance(market, event.params.stake)
   setLockedBetLiquidity(market, event.params.newLockedTotal)
   market.lockedSideBetLiquidity = market.lockedSideBetLiquidity.plus(event.params.payoutReserve)
   calculateMarketAPYs(market, event.block.timestamp, event.block.number)
   market.save()
+  globalState.save()
 }
 
 // No APY recalc here: gross and locked rise by the same amount, so totalAssets

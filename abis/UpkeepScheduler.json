@@ -63,6 +63,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidSideBetCursor",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "UnauthorizedAutomationForwarder",
     "type": "error"
   },

@@ -166,6 +166,11 @@
   },
   {
     "inputs": [],
+    "name": "PayoutLaneCountLockedWhileSettling",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "RoundIsLocked",
     "type": "error"
   },
@@ -208,6 +213,11 @@
   {
     "inputs": [],
     "name": "ZeroAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroBetAmount",
     "type": "error"
   },
   {
@@ -384,6 +394,19 @@
       }
     ],
     "name": "MaxWithdrawalQueueLengthUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "newLaneCount",
+        "type": "uint32"
+      }
+    ],
+    "name": "PayoutLaneCountUpdated",
     "type": "event"
   },
   {
@@ -1355,6 +1378,25 @@
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      }
+    ],
+    "name": "marketRouletteLiquidityNeed",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
