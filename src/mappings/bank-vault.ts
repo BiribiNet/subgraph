@@ -42,6 +42,7 @@ import { calculateMarketAPYs } from "../helpers/marketApy"
 import { addVaultDepositTotals, subtractVaultAssetsTotals } from "../helpers/vaultClassTotals"
 import { BPS_DENOMINATOR, ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "../helpers/aggregation"
+import { normalizeAmountTo18 } from "../helpers/user"
 import { loadMarketByBank } from "../helpers/market"
 import { recordTxDepositToBank } from "../helpers/tx-activity"
 import { releasePendingBets } from "../helpers/vault-liquidity"
@@ -115,17 +116,27 @@ export function handleDeposit(event: Deposit): void {
 
   calculateMarketAPYs(market, event.block.timestamp, event.block.number)
 
+  // `DailyStat` / `HourlyVolumeSnapshot` are cross-market singletons, so what lands
+  // there is normalized to 18 decimals like `volume` and `revenue` already are.
+  // Raw, a 6-decimal deposit counted 10^12 times too small beside an 18-decimal one.
+  // The per-market `market.totalDepositVolume` above stays in the market's own units.
+  const normalizedDeposit = normalizeAmountTo18(event.params.assets, market.assetDecimals)
+
   const dailyStatsDeposit = getOrCreateDailyStats(event.block.timestamp)
-  dailyStatsDeposit.depositVolume = dailyStatsDeposit.depositVolume.plus(event.params.assets)
+  dailyStatsDeposit.depositVolume = dailyStatsDeposit.depositVolume.plus(normalizedDeposit)
   dailyStatsDeposit.depositCount = dailyStatsDeposit.depositCount.plus(BigInt.fromI32(1))
   dailyStatsDeposit.vaultSharePrice = market.sharePrice
   dailyStatsDeposit.save()
 
   const hourlyDeposit = getOrCreateHourlySnapshot(event.block.timestamp)
-  hourlyDeposit.depositVolume = hourlyDeposit.depositVolume.plus(event.params.assets)
+  hourlyDeposit.depositVolume = hourlyDeposit.depositVolume.plus(normalizedDeposit)
   hourlyDeposit.save()
 
-  globalState.totalDeposited = globalState.totalDeposited.plus(event.params.assets)
+  // All-time counterpart of DailyStat.depositVolume — also a flat cross-market
+  // sum, so it carries the same 18-decimal normalization. The per-asset-class
+  // totals in `addVaultDepositTotals` stay raw: they are split by class
+  // precisely so nothing mixes there.
+  globalState.totalDeposited = globalState.totalDeposited.plus(normalizedDeposit)
 
   market.save()
   globalState.save()
@@ -285,17 +296,21 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     subtractVaultAssetsTotals(market, globalState, assetsPaid)
     calculateMarketAPYs(market, event.block.timestamp, event.block.number)
 
+    // Same normalization as deposits: the cross-market aggregates carry 18-decimal
+    // units, `market.totalWithdrawVolume` keeps the market's own.
+    const normalizedWithdrawal = normalizeAmountTo18(assetsPaid, market.assetDecimals)
+
     const dailyStatsWithdraw = getOrCreateDailyStats(event.block.timestamp)
-    dailyStatsWithdraw.withdrawalVolume = dailyStatsWithdraw.withdrawalVolume.plus(assetsPaid)
+    dailyStatsWithdraw.withdrawalVolume = dailyStatsWithdraw.withdrawalVolume.plus(normalizedWithdrawal)
     dailyStatsWithdraw.withdrawalCount = dailyStatsWithdraw.withdrawalCount.plus(BigInt.fromI32(1))
     dailyStatsWithdraw.vaultSharePrice = market.sharePrice
     dailyStatsWithdraw.save()
 
     const hourlyWithdraw = getOrCreateHourlySnapshot(event.block.timestamp)
-    hourlyWithdraw.withdrawalVolume = hourlyWithdraw.withdrawalVolume.plus(assetsPaid)
+    hourlyWithdraw.withdrawalVolume = hourlyWithdraw.withdrawalVolume.plus(normalizedWithdrawal)
     hourlyWithdraw.save()
 
-    globalState.totalWithdrawn = globalState.totalWithdrawn.plus(assetsPaid)
+    globalState.totalWithdrawn = globalState.totalWithdrawn.plus(normalizedWithdrawal)
 
     market.save()
   }

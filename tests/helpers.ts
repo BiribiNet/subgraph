@@ -95,12 +95,12 @@ export function setupTestMarket(marketId: i32 = 1): void {
 }
 
 /** Registers market 2 with its own bank/asset pair — for multi-vault scenarios. */
-export function setupSecondTestMarket(): void {
+export function setupSecondTestMarket(assetDecimals: i32 = 18): void {
   createMockedFunction(TEST_ASSET_2, 'symbol', 'symbol():(string)').returns([
     ethereum.Value.fromString('USDX'),
   ]);
   createMockedFunction(TEST_ASSET_2, 'decimals', 'decimals():(uint8)').returns([
-    ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(18)),
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(assetDecimals)),
   ]);
   createMockedFunction(TEST_BANK_2, 'name', 'name():(string)').returns([
     ethereum.Value.fromString('Biribi Test Vault 2'),
@@ -120,7 +120,7 @@ export function setupSecondTestMarket(): void {
     BigInt.fromI32(1_000_000),
     BigInt.fromI32(10_000)
   );
-  market.assetDecimals = 18;
+  market.assetDecimals = assetDecimals;
   market.save();
 
   const bankKey = changetype<Bytes>(TEST_BANK_2);

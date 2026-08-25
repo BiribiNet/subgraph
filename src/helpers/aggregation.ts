@@ -107,6 +107,10 @@ export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: Bi
   if (stakersShare.gt(ZERO)) {
     const normalizedStakersShare = normalizeAmountTo18(stakersShare, assetDecimals)
     daily.stakersRevenue = daily.stakersRevenue.plus(normalizedStakersShare)
+    // The hourly snapshot declares `stakersRevenue` but nothing ever wrote it.
+    const hourly = getOrCreateHourlySnapshot(timestamp)
+    hourly.stakersRevenue = hourly.stakersRevenue.plus(normalizedStakersShare)
+    hourly.save()
     const globalState = getOrCreateGlobalState()
     globalState.totalStakerRevenue = globalState.totalStakerRevenue.plus(normalizedStakersShare)
     globalState.save()

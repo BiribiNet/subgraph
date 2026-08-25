@@ -28,7 +28,12 @@ import {
   updateRoundMaxPayoutComponents,
 } from "./betting"
 import { decodeBetDataPayload } from "./bet-data"
-import { getOrCreateDailyStats, trackDailyUniquePlayer } from "./aggregation"
+import {
+  getOrCreateDailyStats,
+  getOrCreateHourlySnapshot,
+  trackDailyUniquePlayer,
+  trackHourlyUniquePlayer,
+} from "./aggregation"
 import {
   getOrCreateUser,
   updateUserLastActive,
@@ -83,6 +88,19 @@ function trackProtocolBetStats(
     // save the per-day uniquePlayers count is silently discarded (stays 0 forever).
     daily.save()
   }
+
+  // The hourly snapshot only ever received payouts and vault flows: `volume`,
+  // `betCount` and `uniquePlayers` were initialised to zero and never written,
+  // and `trackHourlyUniquePlayer` had no caller at all, so the 48h activity
+  // series read as a flat line. `amount` is already normalized to 18 decimals
+  // by the caller, matching `DailyStat.volume`.
+  const hourly = getOrCreateHourlySnapshot(timestamp)
+  hourly.volume = hourly.volume.plus(amount)
+  hourly.betCount = hourly.betCount.plus(BigInt.fromI32(1))
+  if (trackHourlyUniquePlayer(timestamp, player.toHexString())) {
+    hourly.uniquePlayers = hourly.uniquePlayers.plus(BigInt.fromI32(1))
+  }
+  hourly.save()
 }
 
 export function processBetRecorded(event: BetRecorded): void {
