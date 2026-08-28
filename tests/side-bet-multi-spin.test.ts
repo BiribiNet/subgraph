@@ -113,4 +113,41 @@ describe('SideBet multi-spin watchlist', () => {
     assert.fieldEquals('SideBet', id, 'spinsObserved', '[7]');
     assert.fieldEquals('SideBet', id, 'spinsResolved', '1');
   });
+  test('the round watchlist is dropped once its spin has been observed', () => {
+    createActiveSideBet(1, 5, 3);
+    registerSideBetForRoundWatch(Bytes.fromI32(1), BigInt.fromI32(5), 3);
+    assert.entityCount('SideBetRoundPending', 3);
+
+    observeSideBetSpinsForRound(BigInt.fromI32(5), BigInt.fromI32(7));
+
+    // VRF resolves a global round exactly once, so this list can never be read again. Leaving it
+    // behind grew the store without bound for no reader.
+    assert.entityCount('SideBetRoundPending', 2);
+    assert.notInStore('SideBetRoundPending', globalRoundIdBytes(BigInt.fromI32(5)).toHexString());
+  });
+
+  test('observing every round in a window leaves no watchlist behind', () => {
+    createActiveSideBet(1, 5, 3);
+    registerSideBetForRoundWatch(Bytes.fromI32(1), BigInt.fromI32(5), 3);
+
+    observeSideBetSpinsForRound(BigInt.fromI32(5), BigInt.fromI32(7));
+    observeSideBetSpinsForRound(BigInt.fromI32(6), BigInt.fromI32(11));
+    observeSideBetSpinsForRound(BigInt.fromI32(7), BigInt.fromI32(3));
+
+    assert.entityCount('SideBetRoundPending', 0);
+    // The spins still landed on the bet — pruning the watchlist loses nothing.
+    assert.fieldEquals('SideBet', Bytes.fromI32(1).toHexString(), 'spinsResolved', '3');
+  });
+
+  test('a non-ACTIVE bet is skipped and its watchlist is still dropped', () => {
+    const bet = createActiveSideBet(1, 5, 1);
+    bet.status = 'EXPIRED';
+    bet.save();
+    registerSideBetForRoundWatch(Bytes.fromI32(1), BigInt.fromI32(5), 1);
+
+    observeSideBetSpinsForRound(BigInt.fromI32(5), BigInt.fromI32(7));
+
+    assert.fieldEquals('SideBet', Bytes.fromI32(1).toHexString(), 'spinsResolved', '0');
+    assert.entityCount('SideBetRoundPending', 0);
+  });
 });

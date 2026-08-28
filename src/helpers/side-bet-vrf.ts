@@ -1,4 +1,4 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, store } from "@graphprotocol/graph-ts"
 import { SideBet, SideBetRoundPending } from "../../generated/schema"
 import { globalRoundIdBytes } from "./globalRound"
 
@@ -23,12 +23,15 @@ export function registerSideBetForRoundWatch(
 }
 
 export function observeSideBetSpinsForRound(roundId: BigInt, winningNumber: BigInt): void {
-  const pending = SideBetRoundPending.load(globalRoundIdBytes(roundId))
+  const pendingId = globalRoundIdBytes(roundId)
+  const pending = SideBetRoundPending.load(pendingId)
   if (pending == null) {
     return
   }
   for (let i = 0; i < pending.sideBetIds.length; i++) {
     const bet = SideBet.load(pending.sideBetIds[i])
+    // A settled, expired or cancelled bet stays in the list; skipping it here is enough, since the
+    // list is read exactly once and then dropped below.
     if (bet == null || bet.status != "ACTIVE") {
       continue
     }
@@ -38,4 +41,8 @@ export function observeSideBetSpinsForRound(roundId: BigInt, winningNumber: BigI
     bet.spinsResolved = spins.length
     bet.save()
   }
+  // Write-once, read-once: VRF resolves a global round exactly once, so this list can never be
+  // needed again. Without the delete every round the protocol has ever run keeps its list forever,
+  // growing the store without bound for no reader.
+  store.remove("SideBetRoundPending", pendingId.toHexString())
 }
