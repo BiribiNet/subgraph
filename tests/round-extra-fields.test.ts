@@ -1,4 +1,4 @@
-import { BigInt, ethereum } from '@graphprotocol/graph-ts';
+import { BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
 import {
   assert,
   beforeEach,
@@ -15,7 +15,9 @@ import {
   DEFAULT_USER,
   TEST_ENGINE,
   emitBetRecorded,
+  emitBrbBurnInTx,
   emitBrbTransfer,
+  emitJackpotFundedInTx,
   testRoundId,
 } from './helpers';
 
@@ -67,14 +69,16 @@ describe('RouletteRound extra fields (uniqueBettors / stakersRevenue / roundBurn
     assert.fieldEquals('RouletteRound', testRoundId(1), 'stakersRevenue', '10000000000000000000');
   });
 
-  test('roundBurnAmount accumulates BRB burns attributed to the paid round', () => {
+  test('roundBurnAmount accumulates the burns the engine attributed to this round', () => {
     emitBetRecorded(DEFAULT_USER, '10000000000000000000', CORNER_BET_DATA, 1);
     assert.fieldEquals('RouletteRound', testRoundId(1), 'roundBurnAmount', '0');
 
-    // RoundResolved sets GlobalState.lastRoundPaid = 1, so the burn is attributed to round 1.
-    handleRoundResolved(createRoundResolvedEvent(1));
+    // The funder burns first; JackpotFunded then names the (round, market) the burn settled for.
+    // See tests/roulette-inconsistencies.test.ts for the multi-market pairing.
+    const txHash = Bytes.fromHexString('0xb0f0');
+    emitBrbBurnInTx('50000000000000000', txHash, 4);
+    emitJackpotFundedInTx(1, 1, '300000000000000000', txHash, 5);
 
-    emitBrbTransfer(DEFAULT_USER, ZERO_ADDRESS_STR, '50000000000000000', 1_000_400, 5);
     assert.fieldEquals('RouletteRound', testRoundId(1), 'roundBurnAmount', '50000000000000000');
   });
 

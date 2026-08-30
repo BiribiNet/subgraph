@@ -1,7 +1,7 @@
 import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
 import { newMockEvent, createMockedFunction } from 'matchstick-as';
 
-import { BetRecorded } from '../generated/RouletteEngine/Game';
+import { BetRecorded, JackpotFunded } from '../generated/RouletteEngine/Game';
 import { Transfer as BrbTransfer } from '../generated/BRBToken/BRB';
 import { handleTransfer as handleBrbTransfer } from '../src/mappings/brb';
 import { ZERO_ADDRESS, BRB_TOKEN_ADDRESS } from '../src/helpers/constant';
@@ -21,7 +21,7 @@ import { getOrCreateGlobalRound } from '../src/helpers/globalRound';
 import { getOrCreateGlobalState } from '../src/helpers/globalState';
 import { getOrCreateMarket, marketRoundId } from '../src/helpers/market';
 import { createNewRouletteRound } from '../src/helpers/rouletteRound';
-import { handleBetRecorded } from '../src/mappings/roulette';
+import { handleBetRecorded, handleJackpotFunded } from '../src/mappings/roulette';
 import {
   handleDeposit,
   handleWithdrawalRequested,
@@ -196,18 +196,40 @@ export function createRoundForTests(
   return round;
 }
 
-/** ABI order matches RouletteEngine: (uint256[] betTypes, uint256[] numbers, uint256[] amounts). */
-export function encodeBetRecordedData(amount: string, betType: i32, number: i32): Bytes {
+const TUPLE_HEAD_WORD_LENGTH = 32;
+
+/**
+ * Builds `betData` exactly as RouletteEngine does: `abi.encode(uint256[] betTypes,
+ * uint256[] numbers, uint256[] amounts)` — three top-level parameters.
+ *
+ * `ethereum.encode` of a tuple value emits the *standalone* tuple encoding, which carries a leading
+ * 32-byte offset to its body. The chain never sends that word, so encoding it here produced a
+ * payload the mapping would never see and let a decoder that expected the same wrapper look
+ * correct. Dropping the head word restores the on-chain layout.
+ */
+export function encodeBetLegs(betTypes: BigInt[], numbers: BigInt[], amounts: BigInt[]): Bytes {
   const encoded = ethereum.encode(
     ethereum.Value.fromTuple(
       changetype<ethereum.Tuple>([
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(betType)]),
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromI32(number)]),
-        ethereum.Value.fromUnsignedBigIntArray([BigInt.fromString(amount)]),
+        ethereum.Value.fromUnsignedBigIntArray(betTypes),
+        ethereum.Value.fromUnsignedBigIntArray(numbers),
+        ethereum.Value.fromUnsignedBigIntArray(amounts),
       ])
     )
   );
-  return encoded ? encoded : Bytes.empty();
+  if (!encoded) {
+    return Bytes.empty();
+  }
+  return Bytes.fromUint8Array(encoded.subarray(TUPLE_HEAD_WORD_LENGTH));
+}
+
+/** ABI order matches RouletteEngine: (uint256[] betTypes, uint256[] numbers, uint256[] amounts). */
+export function encodeBetRecordedData(amount: string, betType: i32, number: i32): Bytes {
+  return encodeBetLegs(
+    [BigInt.fromI32(betType)],
+    [BigInt.fromI32(number)],
+    [BigInt.fromString(amount)]
+  );
 }
 
 /** 10 BRB CORNER on pocket 1 — used for deterministic maxBetAmount assertions. */
@@ -491,6 +513,17 @@ export function globalRoundIdHex(globalRound: i32): string {
   return bigintToBytes(BigInt.fromI32(globalRound)).toHexString();
 }
 
+/**
+ * Baseline for `GlobalState.brbTotalSupply`. The BRB mapping reads `totalSupply()` once, the first
+ * time it sees a non-mint transfer, because the genesis mint predates the manifest's start block —
+ * mock it wherever a BRB Transfer is handled.
+ */
+export function mockBrbTotalSupply(value: string = '3000000000000000000000000'): void {
+  createMockedFunction(BRB_TOKEN, 'totalSupply', 'totalSupply():(uint256)').returns([
+    ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value)),
+  ]);
+}
+
 function buildBrbTransferEvent(
   from: string,
   to: string,
@@ -498,6 +531,7 @@ function buildBrbTransferEvent(
   timestamp: i32,
   logIndex: i32
 ): BrbTransfer {
+  mockBrbTotalSupply();
   const event = changetype<BrbTransfer>(newMockEvent());
   event.address = BRB_TOKEN;
   event.parameters = new Array<ethereum.EventParam>();
@@ -539,4 +573,60 @@ export function emitBrbTransfer(
     handleBrbTransfer(fundEvent);
   }
   handleBrbTransfer(buildBrbTransferEvent(from, to, value, timestamp, logIndex));
+}
+
+/**
+ * A BRB burn (Transfer to the zero address) inside a chosen transaction. The funder emits this
+ * before the engine's JackpotFunded, so the two together model one market's settlement.
+ */
+export function emitBrbBurnInTx(value: string, transactionHash: Bytes, logIndex: i32): void {
+  mockBrbTotalSupply();
+  const event = changetype<BrbTransfer>(newMockEvent());
+  event.address = BRB_TOKEN;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(TEST_BANK)));
+  event.parameters.push(
+    new ethereum.EventParam(
+      'to',
+      ethereum.Value.fromAddress(Address.fromString(ZERO_ADDRESS))
+    )
+  );
+  event.parameters.push(
+    new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value)))
+  );
+  event.transaction.hash = transactionHash;
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(1_000_000);
+  event.block.number = BigInt.fromI32(10_000);
+  handleBrbTransfer(event);
+}
+
+/** RouletteEngine.JackpotFunded — names the (round, market) a queued burn belongs to. */
+export function emitJackpotFundedInTx(
+  globalRoundId: i32,
+  marketId: i32,
+  amount: string,
+  transactionHash: Bytes,
+  logIndex: i32
+): void {
+  const event = changetype<JackpotFunded>(newMockEvent());
+  event.address = TEST_ENGINE;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam(
+      'globalRoundId',
+      ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(globalRoundId))
+    )
+  );
+  event.parameters.push(
+    new ethereum.EventParam('marketId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(marketId)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('amount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(amount)))
+  );
+  event.transaction.hash = transactionHash;
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(1_000_000);
+  event.block.number = BigInt.fromI32(10_000);
+  handleJackpotFunded(event);
 }

@@ -1,17 +1,17 @@
-import { Address, BigInt } from "@graphprotocol/graph-ts"
-import { Transfer, Approval } from "../../generated/BRBToken/BRB"
-import { BRBTransfer, BRBBurn, RouletteRound, TokenApproval } from "../../generated/schema"
+import { Address, Bytes, log } from "@graphprotocol/graph-ts"
+import { BRB, Transfer, Approval } from "../../generated/BRBToken/BRB"
+import { BRBTransfer, BRBBurn, GlobalState, PendingBrbBurn, TokenApproval } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserLastActive } from "../helpers/user"
 import { JACKPOT_TREASURY_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
-import { marketRoundId, isKnownBank, loadMarketByBank } from "../helpers/market"
+import { ZERO } from "../helpers/number"
+import { isKnownBank, loadMarketByBank } from "../helpers/market"
 import { getOrCreateDailyStats } from "../helpers/aggregation"
 import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
 import { addGrossVaultBalance } from "../helpers/vault-ledger"
 import { calculateMarketAPYs } from "../helpers/marketApy"
 import { isBankInboundExcludedFromDonation } from "../helpers/tx-activity"
-import { findBurnRoundForGlobalRound } from "../helpers/round-sync"
 
 /** BRB wallet balance applies to EOAs only — not vaults, jackpot treasury, or zero address. */
 function isBrbWalletAddress(addr: Address): bool {
@@ -23,6 +23,39 @@ function isBrbWalletAddress(addr: Address): bool {
     return false
   }
   return !isKnownBank(addr)
+}
+
+/**
+ * BRB was minted before the manifest's startBlock, so the mint/burn deltas alone drove
+ * `brbTotalSupply` negative (it read -607 BRB against an on-chain supply of ~3M). Seed it from the
+ * token the first time a non-mint transfer is seen, then let the deltas carry it. This is the one
+ * eth_call in the BRB mapping and it fires once per subgraph lifetime: a transfer can only exist
+ * once supply is non-zero, so the guard never re-arms.
+ */
+function seedBrbTotalSupplyOnce(globalState: GlobalState, token: Address): void {
+  if (globalState.brbTotalSupply.notEqual(ZERO)) {
+    return
+  }
+  const supply = BRB.bind(token).try_totalSupply()
+  if (supply.reverted) {
+    log.warning("BRB totalSupply() reverted while seeding the supply baseline", [])
+    return
+  }
+  globalState.brbTotalSupply = supply.value
+}
+
+/** Appends a burn to its transaction's attribution queue (see PendingBrbBurn). */
+function enqueueBurnForAttribution(transactionHash: Bytes, burnId: Bytes): void {
+  let pending = PendingBrbBurn.load(transactionHash)
+  if (pending == null) {
+    pending = new PendingBrbBurn(transactionHash)
+    pending.burnIds = new Array<Bytes>(0)
+    pending.cursor = 0
+  }
+  const burnIds = pending.burnIds
+  burnIds.push(burnId)
+  pending.burnIds = burnIds
+  pending.save()
 }
 
 export function handleTransfer(event: Transfer): void {
@@ -73,6 +106,8 @@ export function handleTransfer(event: Transfer): void {
     return
   }
 
+  seedBrbTotalSupplyOnce(globalState, event.address)
+
   if (toHex == ZERO_ADDRESS) {
     const burnId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
     const burn = new BRBBurn(burnId)
@@ -80,15 +115,12 @@ export function handleTransfer(event: Transfer): void {
     burn.timestamp = event.block.timestamp
     burn.blockNumber = event.block.number
     burn.transactionHash = event.transaction.hash
-    if (globalState.lastRoundPaid.gt(BigInt.fromI32(0))) {
-      const burnRound = findBurnRoundForGlobalRound(globalState.lastRoundPaid)
-      if (burnRound != null) {
-        burn.round = burnRound.id
-        burnRound.roundBurnAmount = burnRound.roundBurnAmount.plus(event.params.value)
-        burnRound.save()
-      }
-    }
     burn.save()
+    // The round is not knowable yet — the funder burns before anything names the settlement it
+    // belongs to. Queue it for the JackpotFunded event later in this same transaction; guessing
+    // from `lastRoundPaid` here attributed every burn to the previous round, and to whichever
+    // market happened to be scanned first.
+    enqueueBurnForAttribution(event.transaction.hash, burnId)
 
     globalState.totalBurned = globalState.totalBurned.plus(event.params.value)
     globalState.brbTotalSupply = globalState.brbTotalSupply.minus(event.params.value)

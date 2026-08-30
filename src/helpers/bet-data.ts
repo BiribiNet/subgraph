@@ -12,9 +12,22 @@ export class DecodedBetData {
   }
 }
 
+// The engine builds `betData` with `abi.encode(uint256[], uint256[], uint256[])` — three
+// top-level parameters, so the payload opens directly with the three array offsets. graph-ts
+// only decodes a parameter *list* of one type, and reading that list as a single dynamic tuple
+// makes ethabi expect a leading offset word pointing at the tuple body. Without it the first
+// array offset (0x60) is read as that pointer and the decode collapses, which is what left
+// every historical bet stored as one synthetic STRAIGHT-on-0 leg and every round exposure
+// bucket at zero. Prepending the 32-byte head word turns the flat payload into the standalone
+// tuple encoding ethabi wants; the bytes after it are untouched.
+const TUPLE_HEAD_OFFSET = Bytes.fromHexString(
+  "0x0000000000000000000000000000000000000000000000000000000000000020"
+)
+
 export function decodeBetDataPayload(betData: Bytes): DecodedBetData {
   const out = new DecodedBetData()
-  const decoded = ethereum.decode("(uint256[],uint256[],uint256[])", betData)
+  const wrapped = changetype<Bytes>(TUPLE_HEAD_OFFSET.concat(betData))
+  const decoded = ethereum.decode("(uint256[],uint256[],uint256[])", wrapped)
   if (decoded == null) {
     return out
   }
