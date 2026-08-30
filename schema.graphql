@@ -924,7 +924,8 @@ enum SideBetStatus { ACTIVE, WON, LOST, EXPIRED, CANCELLED }
 
 type SideBet @entity(immutable: false) {
   id: Bytes!
-  configId: BigInt!
+  "Template the bet was placed against. Null for a bet first seen at settlement: SideBetSettled carries no configId and the on-chain Bet struct does not store one, so it cannot be recovered."
+  configId: BigInt
   player: User!
   market: Market!
   bank: Bytes!
@@ -950,6 +951,8 @@ type SideBet @entity(immutable: false) {
 
 type SideBetConfig @entity(immutable: false) {
   id: ID!
+  "Numeric config id. Mirrors `id`, which is a string and therefore sorts lexicographically ('10' before '2') — order by this field instead."
+  configId: BigInt!
   market: Market!
   betType: SideBetType!
   color: SideBetColor

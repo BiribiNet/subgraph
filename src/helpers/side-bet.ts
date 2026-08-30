@@ -1,10 +1,10 @@
-import { BigInt, Bytes, log } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes, log } from "@graphprotocol/graph-ts"
 import { SideBet as SideBetContract } from "../../generated/SideBet/SideBet"
 import { SideBet, SideBetConfig, SideBetGlobalConfig } from "../../generated/schema"
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateUser, updateUserLastActive } from "./user"
 import { recordUserMarketSideBetStake } from "./user-market-stats"
-import { getMarketById, requireMarket } from "./market"
+import { requireMarket } from "./market"
 
 const BPS_DENOMINATOR = BigInt.fromI32(10000)
 
@@ -61,6 +61,23 @@ export function sideBetStatusFromI32(value: i32): string {
   return "ACTIVE"
 }
 
+/**
+ * Mark a config inactive so it stops being offered.
+ *
+ * `getConfig` REVERTS with `ConfigInactive` for a removed config — it never reports `marketId == 0`
+ * — so deactivation cannot go through an on-chain read. `ConfigRemoved` carries the id, which is
+ * all this needs.
+ */
+export function deactivateSideBetConfig(configId: BigInt, timestamp: BigInt): void {
+  const existing = SideBetConfig.load(configId.toString())
+  if (existing == null) {
+    return
+  }
+  existing.active = false
+  existing.lastUpdatedAt = timestamp
+  existing.save()
+}
+
 export function syncSideBetConfig(
   contract: SideBetContract,
   configId: BigInt,
@@ -68,20 +85,14 @@ export function syncSideBetConfig(
 ): SideBetConfig | null {
   const cfgResult = contract.try_getConfig(configId)
   if (cfgResult.reverted) {
-    log.warning("getConfig({}) reverted", [configId.toString()])
+    // The only reverts here are `ConfigInactive` (removed) and `UnknownConfig` (id past the
+    // count, impossible for an event-driven call). Either way the config must not stay active.
+    log.warning("SideBet getConfig({}) reverted — deactivating", [configId.toString()])
+    deactivateSideBetConfig(configId, timestamp)
     return null
   }
   const cfg = cfgResult.value
   const marketId = cfg.marketId.toI32()
-  if (marketId == 0) {
-    const existing = SideBetConfig.load(configId.toString())
-    if (existing != null) {
-      existing.active = false
-      existing.lastUpdatedAt = timestamp
-      existing.save()
-    }
-    return null
-  }
 
   const market = requireMarket(marketId)
   let entity = SideBetConfig.load(configId.toString())
@@ -91,6 +102,7 @@ export function syncSideBetConfig(
     entity.minStake = BigInt.zero()
     entity.maxStake = BigInt.zero()
   }
+  entity.configId = configId
   entity.market = market.id
   entity.betType = sideBetTypeFromI32(cfg.betType)
   const cfgColor = sideBetColorFromI32(cfg.color)
@@ -110,33 +122,97 @@ export function syncSideBetConfig(
   return entity
 }
 
-export function createSideBetFromChain(
+/** Everything `SideBetPlaced` carries. Enough to index a bet without touching the chain. */
+export class SideBetPlacedInput {
+  constructor(
+    public betId: BigInt,
+    public configId: BigInt,
+    public player: Address,
+    public marketId: i32,
+    public stake: BigInt,
+    public payout: BigInt,
+    public startGlobalRound: BigInt,
+    public windowSpins: i32
+  ) {}
+}
+
+/**
+ * Index a side bet from its `SideBetPlaced` event.
+ *
+ * The event alone carries player, market, stake, payout, window and start round, so the bet is
+ * always created — an `eth_call` failure or a market the registry has not indexed yet can no longer
+ * make it disappear. `getBet` is still preferred for the descriptive fields (bet kind, targets)
+ * because the contract snapshots the config into the bet, and a later `updateConfig` would make the
+ * live config entity describe the bet incorrectly. When that read fails we fall back to the indexed
+ * `SideBetConfig`, and only then to defaults.
+ */
+export function createSideBetFromPlacedEvent(
+  contract: SideBetContract,
+  input: SideBetPlacedInput,
+  timestamp: BigInt
+): SideBet {
+  const id = sideBetIdFromBetId(input.betId)
+  const existing = SideBet.load(id)
+  if (existing != null) {
+    return existing
+  }
+
+  // requireMarket, not getMarketById: a bet in a market the registry has not indexed yet gets a
+  // provisional market rather than being dropped, matching what the config path already does.
+  const market = requireMarket(input.marketId)
+
+  const bet = new SideBet(id)
+  bet.configId = input.configId
+  bet.player = getOrCreateUser(input.player).id
+  bet.market = market.id
+  bet.bank = market.bank
+  bet.startGlobalRound = input.startGlobalRound
+  bet.windowSpins = input.windowSpins
+  bet.spinsResolved = 0
+  bet.stake = input.stake
+  bet.potentialPayout = input.payout
+  bet.actualPayout = BigInt.zero()
+  bet.status = "ACTIVE"
+  bet.placedAt = timestamp
+  bet.spinsObserved = []
+  bet.multiplierBps = deriveMultiplierBps(input.stake, input.payout)
+
+  applyBetDescription(bet, contract, input.betId, input.configId)
+  bet.save()
+
+  recordUserMarketSideBetStake(input.player, market, input.stake, timestamp)
+  updateUserLastActive(input.player, timestamp)
+  return bet
+}
+
+/**
+ * Recover a bet seen only at settlement time.
+ *
+ * `SideBetSettled` carries just (betId, player, outcome, payout), so market, stake and window must
+ * come from `getBet`. Returns null when that read fails — there is genuinely nothing to store.
+ * `configId` stays null: the on-chain `Bet` struct does not keep it, and writing 0 would be
+ * indistinguishable from a real config 0.
+ */
+export function recoverSideBetFromChain(
   contract: SideBetContract,
   betId: BigInt,
-  configId: BigInt,
   timestamp: BigInt
 ): SideBet | null {
+  const id = sideBetIdFromBetId(betId)
+  const existing = SideBet.load(id)
+  if (existing != null) {
+    return existing
+  }
+
   const betResult = contract.try_getBet(betId)
   if (betResult.reverted) {
-    log.warning("getBet({}) reverted", [betId.toString()])
+    log.warning("SideBet getBet({}) reverted — cannot recover bet at settlement", [betId.toString()])
     return null
   }
   const onChain = betResult.value
-  const marketId = onChain.marketId.toI32()
-  const market = getMarketById(marketId)
-  if (market == null) {
-    log.warning("SideBet {}: market {} not registered", [betId.toString(), marketId.toString()])
-    return null
-  }
+  const market = requireMarket(onChain.marketId.toI32())
 
-  const id = sideBetIdFromBetId(betId)
-  let bet = SideBet.load(id)
-  if (bet != null) {
-    return bet
-  }
-
-  bet = new SideBet(id)
-  bet.configId = configId
+  const bet = new SideBet(id)
   bet.player = getOrCreateUser(onChain.player).id
   bet.market = market.id
   bet.bank = market.bank
@@ -151,11 +227,7 @@ export function createSideBetFromChain(
   bet.startGlobalRound = onChain.startGlobalRound
   bet.windowSpins = onChain.windowSpins
   bet.spinsResolved = 0
-  if (onChain.stake.gt(BigInt.zero())) {
-    bet.multiplierBps = onChain.payout.times(BPS_DENOMINATOR).div(onChain.stake).toI32()
-  } else {
-    bet.multiplierBps = 0
-  }
+  bet.multiplierBps = deriveMultiplierBps(onChain.stake, onChain.payout)
   bet.stake = onChain.stake
   bet.potentialPayout = onChain.payout
   bet.actualPayout = BigInt.zero()
@@ -167,4 +239,60 @@ export function createSideBetFromChain(
   recordUserMarketSideBetStake(onChain.player, market, onChain.stake, timestamp)
   updateUserLastActive(onChain.player, timestamp)
   return bet
+}
+
+/** payout/stake as basis points. Returns 0 for a zero stake, which the contract rejects anyway. */
+function deriveMultiplierBps(stake: BigInt, payout: BigInt): i32 {
+  if (stake.le(BigInt.zero())) {
+    return 0
+  }
+  return payout.times(BPS_DENOMINATOR).div(stake).toI32()
+}
+
+/**
+ * Fill in the bet-kind fields, preferring the on-chain snapshot over the live config.
+ *
+ * Leaves `betType` at COLOR_COUNT (enum value 0) when neither source is available, so the bet is
+ * still stored with its correct money fields rather than dropped.
+ */
+function applyBetDescription(
+  bet: SideBet,
+  contract: SideBetContract,
+  betId: BigInt,
+  configId: BigInt
+): void {
+  const betResult = contract.try_getBet(betId)
+  if (!betResult.reverted) {
+    const onChain = betResult.value
+    bet.betType = sideBetTypeFromI32(onChain.betType)
+    const betColor = sideBetColorFromI32(onChain.color)
+    if (betColor != "") {
+      bet.color = betColor
+    }
+    bet.targetNumber = onChain.targetNumber
+    bet.targetCount = onChain.targetCount
+    bet.redRatioBps = onChain.redRatioBps
+    bet.placedAt = onChain.placedAt
+    return
+  }
+
+  const config = SideBetConfig.load(configId.toString())
+  if (config != null) {
+    log.warning("SideBet getBet({}) reverted — describing bet from config {}", [
+      betId.toString(),
+      configId.toString(),
+    ])
+    bet.betType = config.betType
+    bet.color = config.color
+    bet.targetNumber = config.targetNumber
+    bet.targetCount = config.targetCount
+    bet.redRatioBps = config.redRatioBps
+    return
+  }
+
+  log.warning("SideBet {}: neither getBet nor config {} available — kind fields left at defaults", [
+    betId.toString(),
+    configId.toString(),
+  ])
+  bet.betType = sideBetTypeFromI32(0)
 }

@@ -18,8 +18,11 @@ import {
 import { ContractUpgrade, SideBet, SideBetSettlement, Market } from "../../generated/schema"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import {
-  createSideBetFromChain,
+  SideBetPlacedInput,
+  createSideBetFromPlacedEvent,
+  deactivateSideBetConfig,
   getOrCreateSideBetGlobalConfig,
+  recoverSideBetFromChain,
   sideBetIdFromBetId,
   sideBetStatusFromI32,
   syncSideBetConfig
@@ -30,7 +33,7 @@ import {
   recordUserMarketSideBetWin,
 } from "../helpers/user-market-stats"
 import { registerSideBetForRoundWatch } from "../helpers/side-bet-vrf"
-import { getMarketById } from "../helpers/market"
+import { requireMarket } from "../helpers/market"
 import {
   ROLE_CONTRACT_SIDE_BET,
   grantRoleHolder,
@@ -55,21 +58,26 @@ export function handleConfigStakeLimitsUpdated(event: ConfigStakeLimitsUpdated):
 }
 
 export function handleConfigRemoved(event: ConfigRemoved): void {
-  syncSideBetConfig(SideBetContract.bind(event.address), event.params.configId, event.block.timestamp)
+  // Deactivate from the event, not from a read: `getConfig` reverts `ConfigInactive` for a removed
+  // config instead of reporting `marketId == 0`, so routing this through `syncSideBetConfig` used
+  // to leave the entity `active: true` and the template on offer forever.
+  deactivateSideBetConfig(event.params.configId, event.block.timestamp)
 }
 
 export function handleSideBetPlaced(event: SideBetPlaced): void {
   const contract = bindSideBet(event.address)
-  const bet = createSideBetFromChain(
-    contract,
+  const input = new SideBetPlacedInput(
     event.params.betId,
     event.params.configId,
-    event.block.timestamp
+    event.params.player,
+    event.params.marketId.toI32(),
+    event.params.stake,
+    event.params.payout,
+    event.params.startGlobalRound,
+    event.params.windowSpins
   )
-  if (bet == null) {
-    log.warning("SideBetPlaced: failed to index bet {}", [event.params.betId.toString()])
-    return
-  }
+
+  const bet = createSideBetFromPlacedEvent(contract, input, event.block.timestamp)
   registerSideBetForRoundWatch(bet.id, bet.startGlobalRound, bet.windowSpins)
   syncSideBetConfig(contract, event.params.configId, event.block.timestamp)
 }
@@ -79,7 +87,7 @@ export function handleSideBetSettled(event: SideBetSettled): void {
   let bet = SideBet.load(betId)
   if (bet == null) {
     const contract = SideBetContract.bind(event.address)
-    bet = createSideBetFromChain(contract, event.params.betId, BigInt.zero(), event.block.timestamp)
+    bet = recoverSideBetFromChain(contract, event.params.betId, event.block.timestamp)
     if (bet == null) {
       log.warning("SideBetSettled: bet {} not found", [event.params.betId.toString()])
       return
@@ -111,10 +119,9 @@ export function handleSideBetSettled(event: SideBetSettled): void {
 }
 
 function accrueSideBetFee(marketId: i32, jackpot: boolean, amount: BigInt): void {
-  const market = getMarketById(marketId)
-  if (market == null) {
-    return
-  }
+  // requireMarket: a fee for a market the registry has not indexed yet is deferred onto a
+  // provisional market rather than silently dropped.
+  const market = requireMarket(marketId)
   if (jackpot) {
     market.sideBetJackpotFees = market.sideBetJackpotFees.plus(amount)
   } else {
