@@ -12,7 +12,8 @@
     "prod:subgraph": "yarn goldsky subgraph tag create biribi/\"$@\" --tag prod",
     "deploy": "yarn codegen && yarn build && yarn deploy:subgraph $@ && yarn prod:subgraph $@",
     "deploy:api": "yarn codegen && yarn build && node scripts/goldsky-deploy.mjs",
-    "check:constants": "node scripts/check-constants.mjs"
+    "check:constants": "node scripts/check-constants.mjs",
+    "reconcile:vaults": "node scripts/reconcile-vaults.mjs"
   },
   "devDependencies": {
     "@goldskycom/cli": "^13.9.0",

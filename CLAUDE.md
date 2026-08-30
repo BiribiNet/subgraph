@@ -530,6 +530,29 @@ match (or rely on sync-pipeline alone if you do not use `--network`).
 
 **IMPORTANT**: Always set `startBlock` to the contract deployment block to avoid indexing from genesis (massive time waste on Arbitrum).
 
+### Verifying a deploy: `yarn reconcile:vaults`
+
+`Market.totalAssets` is never read from the vault — it is accumulated from events
+(`grossVaultBalance − lockedBetLiquidity`, see `src/helpers/vault-ledger.ts`), and
+share price plus every APY snapshot derive from it. A mapping bug, or history left
+behind by an older deployed mapping, therefore drifts silently: the API keeps
+answering, the numbers are just wrong.
+
+`node scripts/reconcile-vaults.mjs` compares each market's indexed `totalAssets` /
+`totalShares` against `totalAssets()` / `totalSupply()` on the vault, both pinned to
+the same block (it time-travels the subgraph query to whichever head is lower, so it
+never races settlement). It reads only public data. Run it **after every re-index**
+and whenever the staking figures look off; exit code 1 means drift.
+
+It is deliberately not in `yarn test` — it depends on the live endpoint and the RPC,
+which would make CI flaky and offline runs impossible.
+
+A drift equal to `Market.brbDonations` points at inbound transfers booked as
+donations, the one component of `grossVaultBalance` no vault event reverses. Before
+calling that a code bug, check whether the live index predates the current mapping:
+replaying today's handlers over the full event log is the only way to tell stale
+history from a live defect.
+
 ## Interaction Style
 
 - Be precise about AssemblyScript limitations (no closures, no union types, limited stdlib)
