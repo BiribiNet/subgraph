@@ -17,6 +17,12 @@ const ASSET = Address.fromString('0xaaaa000000000000000000000000000000000001');
 const BANK = Address.fromString('0xbbbb000000000000000000000000000000000001');
 
 function mockTokenMetadata(): void {
+  // MarketRegistered reads the engine's infrastructure fee recipient — no event carries it.
+  createMockedFunction(ENGINE, 'INFRA_RECIPIENT', 'INFRA_RECIPIENT():(address)').returns([
+    ethereum.Value.fromAddress(
+      Address.fromString('0x00000000000000000000000000000000000000fe')
+    ),
+  ]);
   createMockedFunction(ASSET, 'symbol', 'symbol():(string)').returns([
     ethereum.Value.fromString('USDC'),
   ]);

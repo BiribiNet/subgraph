@@ -11,6 +11,7 @@ import {
   handleVrfRequested,
 } from '../src/mappings/roulette';
 import { handleTransfer as handleBrbTransfer } from '../src/mappings/brb';
+import { getOrCreateGlobalState } from '../src/helpers/globalState';
 import {
   BRB_TOKEN,
   DEFAULT_USER,
@@ -147,6 +148,26 @@ function emitCallFailed(transactionHash: Bytes, logIndex: i32): void {
   event.block.timestamp = BigInt.fromI32(TIMESTAMP);
   event.block.number = BigInt.fromI32(10_000);
   handleCallFailed(event);
+}
+
+/** A BRB transfer out of the bank — a winner payout and a protocol fee look identical here. */
+function emitBankTransfer(to: string, value: string, transactionHash: Bytes, logIndex: i32): void {
+  mockBrbTotalSupply();
+  const event = changetype<BrbTransfer>(newMockEvent());
+  event.address = BRB_TOKEN;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(TEST_BANK)));
+  event.parameters.push(
+    new ethereum.EventParam('to', ethereum.Value.fromAddress(Address.fromString(to)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value)))
+  );
+  event.transaction.hash = transactionHash;
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(TIMESTAMP);
+  event.block.number = BigInt.fromI32(10_000);
+  handleBrbTransfer(event);
 }
 
 describe('betData decoding', () => {
@@ -354,25 +375,7 @@ describe('payout attribution timing', () => {
     emitVrfRequested(15);
 
     // The bank pays the winner first; PayoutProgress only follows later in the same transaction.
-    mockBrbTotalSupply();
-    const event = changetype<BrbTransfer>(newMockEvent());
-    event.address = BRB_TOKEN;
-    event.parameters = new Array<ethereum.EventParam>();
-    event.parameters.push(new ethereum.EventParam('from', ethereum.Value.fromAddress(TEST_BANK)));
-    event.parameters.push(
-      new ethereum.EventParam('to', ethereum.Value.fromAddress(Address.fromString(DEFAULT_USER)))
-    );
-    event.parameters.push(
-      new ethereum.EventParam(
-        'value',
-        ethereum.Value.fromUnsignedBigInt(BigInt.fromString('2000000000000000000'))
-      )
-    );
-    event.transaction.hash = Bytes.fromHexString('0xbeef05');
-    event.logIndex = BigInt.fromI32(1);
-    event.block.timestamp = BigInt.fromI32(TIMESTAMP);
-    event.block.number = BigInt.fromI32(10_000);
-    handleBrbTransfer(event);
+    emitBankTransfer(DEFAULT_USER, '2000000000000000000', Bytes.fromHexString('0xbeef05'), 1);
 
     const betId = DEFAULT_USER + testRoundId(15).slice(2);
     assert.entityCount('PayoutTransaction', 1);
@@ -406,5 +409,57 @@ describe('GlobalState.currentGlobalRound', () => {
 
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'failedAutomationCalls', '1');
     assert.fieldEquals('GlobalRound', globalRoundIdHex(22), 'failedAutomationCalls', '1');
+  });
+});
+
+describe('protocol fee recipients are not winners', () => {
+  beforeEach(() => {
+    clearStore();
+    setupBrbTestMarket();
+  });
+
+  test('does not credit the infrastructure fee as a payout to a bettor', () => {
+    const globalState = getOrCreateGlobalState();
+    // On testnet the infra recipient and a player are the same wallet, which is what exposed this.
+    globalState.infraRecipient = Bytes.fromHexString(DEFAULT_USER);
+    globalState.save();
+
+    const betData = encodeBetLegs(
+      [BigInt.fromI32(9)],
+      [BigInt.zero()],
+      [BigInt.fromString('1000000000000000000')]
+    );
+    emitBetRecorded(DEFAULT_USER, '1000000000000000000', betData, 30);
+    emitVrfRequested(30);
+
+    // `_collectMarketFees` pays the fee straight out of the bank, exactly like a winner payout.
+    emitBankTransfer(DEFAULT_USER, '20000000000000000', Bytes.fromHexString('0xfee1'), 1);
+
+    const betId = DEFAULT_USER + testRoundId(30).slice(2);
+    assert.entityCount('PayoutTransaction', 0);
+    assert.fieldEquals('RouletteBet', betId, 'won', 'false');
+    assert.fieldEquals('RouletteBet', betId, 'actualPayout', '0');
+  });
+
+  test('still credits a genuine payout to a bettor who holds no protocol role', () => {
+    const globalState = getOrCreateGlobalState();
+    globalState.infraRecipient = Bytes.fromHexString(
+      '0x00000000000000000000000000000000000000fe'
+    );
+    globalState.save();
+
+    const betData = encodeBetLegs(
+      [BigInt.fromI32(9)],
+      [BigInt.zero()],
+      [BigInt.fromString('1000000000000000000')]
+    );
+    emitBetRecorded(DEFAULT_USER, '1000000000000000000', betData, 31);
+    emitVrfRequested(31);
+    emitBankTransfer(DEFAULT_USER, '2000000000000000000', Bytes.fromHexString('0xfee2'), 1);
+
+    const betId = DEFAULT_USER + testRoundId(31).slice(2);
+    assert.entityCount('PayoutTransaction', 1);
+    assert.fieldEquals('RouletteBet', betId, 'won', 'true');
+    assert.fieldEquals('RouletteBet', betId, 'actualPayout', '2000000000000000000');
   });
 });

@@ -527,6 +527,8 @@ type GlobalState @entity(immutable: false) {
   jackpotFunder: Bytes
   "Active JackpotTreasury address (engine config — JackpotTreasuryUpdated); null until set"
   jackpotTreasury: Bytes
+  "Infrastructure fee recipient (engine INFRA_RECIPIENT); null until read at the first MarketRegistered. The engine emits no event for it, so this is resolved on-chain — see resolveInfraRecipient in src/helpers/multiMarketRoulette.ts."
+  infraRecipient: Bytes
   "Lifetime AutomationReceiver.CallFailed count (CRE automation health)"
   failedAutomationCalls: BigInt!
 }

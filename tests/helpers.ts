@@ -52,6 +52,7 @@ export function testRoundId(globalRound: i32, marketId: i32 = 1): string {
 }
 
 export function mockVaultTokenMetadata(): void {
+  mockEngineInfraRecipient();
   createMockedFunction(TEST_ASSET, 'symbol', 'symbol():(string)').returns([
     ethereum.Value.fromString('BRB'),
   ]);
@@ -518,6 +519,18 @@ export function globalRoundIdHex(globalRound: i32): string {
  * time it sees a non-mint transfer, because the genesis mint predates the manifest's start block —
  * mock it wherever a BRB Transfer is handled.
  */
+/**
+ * The engine emits no event for its infrastructure fee recipient, so `MarketRegistered` reads it
+ * on-chain — mock it wherever a market is registered.
+ */
+export function mockEngineInfraRecipient(
+  recipient: string = '0x00000000000000000000000000000000000000fe'
+): void {
+  createMockedFunction(TEST_ENGINE, 'INFRA_RECIPIENT', 'INFRA_RECIPIENT():(address)').returns([
+    ethereum.Value.fromAddress(Address.fromString(recipient)),
+  ]);
+}
+
 export function mockBrbTotalSupply(value: string = '3000000000000000000000000'): void {
   createMockedFunction(BRB_TOKEN, 'totalSupply', 'totalSupply():(uint256)').returns([
     ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value)),
