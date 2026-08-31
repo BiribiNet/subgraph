@@ -109,6 +109,11 @@
   },
   {
     "inputs": [],
+    "name": "ReservedAccountingMigrationUnsafe",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "RoundOutcomeAlreadyKnown",
     "type": "error"
   },
@@ -950,6 +955,13 @@
       }
     ],
     "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "initializeReservedAccounting",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
