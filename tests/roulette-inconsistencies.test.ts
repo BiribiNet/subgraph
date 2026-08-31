@@ -463,3 +463,41 @@ describe('protocol fee recipients are not winners', () => {
     assert.fieldEquals('RouletteBet', betId, 'actualPayout', '2000000000000000000');
   });
 });
+
+describe('User.totalLost', () => {
+  beforeEach(() => {
+    clearStore();
+    setupBrbTestMarket();
+  });
+
+  test('stays at zero for a player who won more than they staked', () => {
+    const betData = encodeBetLegs(
+      [BigInt.fromI32(9)],
+      [BigInt.zero()],
+      [BigInt.fromString('1000000000000000000')]
+    );
+    emitBetRecorded(DEFAULT_USER, '1000000000000000000', betData, 40);
+    emitVrfRequested(40);
+    emitBankTransfer(DEFAULT_USER, '3000000000000000000', Bytes.fromHexString('0xfee3'), 1);
+
+    // Net positive: 3 BRB won on a 1 BRB stake. Unguarded this published -2 BRB "lost", while
+    // UserMarketStats — same inputs, same definition — already reported 0.
+    assert.fieldEquals('User', DEFAULT_USER, 'totalWon', '3000000000000000000');
+    assert.fieldEquals('User', DEFAULT_USER, 'totalLost', '0');
+    // The per-market entity already clamped; this is the contradiction the fix removes.
+    assert.fieldEquals('UserMarketStats', DEFAULT_USER + '-1', 'totalLost', '0');
+  });
+
+  test('still reports the shortfall for a player who is down', () => {
+    const betData = encodeBetLegs(
+      [BigInt.fromI32(9)],
+      [BigInt.zero()],
+      [BigInt.fromString('5000000000000000000')]
+    );
+    emitBetRecorded(DEFAULT_USER, '5000000000000000000', betData, 41);
+    emitVrfRequested(41);
+    emitBankTransfer(DEFAULT_USER, '2000000000000000000', Bytes.fromHexString('0xfee4'), 1);
+
+    assert.fieldEquals('User', DEFAULT_USER, 'totalLost', '3000000000000000000');
+  });
+});
