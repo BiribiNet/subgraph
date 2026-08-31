@@ -567,13 +567,20 @@ function buildBrbTransferEvent(
  * Simulates a BRB Transfer. When `autoFundSender` is true (default) and `from` is not zero,
  * mints 1000 BRB to the sender first so wallet balance tracking does not underflow in tests.
  */
+/**
+ * `transactionHash` matters whenever the scenario also emits a vault event: `newMockEvent()`
+ * hands every event the same default hash, so without an explicit one a transfer and an
+ * unrelated later deposit look like one transaction, and the deposit's donation undo consumes
+ * a gift it never received. Pass a distinct hash for anything meant to be its own transaction.
+ */
 export function emitBrbTransfer(
   from: string,
   to: string,
   value: string,
   timestamp: i32,
   logIndex: i32 = 0,
-  autoFundSender: boolean = true
+  autoFundSender: boolean = true,
+  transactionHash: string = ''
 ): void {
   if (autoFundSender && from != ZERO_ADDRESS) {
     const fundEvent = buildBrbTransferEvent(
@@ -585,7 +592,11 @@ export function emitBrbTransfer(
     );
     handleBrbTransfer(fundEvent);
   }
-  handleBrbTransfer(buildBrbTransferEvent(from, to, value, timestamp, logIndex));
+  const event = buildBrbTransferEvent(from, to, value, timestamp, logIndex);
+  if (transactionHash.length > 0) {
+    event.transaction.hash = Bytes.fromHexString(transactionHash);
+  }
+  handleBrbTransfer(event);
 }
 
 /**

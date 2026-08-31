@@ -56,6 +56,9 @@ describe('Audit fix: donations exclude bets and deposits', () => {
   });
 
   test('pure BRB transfer to bank counts as donation', () => {
+    // Only a BRB vault can hold BRB as liquidity; elsewhere it is a stray token the
+    // vault's own totalAssets() cannot see.
+    setupBrbTestMarket();
     emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), '500000000000000000', 1_000_000);
     assert.fieldEquals('Market', '1', 'brbDonations', '500000000000000000');
   });
