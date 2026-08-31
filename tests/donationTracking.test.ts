@@ -1,4 +1,4 @@
-import { Address, BigInt, ethereum } from '@graphprotocol/graph-ts';
+import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
 import {
   assert,
   beforeEach,
@@ -9,21 +9,28 @@ import {
 } from 'matchstick-as';
 
 import { Transfer as BrbTransfer } from '../generated/BRBToken/BRB';
+import { BetRecorded } from '../generated/RouletteEngine/Game';
 import { Deposit } from '../generated/templates/BankVault/BankVault4626';
+import { RouletteRound } from '../generated/schema';
 import { handleTransfer as handleBrbTransfer } from '../src/mappings/brb';
 import { handleDeposit } from '../src/mappings/bank-vault';
+import { handleBetRecorded } from '../src/mappings/roulette';
+import { ROUND_STATUS_VRF } from '../src/helpers/constant';
+import { marketRoundId } from '../src/helpers/market';
 import { ZERO_ADDRESS } from '../src/helpers/constant';
 import {
   DEFAULT_USER,
   GLOBAL_STATE_ID,
   TEST_BANK,
   BRB_TOKEN,
+  CORNER_BET_DATA,
   createRoundForTests,
   emitBrbTransfer,
   emitDeposit,
   emitSideBetStakeLocked,
   setupBrbTestMarket,
   setupTestMarket,
+  TEST_ENGINE,
 } from './helpers';
 
 const USER_ADDRESS_2 = '0xccccccdc53842141be8f70df9efe4d08538a5555';
@@ -173,5 +180,165 @@ describe('Pool liquidity via BRB transfer + deposit', () => {
     assert.fieldEquals('Market', '1', 'brbDonations', '0');
     assert.fieldEquals('Market', '1', 'totalAssets', '1000000000000000000');
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '0');
+  });
+});
+
+// ── Same-transaction builders ────────────────────────────────────────────────
+//
+// The shared `emit*` helpers each mint their own transaction via `newMockEvent()`. Everything
+// below turns on several logs sharing ONE transaction, which is the only scope in which the
+// per-tx scratch entities mean anything — so these build the events by hand.
+
+function brbTransferInTx(
+  transaction: ethereum.Transaction,
+  from: string,
+  value: string,
+  logIndex: i32
+): void {
+  const event = changetype<BrbTransfer>(newMockEvent());
+  event.transaction = transaction;
+  event.address = BRB_TOKEN;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('from', ethereum.Value.fromAddress(Address.fromString(from)))
+  );
+  event.parameters.push(new ethereum.EventParam('to', ethereum.Value.fromAddress(TEST_BANK)));
+  event.parameters.push(
+    new ethereum.EventParam('value', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(value)))
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(1_000_000);
+  handleBrbTransfer(event);
+}
+
+function depositInTx(
+  transaction: ethereum.Transaction,
+  owner: string,
+  assets: string,
+  logIndex: i32
+): void {
+  const event = changetype<Deposit>(newMockEvent());
+  event.transaction = transaction;
+  event.address = TEST_BANK;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('sender', ethereum.Value.fromAddress(Address.fromString(owner)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('owner', ethereum.Value.fromAddress(Address.fromString(owner)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('assets', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(assets)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('shares', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(assets)))
+  );
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(1_000_000);
+  handleDeposit(event);
+}
+
+function betRecordedInTx(
+  transaction: ethereum.Transaction,
+  player: string,
+  totalAmount: string,
+  localRound: i32,
+  logIndex: i32
+): void {
+  const event = changetype<BetRecorded>(newMockEvent());
+  event.transaction = transaction;
+  event.address = TEST_ENGINE;
+  event.parameters = new Array<ethereum.EventParam>();
+  event.parameters.push(
+    new ethereum.EventParam('marketId', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(1)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('localRound', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(localRound)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('player', ethereum.Value.fromAddress(Address.fromString(player)))
+  );
+  event.parameters.push(
+    new ethereum.EventParam('totalAmount', ethereum.Value.fromUnsignedBigInt(BigInt.fromString(totalAmount)))
+  );
+  event.parameters.push(new ethereum.EventParam('betData', ethereum.Value.fromBytes(CORNER_BET_DATA)));
+  event.logIndex = BigInt.fromI32(logIndex);
+  event.block.timestamp = BigInt.fromI32(1_000_000);
+  event.block.number = BigInt.fromI32(10_000);
+  handleBetRecorded(event);
+}
+
+describe('Donation undo is scoped to what was actually booked', () => {
+  const PRIOR_GIFT = '500000000000000000';
+  const GIFT_TX_HASH = '0xaaaa000000000000000000000000000000000000000000000000000000000001';
+  const DEPOSIT_TX_HASH = '0xbbbb000000000000000000000000000000000000000000000000000000000002';
+  const DEPOSIT_AMOUNT = '1000000000000000000';
+
+  beforeEach(() => {
+    clearStore();
+    setupBrbTestMarket();
+    createRoundForTests(1, 1_000_000);
+  });
+
+  test('should leave an earlier donation intact when a second deposit in one tx was excluded', () => {
+    // A genuine gift, in a transaction of its own — `newMockEvent()` hands out one default hash,
+    // so the hashes have to be set apart by hand or every event shares a scratch and the gift is
+    // fair game. Nothing in a later transaction may spend it.
+    const giftTx = changetype<ethereum.Event>(newMockEvent()).transaction;
+    giftTx.hash = Bytes.fromHexString(GIFT_TX_HASH);
+    brbTransferInTx(giftTx, OTHER_ADDRESS, PRIOR_GIFT, 0);
+    assert.fieldEquals('Market', '1', 'brbDonations', PRIOR_GIFT);
+
+    // Two deposits in ONE transaction — a router or multicall stacking two `deposit()` calls.
+    // The first deposit leaves `depositToBank` behind, which then excludes the SECOND transfer
+    // from donation accounting. Nothing is booked for it, so there is nothing to undo; an undo
+    // inferred from `assets` instead ate into the unrelated gift above, and stripped real
+    // balance out of `grossVaultBalance` with it.
+    const tx = changetype<ethereum.Event>(newMockEvent()).transaction;
+    tx.hash = Bytes.fromHexString(DEPOSIT_TX_HASH);
+    brbTransferInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 0);
+    depositInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 1);
+    brbTransferInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 2);
+    depositInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 3);
+
+    assert.fieldEquals('Market', '1', 'brbDonations', PRIOR_GIFT);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', PRIOR_GIFT);
+    // 0.5 gift + 2 × 1.0 deposited = 2.5, matching what the bank really holds.
+    assert.fieldEquals('Market', '1', 'grossVaultBalance', '2500000000000000000');
+  });
+
+  test('should still undo the donation booked by an ordinary BRB deposit', () => {
+    // Non-regression on the nominal path, where the undo IS load-bearing: the vault pulls the
+    // assets before it emits `Deposit`, so the transfer really was booked as a donation.
+    const tx = changetype<ethereum.Event>(newMockEvent()).transaction;
+    brbTransferInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 0);
+    assert.fieldEquals('Market', '1', 'brbDonations', DEPOSIT_AMOUNT);
+
+    depositInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 1);
+
+    assert.fieldEquals('Market', '1', 'brbDonations', '0');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '0');
+    assert.fieldEquals('Market', '1', 'grossVaultBalance', DEPOSIT_AMOUNT);
+  });
+
+  test('should mark bet funds as non-donation even when the slice is no longer BETTING', () => {
+    // Hardening, not a reproduction of an observed event: the engine rejects bets on a locked
+    // round. But if a slice ever did lag, the bet's own transfer would be booked as a permanent
+    // donation — the bet path has no undo at all.
+    const round = RouletteRound.load(marketRoundId(BigInt.fromI32(1), 1));
+    if (round == null) {
+      throw new Error('round fixture missing');
+    }
+    round.status = ROUND_STATUS_VRF;
+    round.save();
+
+    const tx = changetype<ethereum.Event>(newMockEvent()).transaction;
+    betRecordedInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 1, 0);
+    brbTransferInTx(tx, DEFAULT_USER, DEPOSIT_AMOUNT, 1);
+
+    assert.fieldEquals('Market', '1', 'brbDonations', '0');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '0');
+    // The bet itself is still skipped by the status guard — only the scratch is unconditional.
+    assert.entityCount('RouletteBet', 0);
   });
 });

@@ -1,4 +1,4 @@
-import { Address, BigInt, Bytes, store } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes, log, store } from "@graphprotocol/graph-ts"
 import {
   Deposit,
   Withdraw,
@@ -44,7 +44,7 @@ import { BPS_DENOMINATOR, ONE, ZERO } from "../helpers/number"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "../helpers/aggregation"
 import { normalizeAmountTo18 } from "../helpers/user"
 import { loadMarketByBank } from "../helpers/market"
-import { recordTxDepositToBank } from "../helpers/tx-activity"
+import { consumeTxBrbDonation, recordTxDepositToBank } from "../helpers/tx-activity"
 import { releasePendingBets } from "../helpers/vault-liquidity"
 import {
   addGrossVaultBalance,
@@ -60,26 +60,50 @@ import {
   userMarketStatsId,
 } from "../helpers/user-market-stats"
 
-function undoBrbDonationIfNeeded(market: Market, globalState: GlobalState, assets: BigInt): void {
+/**
+ * Unwind the donation this transaction's inbound BRB transfer was wrongly booked as.
+ *
+ * The transfer lands before the vault event that explains it (ERC-4626 pulls the assets, then
+ * emits `Deposit`), so `brb.ts` has already counted it as a gift by the time we get here. It
+ * leaves a `TxBrbDonation` record of what it actually booked, and we undo exactly that — never
+ * an amount inferred from `assets`. The distinction matters: a transfer can be excluded from
+ * donation accounting by the bet/deposit scratch, in which case nothing was booked and there is
+ * nothing to undo. Guessing from `assets` there would drain someone else's genuine donation, the
+ * vault's real gross balance, and a global counter that was never credited.
+ *
+ * Restricted to BRB markets on purpose: only BRB transfers are booked as donations, so on any
+ * other market `assets` would be a different token's units than the recorded amount.
+ */
+function undoBrbDonationIfNeeded(
+  market: Market,
+  globalState: GlobalState,
+  txHash: Bytes,
+  bank: Bytes,
+  assets: BigInt
+): void {
   if (!Address.fromBytes(market.asset).equals(BRB_TOKEN_ADDRESS)) {
     return
   }
-  let grossUndo = ZERO
-  if (market.brbDonations.ge(assets)) {
-    market.brbDonations = market.brbDonations.minus(assets)
-    grossUndo = assets
-  } else if (market.brbDonations.gt(ZERO)) {
-    grossUndo = market.brbDonations
-    market.brbDonations = ZERO
+  const undone = consumeTxBrbDonation(txHash, bank, assets)
+  if (undone.equals(ZERO)) {
+    return
   }
-  if (grossUndo.gt(ZERO)) {
-    subtractGrossVaultBalance(market, grossUndo)
+  // Both counters were credited by the same booking, so both can absorb it. A shortfall means
+  // the ledger drifted elsewhere: clamp so the store never goes negative, but say so — silently
+  // absorbing the gap is what hid this class of bug before.
+  if (market.brbDonations.lt(undone) || globalState.totalTransfersToPool.lt(undone)) {
+    log.warning("Donation undo of {} exceeds booked totals (market {} has {}, pool has {})", [
+      undone.toString(),
+      market.id,
+      market.brbDonations.toString(),
+      globalState.totalTransfersToPool.toString(),
+    ])
   }
-  if (globalState.totalTransfersToPool.ge(assets)) {
-    globalState.totalTransfersToPool = globalState.totalTransfersToPool.minus(assets)
-  } else {
-    globalState.totalTransfersToPool = ZERO
-  }
+  market.brbDonations = market.brbDonations.ge(undone) ? market.brbDonations.minus(undone) : ZERO
+  globalState.totalTransfersToPool = globalState.totalTransfersToPool.ge(undone)
+    ? globalState.totalTransfersToPool.minus(undone)
+    : ZERO
+  subtractGrossVaultBalance(market, undone)
 }
 
 export function handleDeposit(event: Deposit): void {
@@ -91,7 +115,7 @@ export function handleDeposit(event: Deposit): void {
   const globalState = getOrCreateGlobalState()
 
   recordTxDepositToBank(event.transaction.hash, event.params.assets)
-  undoBrbDonationIfNeeded(market, globalState, event.params.assets)
+  undoBrbDonationIfNeeded(market, globalState, event.transaction.hash, event.address, event.params.assets)
 
   const depositId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const deposit = new VaultDeposit(depositId)
@@ -340,7 +364,7 @@ export function handleSideBetStakeLocked(event: SideBetStakeLocked): void {
   // totalAssets, sharePrice and every APY snapshot in favour of the BRB vault. A TxActivity scratch
   // cannot fix this: the token emits Transfer during the pull, strictly before this event, so the
   // earlier handler can never see a flag written here. Undo retroactively, exactly as deposits do.
-  undoBrbDonationIfNeeded(market, globalState, event.params.stake)
+  undoBrbDonationIfNeeded(market, globalState, event.transaction.hash, event.address, event.params.stake)
   addGrossVaultBalance(market, event.params.stake)
   setLockedBetLiquidity(market, event.params.newLockedTotal)
   market.lockedSideBetLiquidity = market.lockedSideBetLiquidity.plus(event.params.payoutReserve)
