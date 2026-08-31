@@ -1094,6 +1094,19 @@ type TxActivity @entity(immutable: false) {
   betMarketId: Int!
 }
 
+"""
+BRB actually booked as a donation into one bank within one transaction.
+
+The vault events that undo a donation (`Deposit`, `SideBetStakeLocked`) fire *after* the
+ERC-20 `Transfer` that books it, so the undo has to look backwards. Without this record it
+guessed from the amount alone and could subtract a donation it never booked. Keyed by
+(transaction, bank) so a transaction touching several vaults stays correct.
+"""
+type TxBrbDonation @entity(immutable: false) {
+  id: Bytes!
+  amount: BigInt!
+}
+
 "Side bets awaiting a VRF spin on a given global round"
 type SideBetRoundPending @entity(immutable: false) {
   id: Bytes!

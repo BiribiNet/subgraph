@@ -11,7 +11,7 @@ import { getOrCreateDailyStats } from "../helpers/aggregation"
 import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
 import { addGrossVaultBalance } from "../helpers/vault-ledger"
 import { calculateMarketAPYs } from "../helpers/marketApy"
-import { isBankInboundExcludedFromDonation } from "../helpers/tx-activity"
+import { isBankInboundExcludedFromDonation, recordTxBrbDonation } from "../helpers/tx-activity"
 
 /** BRB wallet balance applies to EOAs only — not vaults, jackpot treasury, or zero address. */
 function isBrbWalletAddress(addr: Address): bool {
@@ -137,6 +137,9 @@ export function handleTransfer(event: Transfer): void {
       if (market != null) {
         market.brbDonations = market.brbDonations.plus(event.params.value)
         addGrossVaultBalance(market, event.params.value)
+        // Remember what was booked, so the vault event later in this transaction can undo
+        // exactly this and never more — see `consumeTxBrbDonation`.
+        recordTxBrbDonation(event.transaction.hash, event.params.to, event.params.value)
         calculateMarketAPYs(market, event.block.timestamp, event.block.number)
         market.save()
       }

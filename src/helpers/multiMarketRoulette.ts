@@ -54,7 +54,7 @@ import { getOrCreateGlobalRound, globalRoundIdBytes } from "./globalRound"
 import { marketRoundId, requireMarket, getOrCreateMarket } from "./market"
 import { ZERO } from "./number"
 import { BankVault as BankVaultTemplate, MarketAsset as MarketAssetTemplate } from "../../generated/templates"
-import { recordTxBetToBank } from "./tx-activity"
+import { recordTxBetForReferral, recordTxBetToBank } from "./tx-activity"
 import {
   finalizeMarketRoundsOnResolve,
   lockAllParticipatingMarketRounds,
@@ -127,91 +127,109 @@ export function processBetRecorded(event: BetRecorded): void {
     gr.firstBetAt = event.block.timestamp
   }
 
-  if (round.status == ROUND_STATUS_BETTING) {
-    const market = requireMarket(marketId)
-    const payload = decodeBetDataPayload(event.params.betData)
+  // Seeded before the `BETTING` guard, not inside it. `BankVault4626.placeBet` calls
+  // `recordBet` (this event) and only then pulls the funds, so the bank-inbound `Transfer`
+  // lands later in the same transaction and reads this scratch to know it is bet funds and
+  // not a gift. The tokens move whatever the guard below decides, and a transfer booked as a
+  // donation is never undone on the bet path — `undoBrbDonationIfNeeded` only covers deposits
+  // and side-bet stakes. Hardening, not a fix for an observed event: the engine rejects bets on
+  // a locked round, and a slice only leaves `BETTING` once `VrfRequested` has been indexed.
+  recordTxBetToBank(event.transaction.hash, event.params.totalAmount, marketId)
 
-    const existingUserBet = RouletteBet.load(event.params.player.concat(round.id))
-    const isNewRoundForUser = existingUserBet == null
+  if (round.status != ROUND_STATUS_BETTING) {
+    // Nothing else can be said about this bet, but say that much: today the event vanished
+    // without a trace, which is how a projection drift would stay invisible.
+    log.warning("BetRecorded on round {} (market {}) with slice status {} — bet not recorded", [
+      globalRoundId.toString(),
+      marketId.toString(),
+      round.status,
+    ])
+    return
+  }
 
-    recordRouletteBetFromPayload(
-      event.params.player,
-      payload,
-      event.params.totalAmount,
-      round,
-      market,
-      event.block.number,
-      event.block.timestamp,
-      event.transaction.hash
-    )
+  const market = requireMarket(marketId)
+  const payload = decodeBetDataPayload(event.params.betData)
 
-    const legCount = payload.types.length
-    if (legCount == 0) {
-      updateRoundMaxPayoutComponents(round, event.params.totalAmount, ZERO, ZERO)
-    } else {
-      for (let i = 0; i < legCount; i++) {
-        updateRoundMaxPayoutComponents(
-          round,
-          payload.amounts[i],
-          payload.types[i],
-          payload.numbers[i]
-        )
-      }
-    }
+  const existingUserBet = RouletteBet.load(event.params.player.concat(round.id))
+  const isNewRoundForUser = existingUserBet == null
 
-    const normalizedWager = normalizeAmountTo18(event.params.totalAmount, market.assetDecimals)
-    updateUserWageredStats(
-      event.params.player,
-      event.params.totalAmount,
-      market.assetDecimals,
-      isNewRoundForUser,
-      event.block.timestamp
-    )
-    recordUserMarketWager(
-      event.params.player,
-      market,
-      event.params.totalAmount,
-      isNewRoundForUser,
-      event.block.timestamp
-    )
+  recordRouletteBetFromPayload(
+    event.params.player,
+    payload,
+    event.params.totalAmount,
+    round,
+    market,
+    event.block.number,
+    event.block.timestamp,
+    event.transaction.hash
+  )
 
-    recordTxBetToBank(event.transaction.hash, event.params.totalAmount, marketId)
-
-    const player = getOrCreateUser(event.params.player)
-    const referrerId = player.referrer
-    if (referrerId) {
-      updateUserBrbrEarnings(
-        changetype<Bytes>(referrerId),
-        normalizedWager,
-        true,
-        event.block.timestamp
+  const legCount = payload.types.length
+  if (legCount == 0) {
+    updateRoundMaxPayoutComponents(round, event.params.totalAmount, ZERO, ZERO)
+  } else {
+    for (let i = 0; i < legCount; i++) {
+      updateRoundMaxPayoutComponents(
+        round,
+        payload.amounts[i],
+        payload.types[i],
+        payload.numbers[i]
       )
     }
-
-    round.betCount = round.betCount.plus(BigInt.fromI32(1))
-    if (isNewRoundForUser) {
-      round.uniqueBettors = round.uniqueBettors.plus(BigInt.fromI32(1))
-    }
-    round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
-    round.save()
-
-    market.pendingBets = market.pendingBets.plus(event.params.totalAmount)
-    market.maxBetAmount = round.maxBetAmount
-    market.save()
-
-    globalState.currentGlobalRound = gr.id
-    globalState.currentRoundNumber = globalRoundId
-
-    const daily = getOrCreateDailyStats(event.block.timestamp)
-    daily.betCount = daily.betCount.plus(BigInt.fromI32(1))
-    daily.volume = daily.volume.plus(normalizedWager)
-    daily.save()
-
-    trackProtocolBetStats(globalState, normalizedWager, event.params.player, event.block.timestamp)
-    updateUserLastActive(event.params.player, event.block.timestamp)
-    gr.save()
-    globalState.save()
   }
+
+  const normalizedWager = normalizeAmountTo18(event.params.totalAmount, market.assetDecimals)
+  updateUserWageredStats(
+    event.params.player,
+    event.params.totalAmount,
+    market.assetDecimals,
+    isNewRoundForUser,
+    event.block.timestamp
+  )
+  recordUserMarketWager(
+    event.params.player,
+    market,
+    event.params.totalAmount,
+    isNewRoundForUser,
+    event.block.timestamp
+  )
+
+  recordTxBetForReferral(event.transaction.hash, event.params.totalAmount)
+
+  const player = getOrCreateUser(event.params.player)
+  const referrerId = player.referrer
+  if (referrerId) {
+    updateUserBrbrEarnings(
+      changetype<Bytes>(referrerId),
+      normalizedWager,
+      true,
+      event.block.timestamp
+    )
+  }
+
+  round.betCount = round.betCount.plus(BigInt.fromI32(1))
+  if (isNewRoundForUser) {
+    round.uniqueBettors = round.uniqueBettors.plus(BigInt.fromI32(1))
+  }
+  round.maxBetAmount = calculateMaxPayoutFromRoundComponents(round)
+  round.save()
+
+  market.pendingBets = market.pendingBets.plus(event.params.totalAmount)
+  market.maxBetAmount = round.maxBetAmount
+  market.save()
+
+  globalState.currentGlobalRound = gr.id
+  globalState.currentRoundNumber = globalRoundId
+
+  const daily = getOrCreateDailyStats(event.block.timestamp)
+  daily.betCount = daily.betCount.plus(BigInt.fromI32(1))
+  daily.volume = daily.volume.plus(normalizedWager)
+  daily.save()
+
+  trackProtocolBetStats(globalState, normalizedWager, event.params.player, event.block.timestamp)
+  updateUserLastActive(event.params.player, event.block.timestamp)
+  gr.save()
+  globalState.save()
 }
 
 export function processRoundCountdownStarted(event: RoundCountdownStarted): void {
