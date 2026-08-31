@@ -4,6 +4,21 @@ import { ZERO_ADDRESS } from "./constant"
 import { ONE, ZERO } from "./number"
 import { recomputeAndSaveUserPoints } from "./brb-points"
 
+/**
+ * `totalLost` is a magnitude, not a signed balance: a player who wins more than they stake has
+ * lost nothing, not a negative amount. Subtracting unguarded published -77500 BRB for the one
+ * net-positive player on the live index, while `UserMarketStats` — same inputs, same definition —
+ * reported 0 for that very player through its own clamped helper. The signed figure consumers
+ * want is net profit, which the frontend derives from `totalWon - totalRouletteBets`.
+ */
+function syncTotalLost(user: User): void {
+  if (user.totalRouletteBets.ge(user.totalWon)) {
+    user.totalLost = user.totalRouletteBets.minus(user.totalWon)
+  } else {
+    user.totalLost = ZERO
+  }
+}
+
 export function getOrCreateUser(userAddress: Bytes): User {
   let user = User.load(userAddress)
   if (user == null) {
@@ -186,8 +201,7 @@ export function updateUserWageredStats(userAddress: Bytes, amount: BigInt, asset
   if (isNewRound) {
     user.betCount = user.betCount.plus(ONE)
   }
-  // Derive totalLost from totalRouletteBets - totalWon (always accurate)
-  user.totalLost = user.totalRouletteBets.minus(user.totalWon)
+  syncTotalLost(user)
 
   user.save()
   recomputeAndSaveUserPoints(user, timestamp)
@@ -218,7 +232,7 @@ export function updateUserRouletteStats(
     }
   }
 
-  user.totalLost = user.totalRouletteBets.minus(user.totalWon)
+  syncTotalLost(user)
 
   user.save()
   recomputeAndSaveUserPoints(user, timestamp)

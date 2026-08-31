@@ -9,7 +9,8 @@ import {
   MarketRegistered,
   JackpotFunded,
   InfrastructureFeePaid,
-  Upgraded
+  Upgraded,
+  Game
 } from "../../generated/RouletteEngine/Game"
 import {
   BRBBurn,
@@ -423,6 +424,32 @@ export function processInfrastructureFeePaid(event: InfrastructureFeePaid): void
   round.save()
 }
 
+/**
+ * Caches the engine's infrastructure fee recipient on GlobalState.
+ *
+ * `_collectMarketFees` pays that address straight out of the bank, so its transfer is
+ * indistinguishable from a winner payout at the token level — and the `InfrastructureFeePaid`
+ * event that names it is only emitted afterwards, too late for the Transfer handler. Skipping
+ * the recipient by address is the one check available before the fact.
+ *
+ * The engine emits no event when the recipient is set (it is written in `initialize`), so this
+ * is an eth_call. It runs once per market registration — a handful of calls at the manifest
+ * start block, never on a hot path.
+ */
+function resolveInfraRecipient(engine: Address): void {
+  const globalState = getOrCreateGlobalState()
+  if (globalState.infraRecipient !== null) {
+    return
+  }
+  const recipient = Game.bind(engine).try_INFRA_RECIPIENT()
+  if (recipient.reverted) {
+    log.warning("RouletteEngine.INFRA_RECIPIENT() reverted at {}", [engine.toHexString()])
+    return
+  }
+  globalState.infraRecipient = changetype<Bytes>(recipient.value)
+  globalState.save()
+}
+
 /** Sole source of market catalog: RouletteEngine.MarketRegistered (not MarketRegistry). */
 export function processMarketRegistered(event: MarketRegistered): void {
   const marketId = event.params.marketId.toI32()
@@ -435,6 +462,7 @@ export function processMarketRegistered(event: MarketRegistered): void {
     event.block.number
   )
   market.save()
+  resolveInfraRecipient(event.address)
   BankVaultTemplate.create(event.params.bank)
   // A winner is only ever named by the asset's own Transfer(bank -> winner); no engine or vault
   // event carries (winner, amount). BRB already has a static data source, so spawning one here too

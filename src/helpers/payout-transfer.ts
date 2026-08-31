@@ -6,6 +6,7 @@ import {
   RouletteRound,
   WithdrawTransaction,
   Market,
+  GlobalState,
 } from "../../generated/schema"
 import {
   JACKPOT_TREASURY_ADDRESS,
@@ -22,6 +23,27 @@ import { recordUserMarketWin } from "./user-market-stats"
 
 /** Jackpot payouts are denominated in BRB, never in the market's own asset. */
 const BRB_DECIMALS: i32 = 18
+
+/**
+ * True for the addresses settlement pays out of the bank that are protocol roles, not winners.
+ *
+ * Deliberately skips them outright rather than trying to tell a fee from a genuine win: these are
+ * treasury and contract addresses, and crediting a fee as a win corrupts `won`, `actualPayout`,
+ * the user's win totals and their BRBpoints tier, while contradicting the round's own payout
+ * total. Under-crediting a protocol address, in the unlikely case one also bets, costs nothing by
+ * comparison.
+ */
+function isProtocolFeeRecipient(globalState: GlobalState, to: Address): boolean {
+  const infraRecipient = globalState.infraRecipient
+  if (infraRecipient !== null && to.equals(Address.fromBytes(changetype<Bytes>(infraRecipient)))) {
+    return true
+  }
+  const jackpotFunder = globalState.jackpotFunder
+  if (jackpotFunder !== null && to.equals(Address.fromBytes(changetype<Bytes>(jackpotFunder)))) {
+    return true
+  }
+  return false
+}
 
 /**
  * Records per-winner payout detail from an ERC-20 Transfer (market asset or BRB).
@@ -53,6 +75,16 @@ export function tryRecordMarketPayoutTransfer(
   let assetDecimals: i32 = 18
 
   if (isKnownBank(from)) {
+    // Settlement pays protocol roles out of the same bank as the winners: the infrastructure fee
+    // to INFRA_RECIPIENT and the jackpot swap input to the funder. Both are plain ERC-20
+    // transfers, and the events naming them (InfrastructureFeePaid, JackpotFunded) are emitted
+    // after the transfer, so nothing distinguishes them here except the recipient. Round 447 on
+    // Sepolia credited its 0.02 BRB infra fee as a win to the wallet that happens to hold both
+    // roles on testnet — a bet on BLACK that had lost to a red 1, marked won with a payout the
+    // round's own `totalPayouts` (authoritative, from PayoutProgress) reported as zero.
+    if (isProtocolFeeRecipient(globalState, to)) {
+      return
+    }
     const market = loadMarketByBank(from)
     if (market != null) {
       assetDecimals = market.assetDecimals
