@@ -2,7 +2,7 @@ import { Address, Bytes, log } from "@graphprotocol/graph-ts"
 import { BRB, Transfer, Approval } from "../../generated/BRBToken/BRB"
 import { BRBTransfer, BRBBurn, GlobalState, PendingBrbBurn, TokenApproval } from "../../generated/schema"
 import { updateUserBRBBalance, updateUserLastActive } from "../helpers/user"
-import { JACKPOT_TREASURY_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
+import { BRB_TOKEN_ADDRESS, JACKPOT_TREASURY_ADDRESS, ZERO_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateGlobalState } from "../helpers/globalState"
 import { ZERO } from "../helpers/number"
@@ -130,19 +130,25 @@ export function handleTransfer(event: Transfer): void {
     dailyStatsBurn.save()
   }
 
-  if (isKnownBank(event.params.to)) {
+  const inboundMarket = isKnownBank(event.params.to) ? loadMarketByBank(event.params.to) : null
+  // Only a vault whose own asset is BRB can hold BRB as liquidity. Anywhere else this is a
+  // stray token: `BankVault4626.totalAssets()` reads `asset()` and cannot see it, so counting
+  // it here invented liquidity out of nothing — and across a decimals boundary the number was
+  // absurd. One BRB (1e18 raw) sent to a 6-decimal vault booked a trillion units of TVL, which
+  // then flowed into totalAssets, sharePrice and every APY snapshot. Anyone could do it, to any
+  // vault, for the price of a transfer. The scratch consumption moved in here with the booking
+  // for the same reason: a BRB transfer must not consume the scratch of a bet denominated in
+  // some other market's asset.
+  if (inboundMarket != null && Address.fromBytes(inboundMarket.asset).equals(BRB_TOKEN_ADDRESS)) {
     if (!isBankInboundExcludedFromDonation(event.transaction.hash, event.params.value)) {
       globalState.totalTransfersToPool = globalState.totalTransfersToPool.plus(event.params.value)
-      const market = loadMarketByBank(event.params.to)
-      if (market != null) {
-        market.brbDonations = market.brbDonations.plus(event.params.value)
-        addGrossVaultBalance(market, event.params.value)
-        // Remember what was booked, so the vault event later in this transaction can undo
-        // exactly this and never more — see `consumeTxBrbDonation`.
-        recordTxBrbDonation(event.transaction.hash, event.params.to, event.params.value)
-        calculateMarketAPYs(market, event.block.timestamp, event.block.number)
-        market.save()
-      }
+      inboundMarket.brbDonations = inboundMarket.brbDonations.plus(event.params.value)
+      addGrossVaultBalance(inboundMarket, event.params.value)
+      // Remember what was booked, so the vault event later in this transaction can undo
+      // exactly this and never more — see `consumeTxBrbDonation`.
+      recordTxBrbDonation(event.transaction.hash, event.params.to, event.params.value)
+      calculateMarketAPYs(inboundMarket, event.block.timestamp, event.block.number)
+      inboundMarket.save()
     }
   }
 

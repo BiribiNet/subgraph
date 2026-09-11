@@ -12,6 +12,7 @@ import {
   emitFundsTransferred,
   emitPayoutBatchProcessed,
   emitSideBetStakeLocked,
+  setupBrbTestMarket,
 } from './helpers';
 
 const ONE_BRB = '1000000000000000000';
@@ -19,6 +20,7 @@ const TWO_BRB = '2000000000000000000';
 const DEPOSIT_TS = 1_000_000; // UTC day 11
 const ONE_DAY_LATER = 1_086_400; // UTC day 12
 const TWO_DAYS_LATER = 1_172_800; // UTC day 13
+const DONATION_TX_HASH = '0xdddd000000000000000000000000000000000000000000000000000000000001';
 
 describe('Market APY recalculation on vault yield events', () => {
   beforeEach(() => {
@@ -67,6 +69,9 @@ describe('Market APY recalculation on vault yield events', () => {
   });
 
   test('BRB donation to the bank recomputes APY', () => {
+    // Only a BRB vault can hold BRB as liquidity; elsewhere it is a stray token the
+    // vault's own totalAssets() cannot see.
+    setupBrbTestMarket();
     emitDeposit(DEFAULT_USER, ONE_BRB, ONE_BRB, DEPOSIT_TS);
     // Donation amount differs from the deposit so the same-tx exclusion does not absorb it
     emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), TWO_BRB, ONE_DAY_LATER);
@@ -103,7 +108,20 @@ describe('Market APY recalculation on vault yield events', () => {
   });
 
   test('Yield events before the first deposit do not set the lifetime baseline', () => {
-    emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), ONE_BRB, DEPOSIT_TS);
+    // Only a BRB vault can hold BRB as liquidity; elsewhere it is a stray token the
+    // vault's own totalAssets() cannot see.
+    setupBrbTestMarket();
+    // Its own transaction: otherwise the deposit below shares the default mock hash and its
+    // donation undo takes this gift back.
+    emitBrbTransfer(
+      DEFAULT_USER,
+      TEST_BANK.toHexString(),
+      ONE_BRB,
+      DEPOSIT_TS,
+      0,
+      true,
+      DONATION_TX_HASH
+    );
 
     assert.fieldEquals('Market', '1', 'apyLifetimeBaselineTimestamp', '0');
     assert.entityCount('MarketAPYSnapshot', 0);

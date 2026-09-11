@@ -29,7 +29,9 @@ import {
   emitDeposit,
   emitSideBetStakeLocked,
   setupBrbTestMarket,
+  setupSecondTestMarket,
   setupTestMarket,
+  TEST_BANK_2,
   TEST_ENGINE,
 } from './helpers';
 
@@ -44,12 +46,18 @@ describe('Transfer Tracking Tests', () => {
   });
 
   test('Transfers TO registered bank increment totalTransfersToPool', () => {
+    // Only a BRB vault can hold BRB as liquidity; elsewhere it is a stray token the
+    // vault's own totalAssets() cannot see.
+    setupBrbTestMarket();
     emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), '1000000000000000000', 1_000_000);
 
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '1000000000000000000');
   });
 
   test('Multiple transfers TO bank accumulate', () => {
+    // Only a BRB vault can hold BRB as liquidity; elsewhere it is a stray token the
+    // vault's own totalAssets() cannot see.
+    setupBrbTestMarket();
     emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), '1000000000000000000', 1_000_000);
     emitBrbTransfer(USER_ADDRESS_2, TEST_BANK.toHexString(), '2000000000000000000', 1_000_100, 1);
 
@@ -105,6 +113,9 @@ describe('Pool liquidity via BRB transfer + deposit', () => {
   });
 
   test('BRB transfer to bank increases brbDonations and gross vault balance', () => {
+    // Only a BRB vault can hold BRB as liquidity; elsewhere it is a stray token the
+    // vault's own totalAssets() cannot see.
+    setupBrbTestMarket();
     emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), '500000000000000000', 1_000_000);
 
     assert.fieldEquals('Market', '1', 'brbDonations', '500000000000000000');
@@ -340,5 +351,36 @@ describe('Donation undo is scoped to what was actually booked', () => {
     assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '0');
     // The bet itself is still skipped by the status guard — only the scratch is unconditional.
     assert.entityCount('RouletteBet', 0);
+  });
+});
+
+describe('Stray BRB is not vault liquidity', () => {
+  beforeEach(() => {
+    clearStore();
+    setupTestMarket();
+  });
+
+  test('should ignore BRB sent to a vault whose asset is not BRB', () => {
+    // Market 2 is a 6-decimal vault, i.e. a USDC-like one. `BankVault4626.totalAssets()` reads
+    // `asset()`, so BRB sitting in it is invisible on-chain and must be invisible here too.
+    // Booking it credited 1e18 to a ledger denominated in 1e6 units — a trillion units of TVL
+    // conjured by one transfer anybody can make, which then reached sharePrice and every APY.
+    setupSecondTestMarket(6);
+
+    emitBrbTransfer(DEFAULT_USER, TEST_BANK_2.toHexString(), '1000000000000000000', 1_000_000);
+
+    assert.fieldEquals('Market', '2', 'grossVaultBalance', '0');
+    assert.fieldEquals('Market', '2', 'totalAssets', '0');
+    assert.fieldEquals('Market', '2', 'brbDonations', '0');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalTransfersToPool', '0');
+  });
+
+  test('should still book BRB sent to the BRB vault', () => {
+    setupBrbTestMarket();
+
+    emitBrbTransfer(DEFAULT_USER, TEST_BANK.toHexString(), '1000000000000000000', 1_000_000);
+
+    assert.fieldEquals('Market', '1', 'brbDonations', '1000000000000000000');
+    assert.fieldEquals('Market', '1', 'grossVaultBalance', '1000000000000000000');
   });
 });
