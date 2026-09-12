@@ -1097,7 +1097,7 @@
       },
       {
         "internalType": "uint32",
-        "name": "scanLimit",
+        "name": "",
         "type": "uint32"
       },
       {

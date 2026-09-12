@@ -1027,7 +1027,7 @@
       },
       {
         "indexed": false,
-        "internalType": "enum ISideBet.SideBetType",
+        "internalType": "uint8",
         "name": "betType",
         "type": "uint8"
       }
@@ -1228,7 +1228,7 @@
       },
       {
         "indexed": false,
-        "internalType": "enum ISideBet.SideBetStatus",
+        "internalType": "uint8",
         "name": "outcome",
         "type": "uint8"
       },

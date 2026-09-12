@@ -180,8 +180,11 @@ function writeTurboApplied({
 }
 
 function validateAndApplyTurbo(pipelineFile) {
+  // Goldsky CLI resolves relative paths from a parent dir (`../turbo.applied.yaml`),
+  // so always pass an absolute path.
+  const abs = resolve(root, pipelineFile);
   try {
-    execSync(`yarn goldsky turbo validate ${pipelineFile}`, {
+    execSync(`./node_modules/.bin/goldsky turbo validate ${JSON.stringify(abs)}`, {
       cwd: root,
       stdio: "inherit",
       env: process.env,
@@ -190,7 +193,7 @@ function validateAndApplyTurbo(pipelineFile) {
     console.warn(`turbo validate failed for ${pipelineFile}; continuing to apply.`);
   }
 
-  execSync(`yarn goldsky turbo apply ${pipelineFile}`, {
+  execSync(`./node_modules/.bin/goldsky turbo apply ${JSON.stringify(abs)}`, {
     cwd: root,
     stdio: "inherit",
     env: process.env,
@@ -524,9 +527,9 @@ function parseProdTargetVersion(output, name) {
 
 function fetchGoldskySubgraphList() {
   const cmds = [
-    `yarn goldsky subgraph list`,
-    `yarn goldsky subgraph list ${baseName}`,
-    `yarn goldsky subgraph list ${baseName} --summary`,
+    `./node_modules/.bin/goldsky subgraph list`,
+    `./node_modules/.bin/goldsky subgraph list ${baseName}`,
+    `./node_modules/.bin/goldsky subgraph list ${baseName} --summary`,
   ];
   for (const cmd of cmds) {
     try {
@@ -567,14 +570,14 @@ function pruneOldestSubgraphIfNeeded(deployed, maxVer, listOutput) {
     }
     const prodFull = `${baseName}/${maxVer}`;
     console.log(`Moving prod → ${prodFull} before deleting ${minV}…`);
-    execSync(`yarn goldsky subgraph tag create ${prodFull} --tag prod`, {
+    execSync(`./node_modules/.bin/goldsky subgraph tag create ${prodFull} --tag prod`, {
       cwd: root,
       stdio: "inherit",
       env: process.env,
     });
   }
 
-  execSync(`yarn goldsky subgraph delete ${baseName}/${minV} --force`, {
+  execSync(`./node_modules/.bin/goldsky subgraph delete ${baseName}/${minV} --force`, {
     cwd: root,
     stdio: "inherit",
     env: process.env,
@@ -696,7 +699,7 @@ try {
 
   const fullName = `${baseName}/${nextVersion}`;
   execSync(
-    `yarn goldsky subgraph deploy ${fullName} --path . --description ${JSON.stringify(`sync-pipeline ${new Date().toISOString()}`)}`,
+    `./node_modules/.bin/goldsky subgraph deploy ${fullName} --path . --description ${JSON.stringify(`sync-pipeline ${new Date().toISOString()}`)}`,
     {
       cwd: root,
       stdio: "inherit",
@@ -707,7 +710,7 @@ try {
   if (process.env.GOLDSKY_SKIP_PROD_TAG === "1") {
     console.log("GOLDSKY_SKIP_PROD_TAG=1 — prod tag unchanged.");
   } else {
-    execSync(`yarn goldsky subgraph tag create ${fullName} --tag prod`, {
+    execSync(`./node_modules/.bin/goldsky subgraph tag create ${fullName} --tag prod`, {
       cwd: root,
       stdio: "inherit",
       env: process.env,
