@@ -1244,6 +1244,11 @@
             "internalType": "uint32",
             "name": "jackpotWinnerCount",
             "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "vrfRequestedAt",
+            "type": "uint256"
           }
         ],
         "internalType": "struct RouletteEngineStorageLib.GlobalRoundState",
@@ -1769,6 +1774,13 @@
       }
     ],
     "name": "renounceRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "retryVrf",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
