@@ -1138,6 +1138,111 @@
             "internalType": "uint256",
             "name": "payoutAmount",
             "type": "uint256"
+          }
+        ],
+        "internalType": "struct ISideBet.LegacySettleRow[]",
+        "name": "rows",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "nextCursorBetId",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "bank",
+            "type": "address"
+          },
+          {
+            "internalType": "uint32",
+            "name": "marketId",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "releaseTotal",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalStakes",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalPaid",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IBankVault.Payout[]",
+            "name": "winnerPayouts",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct ISideBet.SettleVaultApply[]",
+        "name": "vaultApplies",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "cursorBetId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint32",
+        "name": "maxBets",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "lane",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "laneCount",
+        "type": "uint32"
+      }
+    ],
+    "name": "previewSettleBundleV2",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "betId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "won",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "payoutAmount",
+            "type": "uint256"
           },
           {
             "internalType": "bool",
@@ -1360,6 +1465,91 @@
             "internalType": "uint256",
             "name": "payoutAmount",
             "type": "uint256"
+          }
+        ],
+        "internalType": "struct ISideBet.LegacySettleRow[]",
+        "name": "rows",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "bank",
+            "type": "address"
+          },
+          {
+            "internalType": "uint32",
+            "name": "marketId",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "releaseTotal",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalStakes",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalPaid",
+            "type": "uint256"
+          },
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct IBankVault.Payout[]",
+            "name": "winnerPayouts",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct ISideBet.SettleVaultApply[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "settleBatch",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "settled",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "betId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "won",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint256",
+            "name": "payoutAmount",
+            "type": "uint256"
           },
           {
             "internalType": "bool",
@@ -1421,7 +1611,7 @@
         "type": "tuple[]"
       }
     ],
-    "name": "settleBatch",
+    "name": "settleBatchV2",
     "outputs": [
       {
         "internalType": "uint256",
