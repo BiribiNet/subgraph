@@ -131,7 +131,7 @@ function emitCallFailed(transactionHash: Bytes, logIndex: i32): void {
   event.parameters.push(
     new ethereum.EventParam(
       'target',
-      ethereum.Value.fromAddress(Address.fromString('0xad1f181ad88aee13a6643104941ecea2b963c2d7'))
+      ethereum.Value.fromAddress(Address.fromString('0x098a5a03be176aae3413ad98f57cb4c63e16b49d'))
     )
   );
   event.parameters.push(

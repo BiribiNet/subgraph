@@ -6,13 +6,14 @@
     "stakedBRB": 284788460,
     "brbReferal": 284788460,
     "sideBet": 284788460,
-    "jackpotFunder": 284788460
+    "jackpotFunder": 284788460,
+    "scheduler": 309338845
   },
   "addresses": {
     "brb": "0xcd97563e22017462f35ba1e266e13f8f756a53c9",
     "roulette": "0x7eb8110d9e84d3c32fa6468d13ea2bc81544acf1",
     "registry": "0xbb93ae01f205ba4c9c9b32def71dc8f76c67f672",
-    "scheduler": "0xad1f181ad88aee13a6643104941ecea2b963c2d7",
+    "scheduler": "0x098A5a03Be176aAe3413ad98f57CB4c63E16B49D",
     "stakedBRB": "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec",
     "banks": [
       "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec",
@@ -33,9 +34,23 @@
     "subscriptionId": "91478276944701169124973572614879929312810262634334161093796665773446386878274"
   },
   "markets": {
-    "usdc": { "marketId": 1, "asset": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d", "bank": "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec" },
-    "dai": { "marketId": 2, "asset": "0xa64617abdca4477b17020a763f24bfe27046a752", "bank": "0xBE100446eEE90392BC154F6d8d80B88f01Da91a7" },
-    "brb": { "marketId": 3, "asset": "0xcd97563e22017462f35ba1e266e13f8f756a53c9", "bank": "0x1759B09798f3DA7FE0D129E66c0a87722a954030" }
+    "usdc": {
+      "marketId": 1,
+      "asset": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+      "bank": "0x7A8C8E4833e3eAA5b440757E3E4fb17537e21Eec"
+    },
+    "dai": {
+      "marketId": 2,
+      "asset": "0xa64617abdca4477b17020a763f24bfe27046a752",
+      "bank": "0xBE100446eEE90392BC154F6d8d80b88f01Da91a7"
+    },
+    "brb": {
+      "marketId": 3,
+      "asset": "0xcd97563e22017462f35ba1e266e13f8f756a53c9",
+      "bank": "0x1759B09798f3DA7FE0D129E66c0a87722a954030"
+    }
   },
-  "deployedAt": "2026-07-06T19:30:00Z"
+  "deployedAt": "2026-07-06T19:30:00Z",
+  "previousScheduler": "0xad1f181ad88aee13a6643104941ecea2b963c2d7",
+  "schedulerRedeployedAt": "2026-09-16T01:45:15.543Z"
 }

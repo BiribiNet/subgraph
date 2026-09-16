@@ -42,7 +42,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 | **BRBReferral** (legacy, deprecated) | `0x5b28b914881e069e72de8183d5b7aec662bf2905` | `Transfer`, `Approval` |
 | **BRBJackpotFunder** | `0xd990413247611013161a7287d262664df8da7309` | `FundedFromMarket`, `FundFromMarketSkipped`, TWAP config (`TwapWindowUpdated`, `PairObservationUpdated`, `SlippageBpsUpdated`, `ColdSlippageBpsUpdated`), failure incidents, `TokenSwept`, `Role*` |
 | **SideBet (BRBGAME)** | `0xA0DCb8FCEd50EeD13899Af86DE70FcE42897E8B1` | `SideBetPlaced`, `SideBetSettled`, `Config*`, `SideBetJackpotFunded`, `SideBetInfrastructureFeePaid`, `MultiplierBandUpdated`, `Upgraded`, `Role*` |
-| **UpkeepScheduler** | `0xad1f181ad88aee13a6643104941ecea2b963c2d7` | `ScanLimitUpdated`, `MaxPayoutsPerCallUpdated`, `ForwarderAuthorityUpdated`, `LaneCursorAdvanced`, `SideBetCursorAdvanced`, `Role*` |
+| **UpkeepScheduler** | `0x098a5a03be176aae3413ad98f57cb4c63e16b49d` | `ScanLimitUpdated`, `MaxPayoutsPerCallUpdated`, `ForwarderAuthorityUpdated`, `LaneCursorAdvanced`, `SideBetCursorAdvanced`, `Role*` |
 | **AutomationReceiver** (CRE) | `0xfda0edcbcf2c6360279cf10ec079d56d43795a86` | `CallExecuted`, `CallFailed` (the automation-health signal — a failed call does NOT revert the CRE report), `CallAllowedSet` |
 | **CreExecutionAuthority** | `0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68` | `ExecutorApprovalUpdated`, `Role*` |
 | **JackpotTreasury** | `0x89658247ab5a1d93830aececc6674170d0d7081c` | not a data source — BRB transfers tracked via `JACKPOT_TREASURY_ADDRESS` in `src/helpers/constant.ts` (patched by sync-pipeline, guarded by `check-constants`) |

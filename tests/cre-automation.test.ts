@@ -41,7 +41,7 @@ import { contractRoleId } from '../src/helpers/access-control';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 
 const RECEIVER = Address.fromString('0xfda0edcbcf2c6360279cf10ec079d56d43795a86');
-const SCHEDULER = Address.fromString('0xad1f181ad88aee13a6643104941ecea2b963c2d7');
+const SCHEDULER = Address.fromString('0x098a5a03be176aae3413ad98f57cb4c63e16b49d');
 const AUTHORITY = Address.fromString('0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68');
 const PERFORM_UPKEEP_SELECTOR = Bytes.fromHexString('0x4585e33b');
 
