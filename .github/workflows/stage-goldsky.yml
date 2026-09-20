@@ -9,14 +9,27 @@ concurrency:
 jobs:
   stage:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Check deployment credential before building
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+        run: node --input-type=module -e "import { credential } from './scripts/goldsky-stage-client.mjs'; credential();"
+      - name: Verify staging safeguards
+        run: node --test scripts/goldsky-stage.test.mjs
       - run: corepack enable && yarn install --immutable
       - run: yarn codegen && yarn test && yarn build
       - name: Deploy separate validation version
         env:
           GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
         run: node scripts/goldsky-stage.mjs biribi validation-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Save submission receipt (not indexing approval)
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-submission-${{ github.run_id }}-${{ github.run_attempt }}
+          path: staging-submission.json
+          if-no-files-found: error

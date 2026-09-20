@@ -25,6 +25,9 @@ jobs:
           corepack enable
           yarn install --immutable
 
+      - name: Verify staging safeguards without credentials
+        run: node --test scripts/goldsky-stage.test.mjs
+
       - name: Generate types
         run: yarn codegen
 
