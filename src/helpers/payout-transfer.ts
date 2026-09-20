@@ -149,12 +149,10 @@ export function tryRecordMarketPayoutTransfer(
     globalState.totalJackpotsPaid = globalState.totalJackpotsPaid.plus(value)
     globalState.totalPayouts = globalState.totalPayouts.plus(normalizedPayout)
 
-    updateUserRouletteStats(to, value, assetDecimals, true, !wasAlreadyWinner, timestamp)
-    if (payoutMarket != null) {
-      recordUserMarketWin(to, payoutMarket, value, !wasAlreadyWinner, timestamp)
-    }
-    bet.won = true
-    bet.actualPayout = bet.actualPayout.plus(value)
+    // JackpotPayout is the BRB receipt. Never add it to a roulette ticket or
+    // market-asset totals, even when that market itself happens to use BRB.
+    // Keeping won unchanged also preserves the first regular-win counter when
+    // a jackpot transfer arrives before the bank's roulette payment.
 
     const dailyStatsJackpotPayout = getOrCreateDailyStats(timestamp)
     dailyStatsJackpotPayout.totalPayouts = dailyStatsJackpotPayout.totalPayouts.plus(normalizedPayout)
@@ -195,3 +193,4 @@ export function tryRecordMarketPayoutTransfer(
   bet.save()
   globalState.save()
 }
+

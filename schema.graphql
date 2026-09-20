@@ -229,9 +229,9 @@ type User @entity(immutable: false) {
   firstSeenAt: BigInt!
   "Last active timestamp"
   lastActiveAt: BigInt!
-  "Total BRB won"
+  "Legacy decimal-normalized roulette payouts across markets, excluding jackpots; not a BRB valuation"
   totalWon: BigInt!
-  "Total BRB lost (derived: totalRouletteBets - totalWon, always consistent)"
+  "Legacy normalized roulette loss magnitude, clamped at zero; not a cross-token monetary PnL"
   totalLost: BigInt!
   "Number of winning bets"
   winCount: BigInt!
@@ -251,7 +251,7 @@ type UserMarketStats @entity(immutable: false) {
   market: Market!
   "Total wagered on roulette in this market"
   totalWagered: BigInt!
-  "Total won (payouts + jackpots) in this market"
+  "Roulette payouts in this market asset only; BRB jackpots are separate JackpotPayout receipts"
   totalWon: BigInt!
   "totalWagered - totalWon"
   totalLost: BigInt!
@@ -424,9 +424,9 @@ type RouletteBet @entity(immutable: false) {
   totalAmount: BigInt!
   "Number of BetRecorded placements by this user in this round — one per bet transaction, not per leg. The leg count of a placement is `amounts.length`. Kept per-placement so it stays comparable with RouletteRound.betCount, DailyStat.betCount and GlobalState.totalBets, which all count placements too."
   betCount: BigInt!
-  "Actual payout received"
+  "Roulette payout received in market asset units, excluding BRB jackpot receipts"
   actualPayout: BigInt!
-  "Whether the bet won"
+  "Whether a regular roulette payout was received; jackpot receipts are separate"
   won: Boolean!
   "First bet block number"
   firstBetBlockNumber: BigInt!
@@ -1116,3 +1116,4 @@ type SideBetRoundPending @entity(immutable: false) {
 }
 
 # sync-pipeline-build-id: 1775000216171
+
