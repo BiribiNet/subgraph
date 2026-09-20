@@ -1,3 +1,4 @@
+import { recordMarketAccounting } from "./market-accounting"
 import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts"
 import {
   JackpotPayout,
@@ -177,6 +178,7 @@ export function tryRecordMarketPayoutTransfer(
     bet.won = true
     updateUserRouletteStats(to, value, assetDecimals, true, !wasAlreadyWinner, timestamp)
     if (payoutMarket != null) {
+      recordMarketAccounting(payoutMarket, payoutId.toHexString() + "-payout", timestamp, blockNumber, ["totalPayouts"], [value])
       recordUserMarketWin(to, payoutMarket, value, !wasAlreadyWinner, timestamp)
     }
 
@@ -193,4 +195,3 @@ export function tryRecordMarketPayoutTransfer(
   bet.save()
   globalState.save()
 }
-

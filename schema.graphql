@@ -666,6 +666,13 @@ type MarketDailyStat @entity(immutable: false) {
   withdrawalVolume: BigInt!
   roundsCompleted: BigInt!
   timestamp: BigInt!
+  "Signed settled roulette result before fees; not accepted volume minus same-day payments"
+  netRevenue: BigInt!
+  "Magnitude of settled losing-round house results"
+  losses: BigInt!
+  calculationVersion: Int!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedAt: BigInt!
 }
 
 type DailyStat @entity(immutable: false) {
@@ -1117,3 +1124,57 @@ type SideBetRoundPending @entity(immutable: false) {
 
 # sync-pipeline-build-id: 1775000216171
 
+"Per-market accounting buckets: hour or lifetime, always raw market asset units"
+type MarketAccountingStat @entity(immutable: false) {
+  id: ID!
+  market: Market!
+  date: Int!
+  volume: BigInt!
+  betCount: BigInt!
+  uniquePlayers: BigInt!
+  revenue: BigInt!
+  stakersRevenue: BigInt!
+  jackpotFunded: BigInt!
+  infraRevenue: BigInt!
+  totalPayouts: BigInt!
+  depositVolume: BigInt!
+  withdrawalVolume: BigInt!
+  roundsCompleted: BigInt!
+  timestamp: BigInt!
+  "Signed settled roulette result before fees; not accepted volume minus same-day payments"
+  netRevenue: BigInt!
+  "Magnitude of settled losing-round house results"
+  losses: BigInt!
+  calculationVersion: Int!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedAt: BigInt!
+}
+
+"Idempotency marker for each accounting source event/category"
+type MarketAccountingEvent @entity(immutable: true) {
+  id: ID!
+  market: Market!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+"Distinct participant within one market and one accounting bucket"
+type MarketAccountingPlayer @entity(immutable: true) { id: ID! }
+
+"Versioned simple annualization with the actual observation interval; null means unavailable"
+type MarketReturnObservation @entity(immutable: false) {
+  id: ID!
+  market: Market!
+  calculationVersion: Int!
+  methodology: String!
+  observedAt: BigInt!
+  observedBlock: BigInt!
+  apr7Day: BigDecimal
+  from7Day: BigInt
+  apr30Day: BigDecimal
+  from30Day: BigInt
+  apr365Day: BigDecimal
+  from365Day: BigInt
+  aprLifetime: BigDecimal
+  fromLifetime: BigInt
+}
