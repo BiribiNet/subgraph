@@ -383,9 +383,9 @@ export function processJackpotFunded(event: JackpotFunded): void {
   )
   round.save()
 
-  const daily = getOrCreateDailyStats(event.block.timestamp)
-  daily.jackpotFunded = daily.jackpotFunded.plus(event.params.amount)
-  daily.save()
+  // This is market-asset INPUT to the funder, already recorded on the round.
+  // DailyStat.jackpotFunded is actual BRB received by the treasury; brb.ts
+  // records that transfer once. Adding this input mixes assets and double counts.
 }
 
 /**
@@ -482,3 +482,4 @@ export function processGameUpgraded(event: Upgraded): void {
   entity.transactionHash = event.transaction.hash
   entity.save()
 }
+
