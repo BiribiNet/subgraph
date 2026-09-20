@@ -73,6 +73,10 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
+        - event: RoulettePayment(indexed uint64,indexed uint32,indexed address,address,uint256)
+          handler: handleRoulettePayment
+        - event: JackpotPayment(indexed uint64,indexed address,indexed address,uint256)
+          handler: handleJackpotPayment
         - event: BetRecorded(uint32,uint64,address,uint256,bytes)
           handler: handleBetRecorded
         - event: RoundCountdownStarted(uint64,uint32,uint256)
@@ -135,6 +139,10 @@ dataSources:
         - name: BRBJackpotFunder
           file: ./abis/BRBJackpotFunder.json
       eventHandlers:
+        - event: FundingAttemptStarted(indexed uint256,indexed uint32,indexed address,uint256,uint256)
+          handler: handleFundingAttemptStarted
+        - event: FundingAttemptCompleted(indexed uint256,uint256,uint256)
+          handler: handleFundingAttemptCompleted
         - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
           handler: handleFundedFromMarket
         - event: FundFromMarketSkipped(uint32,address,uint8)
@@ -274,8 +282,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: UpkeepScheduler
-      address: "0x098a5a03be176aae3413ad98f57cb4c63e16b49d"
-      startBlock: 309338845
+      address: "0xad1f181ad88aee13a6643104941ecea2b963c2d7"
+      startBlock: 284788460
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -391,6 +399,10 @@ templates:
         - name: MergedEvents
           file: ./abis/MergedEvents.json
       eventHandlers:
+        - event: WithdrawalIdentified(indexed uint256,indexed address,address,uint16)
+          handler: handleWithdrawalIdentified
+        - event: WithdrawalPaid(indexed uint256,indexed address,uint256,uint256)
+          handler: handleWithdrawalPaid
         - event: Deposit(indexed address,indexed address,uint256,uint256)
           handler: handleDeposit
         - event: Withdraw(indexed address,indexed address,indexed address,uint256,uint256)

@@ -1178,3 +1178,45 @@ type MarketReturnObservation @entity(immutable: false) {
   aprLifetime: BigDecimal
   fromLifetime: BigInt
 }
+
+"Explicit engine receipt. Independent evidence; never added again to Transfer-derived totals."
+type ProtocolPaymentReceipt @entity(immutable: true) {
+  id: Bytes!
+  kind: String!
+  roundNumber: BigInt!
+  marketId: Int
+  recipient: Bytes!
+  token: Bytes!
+  amount: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+type ProtocolWithdrawalReceipt @entity(immutable: false) {
+  id: ID!
+  bank: Bytes!
+  requestId: BigInt!
+  owner: Bytes!
+  receiver: Bytes
+  bps: Int
+  requestedAt: BigInt
+  processedAt: BigInt
+  assetsPaid: BigInt
+  sharesBurned: BigInt
+  requestTransaction: Bytes
+  paymentTransaction: Bytes
+}
+type ProtocolFundingAttempt @entity(immutable: false) {
+  id: ID!
+  funder: Bytes!
+  attemptId: BigInt!
+  marketId: Int
+  asset: Bytes
+  inputBalance: BigInt
+  brbBalance: BigInt
+  remainingInput: BigInt
+  remainingBrb: BigInt
+  transactionHash: Bytes!
+  timestamp: BigInt!
+  completed: Boolean!
+}

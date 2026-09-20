@@ -196,3 +196,35 @@ export function handleRoleAdminChanged(event: RoleAdminChanged): void {
     event.params.newAdminRole
   )
 }
+
+import { FundingAttemptStarted, FundingAttemptCompleted } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
+import { ProtocolFundingAttempt } from "../../generated/schema"
+
+export function handleFundingAttemptStarted(event: FundingAttemptStarted): void {
+  const row = new ProtocolFundingAttempt(event.address.toHexString() + "-" + event.params.attemptId.toString())
+  row.funder = event.address
+  row.attemptId = event.params.attemptId
+  row.marketId = event.params.marketId.toI32()
+  row.asset = event.params.asset
+  row.inputBalance = event.params.inputBalance
+  row.brbBalance = event.params.brbBalance
+  row.transactionHash = event.transaction.hash
+  row.timestamp = event.block.timestamp
+  row.completed = false
+  row.save()
+}
+export function handleFundingAttemptCompleted(event: FundingAttemptCompleted): void {
+  const id = event.address.toHexString() + "-" + event.params.attemptId.toString()
+  let row = ProtocolFundingAttempt.load(id)
+  if (row == null) {
+    row = new ProtocolFundingAttempt(id)
+    row.funder = event.address
+    row.attemptId = event.params.attemptId
+    row.transactionHash = event.transaction.hash
+    row.timestamp = event.block.timestamp
+  }
+  row.remainingInput = event.params.remainingInput
+  row.remainingBrb = event.params.remainingBrb
+  row.completed = true
+  row.save()
+}
