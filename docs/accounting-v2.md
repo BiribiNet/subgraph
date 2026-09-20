@@ -27,3 +27,10 @@ or nonpositive baseline => unavailable. Calculation version is 2.
 Consumers must feature-detect the new schema or be released after endpoint promotion.
 Old `Market.apy*` fields remain compatible, but must not be labeled as compound APY.
 No published index or contract is upgraded merely by merging this source change.
+
+`Reconcile indexed evidence` runs the vault comparison, exports a fully paginated
+round at one block, and verifies each indexed payout against a distinct confirmed
+ERC-20 transfer. Reports are saved as workflow artifacts. The block hash must match
+the RPC. A zero-transfer round is explicitly reported as zero verified transfers,
+not as proof of payout behavior. This does not certify VRF cryptography or index
+completeness. Use winning rounds and jackpots as well as losing rounds before promotion.

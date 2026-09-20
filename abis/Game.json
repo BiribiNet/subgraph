@@ -348,6 +348,37 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "roundId",
+        "type": "uint64"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "JackpotPayment",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "address",
         "name": "previousTreasury",
@@ -549,6 +580,43 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "uint64",
+        "name": "roundId",
+        "type": "uint64"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RoulettePayment",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "uint64",
         "name": "roundId",
@@ -607,6 +675,25 @@
       }
     ],
     "name": "Upgraded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "previousScheduler",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newScheduler",
+        "type": "address"
+      }
+    ],
+    "name": "UpkeepSchedulerUpdated",
     "type": "event"
   },
   {
@@ -1811,6 +1898,82 @@
         "type": "uint64"
       }
     ],
+    "name": "roundDiagnostics",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "requestedAt",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "available",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "fulfilled",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint8",
+            "name": "winningNumber",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint8",
+            "name": "jackpotNumber",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint32",
+            "name": "marketsParticipating",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "marketsSettled",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "jackpotCursor",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "jackpotPaid",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "jackpotDistributed",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct JackpotBatchLib.RoundDiagnostics",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "roundId",
+        "type": "uint64"
+      }
+    ],
     "name": "roundJackpotTriggered",
     "outputs": [
       {
@@ -1931,6 +2094,19 @@
       }
     ],
     "name": "setRoundDuration",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newScheduler",
+        "type": "address"
+      }
+    ],
+    "name": "setUpkeepScheduler",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

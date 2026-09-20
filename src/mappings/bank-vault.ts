@@ -478,3 +478,33 @@ export function handleRoleAdminChanged(event: RoleAdminChanged): void {
     event.params.newAdminRole
   )
 }
+
+import { WithdrawalIdentified, WithdrawalPaid } from "../../generated/templates/BankVault/BankVault4626"
+import { ProtocolWithdrawalReceipt } from "../../generated/schema"
+
+export function handleWithdrawalIdentified(event: WithdrawalIdentified): void {
+  const row = new ProtocolWithdrawalReceipt(event.address.toHexString() + "-" + event.params.requestId.toString())
+  row.bank = event.address
+  row.requestId = event.params.requestId
+  row.owner = event.params.owner
+  row.receiver = event.params.receiver
+  row.bps = event.params.bps
+  row.requestedAt = event.block.timestamp
+  row.requestTransaction = event.transaction.hash
+  row.save()
+}
+export function handleWithdrawalPaid(event: WithdrawalPaid): void {
+  const id = event.address.toHexString() + "-" + event.params.requestId.toString()
+  let row = ProtocolWithdrawalReceipt.load(id)
+  if (row == null) {
+    row = new ProtocolWithdrawalReceipt(id)
+    row.bank = event.address
+    row.requestId = event.params.requestId
+    row.owner = event.params.owner
+  }
+  row.processedAt = event.block.timestamp
+  row.assetsPaid = event.params.assetsPaid
+  row.sharesBurned = event.params.sharesBurned
+  row.paymentTransaction = event.transaction.hash
+  row.save()
+}

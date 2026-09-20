@@ -156,3 +156,32 @@ export function handleRoleAdminChanged(event: RoleAdminChanged): void {
     event.params.newAdminRole
   )
 }
+
+import { RoulettePayment, JackpotPayment } from "../../generated/RouletteEngine/Game"
+import { ProtocolPaymentReceipt } from "../../generated/schema"
+
+export function handleRoulettePayment(event: RoulettePayment): void {
+  const row = new ProtocolPaymentReceipt(event.transaction.hash.concatI32(event.logIndex.toI32()))
+  row.kind = "ROULETTE"
+  row.roundNumber = event.params.roundId
+  row.marketId = event.params.marketId.toI32()
+  row.recipient = event.params.recipient
+  row.token = event.params.token
+  row.amount = event.params.amount
+  row.transactionHash = event.transaction.hash
+  row.blockNumber = event.block.number
+  row.timestamp = event.block.timestamp
+  row.save()
+}
+export function handleJackpotPayment(event: JackpotPayment): void {
+  const row = new ProtocolPaymentReceipt(event.transaction.hash.concatI32(event.logIndex.toI32()))
+  row.kind = "JACKPOT"
+  row.roundNumber = event.params.roundId
+  row.recipient = event.params.recipient
+  row.token = event.params.token
+  row.amount = event.params.amount
+  row.transactionHash = event.transaction.hash
+  row.blockNumber = event.block.number
+  row.timestamp = event.block.timestamp
+  row.save()
+}
