@@ -282,8 +282,8 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: UpkeepScheduler
-      address: "0xad1f181ad88aee13a6643104941ecea2b963c2d7"
-      startBlock: 284788460
+      address: "0x098a5a03be176aae3413ad98f57cb4c63e16b49d"
+      startBlock: 309338845
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
