@@ -19,4 +19,4 @@ jobs:
       - name: Deploy separate validation version
         env:
           GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
-        run: node scripts/goldsky-stage.mjs biribi-arb-sepolia validation-${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/goldsky-stage.mjs biribi validation-${{ github.run_id }}-${{ github.run_attempt }}

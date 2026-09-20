@@ -17,7 +17,7 @@ function baseline(market: string, timestamp: BigInt, days: i32): MarketAPYSnapsh
     const candidate = day.minus(BigInt.fromI32(offset))
     if (candidate.lt(ZERO)) break
     const snapshot = MarketAPYSnapshot.load(market + "-" + candidate.toString())
-    if (snapshot != null && snapshot.totalAssets.gt(ZERO) && snapshot.totalShares.gt(ZERO)) return snapshot
+    if (snapshot != null && snapshot.totalAssets.gt(ZERO) && snapshot.totalShares.gt(ZERO) && snapshot.timestamp.le(timestamp.minus(BigInt.fromI32(days).times(BigInt.fromI32(86400))))) return snapshot
   }
   return null
 }
