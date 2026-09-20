@@ -25,7 +25,7 @@ export function syncAllMarketRoundsForGlobalRound(
   }
 }
 
-export function finalizeMarketRoundsOnResolve(globalRoundId: BigInt, timestamp: BigInt): void {
+export function finalizeMarketRoundsOnResolve(globalRoundId: BigInt, timestamp: BigInt, blockNumber: BigInt = BigInt.zero()): void {
   syncAllMarketRoundsForGlobalRound(globalRoundId, ROUND_STATUS_CLEAN)
   for (let marketId = 1; marketId <= MAX_MARKET_SCAN; marketId++) {
     const round = RouletteRound.load(marketRoundId(globalRoundId, marketId))
@@ -34,7 +34,7 @@ export function finalizeMarketRoundsOnResolve(globalRoundId: BigInt, timestamp: 
     }
     const market = requireMarket(marketId)
     clearMarketPendingBets(market)
-    updateRoundRevenueAggregates(round, timestamp)
+    updateRoundRevenueAggregates(round, timestamp, blockNumber)
     market.maxBetAmount = BigInt.fromI32(0)
     market.save()
   }

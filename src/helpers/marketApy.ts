@@ -1,4 +1,5 @@
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
+import { recordMarketReturns } from "./market-returns"
 import { Market, MarketAPYSnapshot } from "../../generated/schema"
 import { ZERO } from "./number"
 import { calculateSharePrice } from "./globalState"
@@ -204,5 +205,6 @@ export function calculateMarketAPYs(
     market.apyLifetimeBaselineTimestamp
   )
 
+  recordMarketReturns(market, currentTimestamp, blockNumber)
   market.sharePrice = calculateSharePrice(market.totalAssets, market.totalShares, market.assetDecimals)
 }

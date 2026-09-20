@@ -1,3 +1,4 @@
+import { recordMarketAccounting } from "./market-accounting"
 import { BigInt, BigDecimal } from "@graphprotocol/graph-ts"
 import { DailyStat, DailyPlayer, GlobalState, HourlyVolumeSnapshot, HourlyPlayer, Market, RouletteRound } from "../../generated/schema"
 import { ZERO } from "./number"
@@ -85,7 +86,17 @@ export function trackHourlyUniquePlayer(timestamp: BigInt, playerAddress: string
   return false
 }
 
-export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: BigInt): void {
+export function updateRoundRevenueAggregates(round: RouletteRound, timestamp: BigInt, blockNumber: BigInt = ZERO): void {
+  const accountingMarket = Market.load(round.market)
+  if (accountingMarket != null) {
+    const net = round.totalBets.minus(round.totalPayouts)
+    const gross = net.gt(ZERO) ? net : ZERO
+    const retained = gross.minus(round.jackpotRevenue).minus(round.infraRevenue)
+    recordMarketAccounting(accountingMarket, "settled-" + round.id.toHexString(), timestamp, blockNumber,
+      ["roundsCompleted", "netRevenue", "revenue", "losses", "stakersRevenue", "jackpotFunded", "infraRevenue"],
+      [BigInt.fromI32(1), net, gross, net.lt(ZERO) ? ZERO.minus(net) : ZERO,
+       retained.gt(ZERO) ? retained : ZERO, round.jackpotRevenue, round.infraRevenue])
+  }
   if (round.totalBets.le(round.totalPayouts)) {
     return
   }

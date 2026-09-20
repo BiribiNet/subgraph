@@ -1,3 +1,4 @@
+import { recordMarketAccounting } from "./market-accounting"
 import { Address, BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts"
 import {
   BetRecorded,
@@ -195,6 +196,7 @@ export function processBetRecorded(event: BetRecorded): void {
     event.block.timestamp
   )
 
+  recordMarketAccounting(market, event.transaction.hash.toHexString() + "-" + event.logIndex.toString() + "-wager", event.block.timestamp, event.block.number, ["volume", "betCount"], [event.params.totalAmount, BigInt.fromI32(1)], event.params.player)
   recordTxBetForReferral(event.transaction.hash, event.params.totalAmount)
 
   const player = getOrCreateUser(event.params.player)
@@ -336,7 +338,7 @@ export function processRoundResolved(event: RoundResolved): void {
   // wiped that write — which is why `totalStakerRevenue` read 0 while every round carried one.
   globalState.save()
 
-  finalizeMarketRoundsOnResolve(roundId, event.block.timestamp)
+  finalizeMarketRoundsOnResolve(roundId, event.block.timestamp, event.block.number)
 
   const daily = getOrCreateDailyStats(event.block.timestamp)
   daily.roundsCompleted = daily.roundsCompleted.plus(BigInt.fromI32(1))
@@ -482,4 +484,3 @@ export function processGameUpgraded(event: Upgraded): void {
   entity.transactionHash = event.transaction.hash
   entity.save()
 }
-

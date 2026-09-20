@@ -1,3 +1,4 @@
+import { recordMarketAccounting } from "../helpers/market-accounting"
 import { Address, BigInt, Bytes, log, store } from "@graphprotocol/graph-ts"
 import {
   Deposit,
@@ -129,6 +130,7 @@ export function handleDeposit(event: Deposit): void {
   deposit.save()
 
   updateUserStakingStats(event.params.owner, event.params.assets, market.assetDecimals, true, event.block.timestamp)
+  recordMarketAccounting(market, event.transaction.hash.toHexString() + "-" + event.logIndex.toString() + "-deposit", event.block.timestamp, event.block.number, ["depositVolume"], [event.params.assets])
   recordUserMarketStake(event.params.owner, market, event.params.assets, true, event.block.timestamp)
   updateUserLastActive(event.params.owner, event.block.timestamp)
   updateUserDepositCostBasis(event.params.owner, event.params.assets, event.params.shares)
@@ -295,6 +297,7 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     withdrawal.save()
 
     updateUserStakingStats(event.params.owner, assetsPaid, market.assetDecimals, false, event.block.timestamp)
+    recordMarketAccounting(market, event.transaction.hash.toHexString() + "-" + event.logIndex.toString() + "-withdraw", event.block.timestamp, event.block.number, ["withdrawalVolume"], [assetsPaid])
     recordUserMarketStake(event.params.owner, market, assetsPaid, false, event.block.timestamp)
     updateUserLastActive(event.params.owner, event.block.timestamp)
     updateUserWithdrawalCostBasis(event.params.owner, sharesBurned)
