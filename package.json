@@ -13,6 +13,7 @@
     "deploy": "yarn codegen && yarn build && yarn deploy:subgraph $@ && yarn prod:subgraph $@",
     "deploy:api": "yarn codegen && yarn build && node scripts/goldsky-deploy.mjs",
     "check:constants": "node scripts/check-constants.mjs",
+    "validate:deploy": "node scripts/validate-deploy.mjs",
     "reconcile:vaults": "node scripts/reconcile-vaults.mjs"
   },
   "devDependencies": {

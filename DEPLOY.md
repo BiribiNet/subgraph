@@ -124,7 +124,19 @@ yarn deploy:api biribi/<version>    # no --tag: goldsky-deploy defaults to no ta
 ```
 
 **Phase 2 — wait for a full sync, then validate against the *new* version's
-endpoint** (not `prod`):
+endpoint** (not `prod`). `yarn validate:deploy` runs the whole checklist:
+
+```bash
+yarn validate:deploy                      # newest version vs. the one below it
+yarn validate:deploy 0.1.52 0.1.53        # or name both explicitly
+```
+
+It reads both versions at the **same block** via time-travel and exits 1 on a
+non-regression break, 2 when the candidate has not caught up yet (a comparison
+at two different blocks looks like a result and is worse than none). Goldsky
+prunes history to a rolling window of a few thousand blocks, so the script
+raises the pinned block until both versions answer it. It reads only public
+data and never moves a tag. What it covers:
 
 1. Indexing health — `synced: true`, `health: healthy`, `fatalError: null`.
 2. Payout attribution repaired — a winner in a non-BRB market now has
@@ -137,6 +149,16 @@ endpoint** (not `prod`):
 5. **Non-regression** — `totalRounds`, `totalBets` and `brbTotalSupply` must
    match the old version. No fix touches those counters, so any difference is an
    alarm, not an improvement.
+
+It also prints the schema delta and the row count of every entity the candidate
+adds, so a new data source that indexes nothing is visible before the tag moves.
+An empty one is **not** automatically a bug: the handler may be waiting on an
+event the deployed contracts do not emit yet. Check the chain for the event
+signature before calling it a mapping defect.
+
+Finally it diffs the top `brbpPoints` holders and says whether Snapshot voting
+weight moves. When it does, the governance caveat below applies; when it does
+not, the cutover carries no governance risk and needs no voting-window timing.
 
 **Phase 3 — cut over** only once the above holds:
 
