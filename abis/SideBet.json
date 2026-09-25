@@ -498,6 +498,19 @@
   },
   {
     "inputs": [],
+    "name": "CHALLENGE_EVALUATOR",
+    "outputs": [
+      {
+        "internalType": "contract SideBetChallengeEvaluator",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
     "outputs": [
       {

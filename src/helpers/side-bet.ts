@@ -41,6 +41,12 @@ export function sideBetTypeFromI32(value: i32): string {
   if (value == 6) return "DOZEN_HIT"
   if (value == 7) return "COLUMN_HIT"
   if (value == 8) return "JACKPOT_IN_WINDOW"
+  if (value == 9) return "DOZEN_PASSPORT"
+  if (value == 10) return "BOOMERANG"
+  if (value == 11) return "MIRROR_PAIR"
+  if (value == 12) return "WHEEL_NEIGHBORS"
+  if (value == 13) return "DISTINCT_COLLECTION"
+  if (value == 14) return "COLOR_DUEL"
   log.warning("Unknown SideBetType value {}", [value.toString()])
   return "COLOR_COUNT"
 }
