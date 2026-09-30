@@ -1,5 +1,5 @@
 /**
- * Patch turbo.yaml + turbo-cre.yaml (Goldsky _gs_log_decode ABI + contract addresses)
+ * Patch turbo.yaml + turbo-cre.yaml + turbo-keeper-payout.yaml (Goldsky ABI + addresses)
  * and subgraph.yaml from a deployment JSON, then optionally validate/apply turbo + deploy
  * subgraph (tcg-vault style).
  *
@@ -21,6 +21,8 @@
  *   CRE_WEBHOOK_URL          — required for full sync (turbo-cre.yaml ${CRE_WEBHOOK_URL})
  *                            — CRE turbo uses Goldsky `secret_name: BIRIBI_CRE_SCHEDULE` (httpauth),
  *                              header should be `x-webhook-secret` matching the Worker WEBHOOK_SECRET
+ *   KEEPER_PAYOUT_WEBHOOK_URL — required for full sync (turbo-keeper-payout.yaml); Worker POST /webhook/payout
+ *   SKIP_KEEPER_PAYOUT_TURBO — if 1, skip applying biribi-keeper-payout (CRE-only deploys)
  */
 import { config } from "dotenv";
 import { execSync } from "node:child_process";
@@ -35,6 +37,7 @@ config({ path: join(root, ".env") });
 /** Must match turbo.yaml webhook url placeholder (string replace — not a regex). */
 const WEBHOOK_SECRET_PLACEHOLDER = "${WEBHOOK_SECRET}";
 const CRE_WEBHOOK_URL_PLACEHOLDER = "${CRE_WEBHOOK_URL}";
+const KEEPER_PAYOUT_WEBHOOK_URL_PLACEHOLDER = "${KEEPER_PAYOUT_WEBHOOK_URL}";
 const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
 const rouletteAddressPlaceholder = "__SYNC_PIPELINE_ROULETTE_ADDRESS__";
 const abiPlaceholder = "__SYNC_PIPELINE_ABI__";
@@ -427,6 +430,20 @@ const creTurbo = writeTurboApplied({
   urlLabel: "CRE_WEBHOOK_URL",
 });
 
+const skipKeeperPayoutTurbo = process.env.SKIP_KEEPER_PAYOUT_TURBO === "1";
+const keeperPayoutTurbo = skipKeeperPayoutTurbo
+  ? null
+  : writeTurboApplied({
+      templateName: "turbo-keeper-payout.yaml",
+      appliedName: "turbo-keeper-payout.applied.yaml",
+      abiLiteral: null,
+      addressList: [addr("roulette")],
+      addressMode: "single",
+      urlPlaceholder: KEEPER_PAYOUT_WEBHOOK_URL_PLACEHOLDER,
+      urlEnvKey: "KEEPER_PAYOUT_WEBHOOK_URL",
+      urlLabel: "KEEPER_PAYOUT_WEBHOOK_URL",
+    });
+
 let turbo = mirrorTurbo.content;
 const turboAppliedPath = mirrorTurbo.appliedPath;
 
@@ -650,6 +667,19 @@ try {
       urlLabel: "CRE_WEBHOOK_URL",
       appliedPath: creTurbo.appliedPath,
     },
+    ...(keeperPayoutTurbo
+      ? [
+          {
+            file: "turbo-keeper-payout.applied.yaml",
+            content: keeperPayoutTurbo.content,
+            placeholder: null,
+            urlPlaceholder: KEEPER_PAYOUT_WEBHOOK_URL_PLACEHOLDER,
+            urlEnvKey: "KEEPER_PAYOUT_WEBHOOK_URL",
+            urlLabel: "KEEPER_PAYOUT_WEBHOOK_URL",
+            appliedPath: keeperPayoutTurbo.appliedPath,
+          },
+        ]
+      : []),
   ];
 
   for (const pipeline of turboPipelines) {
@@ -721,4 +751,5 @@ try {
   writeFileSync(schemaPath, schemaOriginal, "utf8");
   cleanupAppliedTurbo("turbo.applied.yaml");
   cleanupAppliedTurbo("turbo-cre.applied.yaml");
+  cleanupAppliedTurbo("turbo-keeper-payout.applied.yaml");
 }

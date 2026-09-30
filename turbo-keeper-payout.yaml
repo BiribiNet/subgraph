@@ -1,0 +1,70 @@
+# Goldsky Turbo pipeline (keeper mode): VRFResult / PayoutProgress → payout-drain webhook.
+# Separate from biribi-cre-countdown so CRE mode does not pay for ignored wakes.
+# Apply only while EXECUTION_MODE=keeper. Pause/delete when switching back to CRE.
+#
+# Roulette address + webhook URL are injected by scripts/sync-pipeline.mjs (do not edit manually).
+#   DEPLOY_JSON=./deployments/arbitrum-sepolia.json yarn sync:pipeline
+#
+# Consumer: cre-automation-starter Worker POST /webhook/payout
+#   - Parses round_id from VRFResult / PayoutProgress
+#   - Auth: Goldsky httpauth secret BIRIBI_CRE_SCHEDULE (same as turbo-cre.yaml)
+name: biribi-keeper-payout
+resource_size: s
+use_dedicated_ip: false
+job: false
+sources:
+  raw_logs:
+    dataset_name: arbitrum_sepolia.raw_logs
+    start_at: latest
+    type: dataset
+    version: 1.0.0
+transforms:
+  decoded_events:
+    primary_key: id
+    sql: |-
+      SELECT
+        id,
+        address,
+        _gs_log_decode(
+          '[{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint64","name":"roundId","type":"uint64"},{"indexed":false,"internalType":"uint8","name":"winningNumber","type":"uint8"},{"indexed":false,"internalType":"uint8","name":"jackpotNumber","type":"uint8"}],"name":"VRFResult","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint64","name":"globalRoundId","type":"uint64"},{"indexed":false,"internalType":"uint32","name":"marketId","type":"uint32"},{"indexed":false,"internalType":"uint256","name":"fromCursor","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"toCursor","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"paidAmount","type":"uint256"}],"name":"PayoutProgress","type":"event"}]',
+          topics,
+          data
+        ) as decoded,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index,
+        _gs_op
+      FROM raw_logs
+      WHERE address = '__SYNC_PIPELINE_ROULETTE_ADDRESS__'
+    type: sql
+  payout_wake:
+    primary_key: id
+    sql: |-
+      SELECT
+        id,
+        address,
+        CASE
+          WHEN decoded.event_signature = 'VRFResult' THEN decoded.event_params[1]
+          ELSE decoded.event_params[1]
+        END AS round_id,
+        decoded.event_signature AS event_name,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index,
+        _gs_op
+      FROM decoded_events
+      WHERE decoded IS NOT NULL
+        AND (
+          decoded.event_signature = 'VRFResult'
+          OR decoded.event_signature = 'PayoutProgress'
+        )
+    type: sql
+sinks:
+  keeper_payout_webhook:
+    from: payout_wake
+    one_row_per_request: false
+    type: webhook
+    secret_name: BIRIBI_CRE_SCHEDULE
+    url: ${KEEPER_PAYOUT_WEBHOOK_URL}

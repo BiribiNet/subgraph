@@ -143,6 +143,7 @@ src/whitelist.ts
 .goldsky-bundle.zip
 turbo.applied.yaml
 turbo-cre.applied.yaml
+turbo-keeper-payout.applied.yaml
 
 # Matchstick runtime artifacts
 tests/.latest.json
