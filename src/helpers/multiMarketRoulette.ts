@@ -300,6 +300,7 @@ export function processVRFResult(event: VRFResult): void {
   gr.winningNumber = BigInt.fromI32(i32(event.params.winningNumber))
   gr.jackpotTriggered = i32(event.params.winningNumber) == i32(event.params.jackpotNumber)
   gr.vrfResultAt = event.block.timestamp
+  gr.vrfResultTxHash = event.transaction.hash
   gr.save()
 
   observeSideBetSpinsForRound(roundId, BigInt.fromI32(i32(event.params.winningNumber)))

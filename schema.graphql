@@ -162,6 +162,8 @@ type GlobalRound @entity(immutable: false) {
   endedAt: BigInt
   "VRF fulfilled"
   vrfResultAt: BigInt
+  "VRF result tx"
+  vrfResultTxHash: Bytes
   "RoundResolved"
   resolvedAt: BigInt
   "Admin force-resolve"

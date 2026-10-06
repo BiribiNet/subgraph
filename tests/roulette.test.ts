@@ -1,4 +1,4 @@
-import { Address, BigInt, ethereum } from '@graphprotocol/graph-ts';
+import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts';
 import {
   assert,
   beforeEach,
@@ -67,6 +67,9 @@ function createVRFResultEvent(
   ev.logIndex = BigInt.fromI32(0);
   ev.block.timestamp = BigInt.fromI32(timestamp);
   ev.block.number = BigInt.fromI32(timestamp / 100);
+  ev.transaction.hash = Bytes.fromHexString(
+    '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  );
   return ev;
 }
 
@@ -116,6 +119,12 @@ describe('handleVRFResult', () => {
     assert.fieldEquals('GlobalRound', grId, 'winningNumber', '17');
     assert.fieldEquals('GlobalRound', grId, 'jackpotNumber', '5');
     assert.fieldEquals('GlobalRound', grId, 'vrfResultAt', '1000200');
+    assert.fieldEquals(
+      'GlobalRound',
+      grId,
+      'vrfResultTxHash',
+      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
     assert.fieldEquals('RouletteRound', testRoundId(1), 'status', ROUND_STATUS_BETTING);
   });
 });
