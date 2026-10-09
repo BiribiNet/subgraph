@@ -27,7 +27,7 @@ const constantTs = readFileSync(
   join(root, "src", "helpers", "constant.ts"),
   "utf8",
 );
-const subgraphYaml = readFileSync(join(root, "subgraph.yaml"), "utf8");
+const subgraphYaml = readFileSync(join(root, "subgraph.yaml"), "utf8").replace(/\r\n/g, "\n");
 
 function constantValue(name) {
   const match = constantTs.match(

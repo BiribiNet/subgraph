@@ -1,9 +1,10 @@
-import { log } from "@graphprotocol/graph-ts"
+import { BigInt, log } from "@graphprotocol/graph-ts"
 
 import {
   ColdSlippageBpsUpdated,
   FundFromMarketSkipped,
   FundedFromMarket,
+  PendingBrbDistributed,
   PairObservationUpdated,
   SlippageBpsUpdated,
   SwapAssetBpsUpdated,
@@ -16,12 +17,14 @@ import {
   RoleRevoked,
   RoleAdminChanged,
 } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
-import { JackpotBuy, JackpotFundingSkip, JackpotFunderIncident } from "../../generated/schema"
+import { JackpotBuy, JackpotFundingSkip, JackpotFunderIncident, JackpotFundingRecovery, PendingBrbBurn } from "../../generated/schema"
 
 // JackpotFunderIncident.kind enum values (must match schema enum JackpotFunderIncidentKind).
 const INCIDENT_BURN_FAILED = "BURN_FAILED"
 const INCIDENT_TREASURY_TRANSFER_FAILED = "TREASURY_TRANSFER_FAILED"
 const INCIDENT_TOKEN_SWEPT = "TOKEN_SWEPT"
+import { ERC20 } from "../../generated/BRBJackpotFunder/ERC20"
+import { BRB_TOKEN_ADDRESS } from "../helpers/constant"
 import { bigintToBytes } from "../helpers/bigintToBytes"
 import { getOrCreateJackpotFunderConfig } from "../helpers/jackpot-funder"
 import { getMarketById } from "../helpers/market"
@@ -39,6 +42,7 @@ import {
 // parameters (cold slippage + TWAP window).
 
 export function handleFundedFromMarket(event: FundedFromMarket): void {
+  getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   const marketIdInt32 = event.params.marketId.toI32()
   const market = getMarketById(marketIdInt32)
   if (market == null) {
@@ -47,6 +51,7 @@ export function handleFundedFromMarket(event: FundedFromMarket): void {
   }
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const buy = new JackpotBuy(id)
+  buy.funder = event.address
   buy.market = market.id
   buy.asset = event.params.asset
   buy.assetSwapped = event.params.assetSwapped
@@ -59,6 +64,26 @@ export function handleFundedFromMarket(event: FundedFromMarket): void {
   buy.save()
 }
 
+export function handlePendingBrbDistributed(event: PendingBrbDistributed): void {
+  const recovery = new JackpotFundingRecovery(event.transaction.hash.concat(bigintToBytes(event.logIndex)))
+  recovery.funder = event.address
+  const market = getMarketById(event.params.marketId.toI32())
+  if (market != null) recovery.market = market.id
+  recovery.treasuryAmount = event.params.treasuryAmount
+  recovery.burnedAmount = event.params.burnedAmount
+  recovery.timestamp = event.block.timestamp
+  recovery.transactionHash = event.transaction.hash
+  recovery.save()
+  // This burn repays an older liability. Do not attribute it to today's roulette round.
+  if (event.params.burnedAmount.gt(BigInt.fromI32(0))) {
+    const pending = PendingBrbBurn.load(event.transaction.hash)
+    if (pending != null && pending.cursor < pending.burnIds.length) {
+      pending.cursor += 1
+      pending.save()
+    }
+  }
+}
+
 export function handleFundFromMarketSkipped(event: FundFromMarketSkipped): void {
   const marketIdInt32 = event.params.marketId.toI32()
   const market = getMarketById(marketIdInt32)
@@ -68,6 +93,7 @@ export function handleFundFromMarketSkipped(event: FundFromMarketSkipped): void 
   }
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const skip = new JackpotFundingSkip(id)
+  skip.funder = event.address
   skip.market = market.id
   skip.asset = event.params.asset
   skip.reason = event.params.reason
@@ -81,6 +107,10 @@ export function handleFundFromMarketSkipped(event: FundFromMarketSkipped): void 
 export function handleJackpotBurnFailed(event: JackpotBurnFailed): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const incident = new JackpotFunderIncident(id)
+  incident.funder = event.address
+  incident.asset = BRB_TOKEN_ADDRESS
+  incident.assetSymbol = "BRB"
+  incident.assetDecimals = 18
   incident.kind = INCIDENT_BURN_FAILED
   const market = getMarketById(event.params.marketId.toI32())
   if (market != null) {
@@ -96,12 +126,16 @@ export function handleJackpotBurnFailed(event: JackpotBurnFailed): void {
 export function handleJackpotTreasuryTransferFailed(event: JackpotTreasuryTransferFailed): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const incident = new JackpotFunderIncident(id)
+  incident.funder = event.address
   incident.kind = INCIDENT_TREASURY_TRANSFER_FAILED
   const market = getMarketById(event.params.marketId.toI32())
   if (market != null) {
     incident.market = market.id
   }
-  incident.asset = event.params.treasury
+  incident.asset = BRB_TOKEN_ADDRESS
+  incident.assetSymbol = "BRB"
+  incident.assetDecimals = 18
+  incident.to = event.params.treasury
   incident.amount = event.params.amount
   incident.timestamp = event.block.timestamp
   incident.blockNumber = event.block.number
@@ -112,8 +146,14 @@ export function handleJackpotTreasuryTransferFailed(event: JackpotTreasuryTransf
 export function handleTokenSwept(event: TokenSwept): void {
   const id = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const incident = new JackpotFunderIncident(id)
+  incident.funder = event.address
   incident.kind = INCIDENT_TOKEN_SWEPT
   incident.asset = event.params.asset
+  const token = ERC20.bind(event.params.asset)
+  const symbol = token.try_symbol()
+  const decimals = token.try_decimals()
+  if (!symbol.reverted) incident.assetSymbol = symbol.value
+  if (!decimals.reverted) incident.assetDecimals = decimals.value
   incident.to = event.params.to
   incident.amount = event.params.amount
   incident.timestamp = event.block.timestamp
@@ -123,14 +163,14 @@ export function handleTokenSwept(event: TokenSwept): void {
 }
 
 export function handleSwapAssetBpsUpdated(event: SwapAssetBpsUpdated): void {
-  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   cfg.swapAssetTotalBps = event.params.totalBps
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
 }
 
 export function handleTreasuryBrbSplitUpdated(event: TreasuryBrbSplitUpdated): void {
-  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   cfg.treasuryBrbNumerator = event.params.numerator
   cfg.treasuryBrbDenominator = event.params.denominator
   cfg.lastUpdatedAt = event.block.timestamp
@@ -138,21 +178,21 @@ export function handleTreasuryBrbSplitUpdated(event: TreasuryBrbSplitUpdated): v
 }
 
 export function handleSlippageBpsUpdated(event: SlippageBpsUpdated): void {
-  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   cfg.slippageBps = event.params.slippageBps
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
 }
 
 export function handleColdSlippageBpsUpdated(event: ColdSlippageBpsUpdated): void {
-  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   cfg.coldSlippageBps = event.params.coldSlippageBps
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
 }
 
 export function handleTwapWindowUpdated(event: TwapWindowUpdated): void {
-  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   cfg.twapWindowSeconds = event.params.twapWindowSeconds
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
@@ -162,7 +202,7 @@ export function handleTwapWindowUpdated(event: TwapWindowUpdated): void {
 // for a BRB/<asset> pair. We only bump lastUpdatedAt on the config singleton — the
 // raw observation history is not needed by any consumer yet.
 export function handlePairObservationUpdated(event: PairObservationUpdated): void {
-  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp)
+  const cfg = getOrCreateJackpotFunderConfig(event.block.timestamp, event.address)
   cfg.lastUpdatedAt = event.block.timestamp
   cfg.save()
 }
