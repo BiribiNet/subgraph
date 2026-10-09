@@ -1,6 +1,10 @@
 import { BigInt, log } from "@graphprotocol/graph-ts"
 
 import {
+  FundingReconciled,
+  FundingRetryScheduled,
+  FundingRetryReset,
+  FundingImported,
   ColdSlippageBpsUpdated,
   FundFromMarketSkipped,
   FundedFromMarket,
@@ -17,7 +21,82 @@ import {
   RoleRevoked,
   RoleAdminChanged,
 } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
-import { JackpotBuy, JackpotFundingSkip, JackpotFunderIncident, JackpotFundingRecovery, PendingBrbBurn, BRBBurn, BRBTransfer } from "../../generated/schema"
+import { FundingInputImport, FundingVaultBalance, FundingLedgerSnapshot, JackpotBuy, JackpotFundingSkip, JackpotFunderIncident, JackpotFundingRecovery, PendingBrbBurn, BRBBurn, BRBTransfer } from "../../generated/schema"
+
+export function handleFundingImported(event: FundingImported): void {
+  const row = new FundingInputImport(event.transaction.hash.concat(bigintToBytes(event.logIndex)))
+  row.funder = event.address
+  row.marketId = event.params.marketId.toI32()
+  row.asset = event.params.asset
+  row.amount = event.params.amount
+  row.sourceTransaction = event.params.sourceTransaction
+  row.transactionHash = event.transaction.hash
+  row.timestamp = event.block.timestamp
+  row.save()
+}
+
+export function handleFundingReconciled(event: FundingReconciled): void {
+  const id = event.address.toHexString() + "-" + event.params.marketId.toString()
+  let vault = FundingVaultBalance.load(id)
+  if (vault == null) {
+    vault = new FundingVaultBalance(id)
+    vault.failures = 0
+    vault.nextAttemptAt = BigInt.fromI32(0)
+    vault.stopped = false
+  }
+  vault.funder = event.address
+  vault.marketId = event.params.marketId.toI32()
+  vault.asset = event.params.asset
+  vault.credited = event.params.credited
+  vault.processed = event.params.processed
+  vault.queued = event.params.queued
+  vault.brbProduced = event.params.brbProduced
+  vault.treasuryPaid = event.params.treasuryPaid
+  vault.burned = event.params.burned
+  vault.pendingTreasury = event.params.pendingTreasury
+  vault.pendingBurn = event.params.pendingBurn
+  vault.balanced = vault.credited.equals(vault.processed.plus(vault.queued)) &&
+    vault.brbProduced.equals(vault.treasuryPaid.plus(vault.burned).plus(vault.pendingTreasury).plus(vault.pendingBurn))
+  vault.blockNumber = event.block.number
+  vault.timestamp = event.block.timestamp
+  vault.transactionHash = event.transaction.hash
+  vault.save()
+  const snapshot = new FundingLedgerSnapshot(event.transaction.hash.concat(bigintToBytes(event.logIndex)))
+  snapshot.vault = id
+  snapshot.credited = vault.credited
+  snapshot.processed = vault.processed
+  snapshot.queued = vault.queued
+  snapshot.brbProduced = vault.brbProduced
+  snapshot.treasuryPaid = vault.treasuryPaid
+  snapshot.burned = vault.burned
+  snapshot.pendingTreasury = vault.pendingTreasury
+  snapshot.pendingBurn = vault.pendingBurn
+  snapshot.balanced = vault.balanced
+  snapshot.blockNumber = event.block.number
+  snapshot.timestamp = event.block.timestamp
+  snapshot.transactionHash = event.transaction.hash
+  snapshot.save()
+}
+
+export function handleFundingRetryScheduled(event: FundingRetryScheduled): void {
+  const id = event.address.toHexString() + "-" + event.params.marketId.toString()
+  const vault = FundingVaultBalance.load(id)
+  if (vault == null) return
+  vault.failures = event.params.failures
+  vault.nextAttemptAt = event.params.nextAttemptAt
+  vault.stopped = event.params.stopped
+  vault.save()
+}
+
+export function handleFundingRetryReset(event: FundingRetryReset): void {
+  const id = event.address.toHexString() + "-" + event.params.marketId.toString()
+  const vault = FundingVaultBalance.load(id)
+  if (vault == null) return
+  vault.failures = 0
+  vault.nextAttemptAt = BigInt.fromI32(0)
+  vault.stopped = false
+  vault.save()
+}
 
 // JackpotFunderIncident.kind enum values (must match schema enum JackpotFunderIncidentKind).
 const INCIDENT_BURN_FAILED = "BURN_FAILED"
