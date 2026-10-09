@@ -17,7 +17,7 @@ import {
   RoleRevoked,
   RoleAdminChanged,
 } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
-import { JackpotBuy, JackpotFundingSkip, JackpotFunderIncident, JackpotFundingRecovery, PendingBrbBurn } from "../../generated/schema"
+import { JackpotBuy, JackpotFundingSkip, JackpotFunderIncident, JackpotFundingRecovery, PendingBrbBurn, BRBBurn, BRBTransfer } from "../../generated/schema"
 
 // JackpotFunderIncident.kind enum values (must match schema enum JackpotFunderIncidentKind).
 const INCIDENT_BURN_FAILED = "BURN_FAILED"
@@ -78,8 +78,17 @@ export function handlePendingBrbDistributed(event: PendingBrbDistributed): void 
   if (event.params.burnedAmount.gt(BigInt.fromI32(0))) {
     const pending = PendingBrbBurn.load(event.transaction.hash)
     if (pending != null && pending.cursor < pending.burnIds.length) {
-      pending.cursor += 1
-      pending.save()
+      // burn() emits immediately before this event. Earlier unrelated burns must stay intact.
+      const ids = pending.burnIds
+      const lastId = ids[ids.length - 1]
+      const burn = BRBBurn.load(lastId)
+      const transfer = BRBTransfer.load(lastId)
+      if (burn != null && transfer != null && transfer.from.equals(event.address)
+        && burn.amount.equals(event.params.burnedAmount)) {
+        ids.pop()
+        pending.burnIds = ids
+        pending.save()
+      }
     }
   }
 }

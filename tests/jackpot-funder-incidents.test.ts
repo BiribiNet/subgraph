@@ -23,7 +23,7 @@ import {
 } from '../src/mappings/jackpot-funder';
 import { bigintToBytes } from '../src/helpers/bigintToBytes';
 import { setupTestMarket } from './helpers';
-import { PendingBrbBurn } from '../generated/schema';
+import { PendingBrbBurn, BRBBurn, BRBTransfer } from '../generated/schema';
 
 const FUNDER = Address.fromString('0xc245ad88d401d08d674596d5a2c9f17011ed27c1');
 const TREASURY = Address.fromString('0xeeee000000000000000000000000000000000001');
@@ -60,14 +60,31 @@ describe('BRBJackpotFunder incident events', () => {
       new ethereum.EventParam('burnedAmount', ethereum.Value.fromUnsignedBigInt(BigInt.fromI32(50))),
     ];
     const pending = new PendingBrbBurn(event.transaction.hash);
-    pending.burnIds = [event.transaction.hash];
+    const olderId = event.transaction.hash.concat(bigintToBytes(BigInt.fromI32(0)));
+    const recoveredId = event.transaction.hash.concat(bigintToBytes(BigInt.fromI32(1)));
+    const burn = new BRBBurn(recoveredId);
+    burn.amount = BigInt.fromI32(50);
+    burn.timestamp = event.block.timestamp;
+    burn.blockNumber = event.block.number;
+    burn.transactionHash = event.transaction.hash;
+    burn.save();
+    const transfer = new BRBTransfer(recoveredId);
+    transfer.from = FUNDER;
+    transfer.to = Address.zero();
+    transfer.value = BigInt.fromI32(50);
+    transfer.timestamp = event.block.timestamp;
+    transfer.blockNumber = event.block.number;
+    transfer.transactionHash = event.transaction.hash;
+    transfer.save();
+    pending.burnIds = [olderId, recoveredId];
     pending.cursor = 0;
     pending.save();
     handlePendingBrbDistributed(event);
     assert.entityCount('JackpotFundingRecovery', 1);
     assert.fieldEquals('JackpotFundingRecovery', incidentId(event), 'market', '1');
     assert.fieldEquals('JackpotFundingRecovery', incidentId(event), 'burnedAmount', '50');
-    assert.fieldEquals('PendingBrbBurn', event.transaction.hash.toHexString(), 'cursor', '1');
+    assert.fieldEquals('PendingBrbBurn', event.transaction.hash.toHexString(), 'cursor', '0');
+    assert.i32Equals(PendingBrbBurn.load(event.transaction.hash)!.burnIds.length, 1);
   });
 
   test('JackpotBurnFailed records a BURN_FAILED incident linked to the market', () => {
