@@ -1250,6 +1250,59 @@ type ProtocolFundingAttempt @entity(immutable: false) {
 }
 
 # Voluntary tips are separate from protocol fees, wagers and points.
+"Cumulative raw ledger for one vault at one funder; input asset and BRB output are separate units."
+type FundingVaultBalance @entity(immutable: false) {
+  id: ID!
+  funder: Bytes!
+  marketId: Int!
+  asset: Bytes!
+  credited: BigInt!
+  processed: BigInt!
+  queued: BigInt!
+  brbProduced: BigInt!
+  treasuryPaid: BigInt!
+  burned: BigInt!
+  pendingTreasury: BigInt!
+  pendingBurn: BigInt!
+  balanced: Boolean!
+  failures: Int!
+  nextAttemptAt: BigInt!
+  stopped: Boolean!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+"Immutable proof of a reconciliation, including queued funds and BRB liabilities."
+type FundingInputImport @entity(immutable: true) {
+  id: Bytes!
+  funder: Bytes!
+  marketId: Int!
+  asset: Bytes!
+  amount: BigInt!
+  sourceTransaction: Bytes!
+  transactionHash: Bytes!
+  timestamp: BigInt!
+}
+
+"Immutable proof of a reconciliation, including queued funds and BRB liabilities."
+type FundingLedgerSnapshot @entity(immutable: true) {
+  id: Bytes!
+  vault: FundingVaultBalance!
+  credited: BigInt!
+  processed: BigInt!
+  queued: BigInt!
+  brbProduced: BigInt!
+  treasuryPaid: BigInt!
+  burned: BigInt!
+  pendingTreasury: BigInt!
+  pendingBurn: BigInt!
+  balanced: Boolean!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 type Tip @entity(immutable: true) {
   id: Bytes!
   jar: Bytes!
