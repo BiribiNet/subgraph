@@ -477,24 +477,6 @@ type RoulettePlacement @entity(immutable: true) {
   timestamp: BigInt!
 }
 
-"Last observed per-vault voluntary limits. Enforcement and time-based activation require an RPC read."
-type PlayerProtection @entity(immutable: false) {
-  id: Bytes!
-  bank: Bytes!
-  player: Bytes!
-  dailyLimit: BigInt!
-  sessionSeconds: BigInt!
-  pendingDailyLimit: BigInt!
-  pendingSessionSeconds: BigInt!
-  changesAt: BigInt!
-  excludedUntil: BigInt!
-  spent: BigInt!
-  spentDay: BigInt!
-  sessionStartedAt: BigInt!
-  blockNumber: BigInt!
-  timestamp: BigInt!
-  transactionHash: Bytes!
-}
 
 "Protocol singleton (id: 0x…01) — live ops, vault rollups, and lifetime analytics. Per-market open wagers on Market.pendingBets."
 type GlobalState @entity(immutable: false) {
