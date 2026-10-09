@@ -17,8 +17,11 @@ if (!network || !networks.length || networks.some(value => value !== network)) t
 for (const expected of [metadata.token, metadata.engine]) {
   if (!manifest.toLowerCase().includes(expected.toLowerCase())) throw new Error("Deployment token/engine differs from manifest");
 }
-const template = manifest.slice(manifest.indexOf("  - name: TipJar\n"));
+const templatesStart = manifest.indexOf("templates:\n");
+const templateStart = manifest.indexOf("  - name: TipJar\n", templatesStart);
+const template = templateStart < 0 ? "" : manifest.slice(templateStart);
 if (!template.startsWith("  - name: TipJar\n")) throw new Error("TipJar template missing");
 const source = template.replace("    source:\n      abi: TipJar", `    source:\n      address: '${metadata.address}'\n      startBlock: ${metadata.startBlock}\n      abi: TipJar`);
-writeFileSync("subgraph.tips.yaml", manifest.replace("templates:\n", `${source}\ntemplates:\n`));
+const dataSources = manifest.slice(0, templatesStart).replace(/^  - name: TipJar\n[\s\S]*?(?=^  - name:|$(?![\s\S]))/m, "");
+writeFileSync("subgraph.tips.yaml", dataSources + source + "\ntemplates:\n" + manifest.slice(templatesStart + "templates:\n".length));
 console.log("Created subgraph.tips.yaml. Verify deployment metadata against its receipt before deploying.");

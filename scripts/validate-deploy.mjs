@@ -92,14 +92,17 @@ for (const version of [LIVE, CANDIDATE]) {
   }
 }
 
-const endpoint = (version) => apiBase + byVersion.get(version).graphql_endpoint;
+const endpoint = (version) => {
+  const entry = byVersion.get(version);
+  return apiBase + (entry.private_endpoint_enabled ? entry.private_graphql_endpoint : entry.graphql_endpoint);
+};
 const indexing = (version) =>
   byVersion.get(version).deployments?.[0]?.indexing_progress ?? {};
 
 async function query(version, body) {
   const response = await fetch(endpoint(version), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ query: body }),
   });
   return response.json();

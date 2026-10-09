@@ -123,6 +123,144 @@ dataSources:
     network: arbitrum-sepolia
     source:
       abi: BRBJackpotFunder
+      address: "0xfb5075174cb85adfbf0a4e946840cbfd03bf48a2"
+      startBlock: 317422007
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - JackpotBuy
+        - JackpotFundingSkip
+        - JackpotFunderConfig
+        - JackpotFunderIncident
+        - FundingVaultBalance
+        - FundingLedgerSnapshot
+        - FundingInputImport
+        - Market
+      abis:
+        - name: BRBJackpotFunder
+          file: ./abis/BRBJackpotFunder.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: FundingAttemptStarted(indexed uint256,indexed uint32,indexed address,uint256,uint256)
+          handler: handleFundingAttemptStarted
+        - event: FundingReconciled(indexed uint32,indexed address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleFundingReconciled
+        - event: FundingRetryScheduled(indexed uint32,uint8,uint256,bool)
+          handler: handleFundingRetryScheduled
+        - event: FundingRetryReset(indexed uint32)
+          handler: handleFundingRetryReset
+        - event: FundingImported(indexed uint32,indexed address,uint256,bytes32)
+          handler: handleFundingImported
+        - event: FundingAttemptCompleted(indexed uint256,uint256,uint256)
+          handler: handleFundingAttemptCompleted
+        - event: PendingBrbDistributed(indexed uint32,uint256,uint256)
+          handler: handlePendingBrbDistributed
+        - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
+          handler: handleFundedFromMarket
+        - event: FundFromMarketSkipped(uint32,address,uint8)
+          handler: handleFundFromMarketSkipped
+        - event: JackpotBurnFailed(uint32,uint256)
+          handler: handleJackpotBurnFailed
+        - event: JackpotTreasuryTransferFailed(uint32,address,uint256)
+          handler: handleJackpotTreasuryTransferFailed
+        - event: TokenSwept(address,address,uint256)
+          handler: handleTokenSwept
+        - event: SwapAssetBpsUpdated(uint256)
+          handler: handleSwapAssetBpsUpdated
+        - event: TreasuryBrbSplitUpdated(uint256,uint256)
+          handler: handleTreasuryBrbSplitUpdated
+        - event: SlippageBpsUpdated(uint256)
+          handler: handleSlippageBpsUpdated
+        - event: ColdSlippageBpsUpdated(uint256)
+          handler: handleColdSlippageBpsUpdated
+        - event: TwapWindowUpdated(uint32)
+          handler: handleTwapWindowUpdated
+        - event: PairObservationUpdated(address,uint32)
+          handler: handlePairObservationUpdated
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+      file: ./src/mappings/jackpot-funder.ts
+  - name: BRBJackpotFunderPrevious20261009
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRBJackpotFunder
+      address: "0x6af569259b87ef2ae4998436047fdfafaeedc7d9"
+      startBlock: 317414249
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - JackpotBuy
+        - JackpotFundingSkip
+        - JackpotFunderConfig
+        - JackpotFunderIncident
+        - FundingVaultBalance
+        - FundingLedgerSnapshot
+        - FundingInputImport
+        - Market
+      abis:
+        - name: BRBJackpotFunder
+          file: ./abis/BRBJackpotFunder.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: FundingAttemptStarted(indexed uint256,indexed uint32,indexed address,uint256,uint256)
+          handler: handleFundingAttemptStarted
+        - event: FundingReconciled(indexed uint32,indexed address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleFundingReconciled
+        - event: FundingRetryScheduled(indexed uint32,uint8,uint256,bool)
+          handler: handleFundingRetryScheduled
+        - event: FundingRetryReset(indexed uint32)
+          handler: handleFundingRetryReset
+        - event: FundingImported(indexed uint32,indexed address,uint256,bytes32)
+          handler: handleFundingImported
+        - event: FundingAttemptCompleted(indexed uint256,uint256,uint256)
+          handler: handleFundingAttemptCompleted
+        - event: PendingBrbDistributed(indexed uint32,uint256,uint256)
+          handler: handlePendingBrbDistributed
+        - event: FundedFromMarket(uint32,address,uint256,uint256,uint256,uint256)
+          handler: handleFundedFromMarket
+        - event: FundFromMarketSkipped(uint32,address,uint8)
+          handler: handleFundFromMarketSkipped
+        - event: JackpotBurnFailed(uint32,uint256)
+          handler: handleJackpotBurnFailed
+        - event: JackpotTreasuryTransferFailed(uint32,address,uint256)
+          handler: handleJackpotTreasuryTransferFailed
+        - event: TokenSwept(address,address,uint256)
+          handler: handleTokenSwept
+        - event: SwapAssetBpsUpdated(uint256)
+          handler: handleSwapAssetBpsUpdated
+        - event: TreasuryBrbSplitUpdated(uint256,uint256)
+          handler: handleTreasuryBrbSplitUpdated
+        - event: SlippageBpsUpdated(uint256)
+          handler: handleSlippageBpsUpdated
+        - event: ColdSlippageBpsUpdated(uint256)
+          handler: handleColdSlippageBpsUpdated
+        - event: TwapWindowUpdated(uint32)
+          handler: handleTwapWindowUpdated
+        - event: PairObservationUpdated(address,uint32)
+          handler: handlePairObservationUpdated
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+      file: ./src/mappings/jackpot-funder.ts
+  - name: BRBJackpotFunderLegacy
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: BRBJackpotFunder
       address: "0xd990413247611013161a7287d262664df8da7309"
       startBlock: 284788460
     mapping:
@@ -357,6 +495,28 @@ dataSources:
         - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
           handler: handleRoleAdminChanged
       file: ./src/mappings/cre-authority.ts
+  - name: TipJar
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      address: '0xD8B67354374c41E6ED7494D404b0e8D27167031D'
+      startBlock: 317414260
+      abi: TipJar
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Tip
+        - TipTotal
+      abis:
+        - name: TipJar
+          file: ./abis/TipJar.json
+      eventHandlers:
+        - event: TipSent(indexed address,indexed address,indexed address,uint256)
+          handler: handleTipSent
+      file: ./src/mappings/tips.ts
+
 templates:
   - name: MarketAsset
     kind: ethereum/contract

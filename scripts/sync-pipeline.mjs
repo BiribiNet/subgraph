@@ -271,6 +271,11 @@ const turboAddresses = [addr("brb"), addr("roulette"), addr("brbReferal"), ...ba
 if (a.upkeepManager) turboAddresses.push(addr("upkeepManager"));
 if (a.sideBet) turboAddresses.push(addr("sideBet"));
 if (a.jackpotFunder) turboAddresses.push(addr("jackpotFunder"));
+if (a.legacyJackpotFunder) turboAddresses.push(addr("legacyJackpotFunder"));
+for (const historical of a.historicalJackpotFunders ?? []) {
+  const address = String(historical).toLowerCase();
+  if (!turboAddresses.includes(address)) turboAddresses.push(address);
+}
 if (bankAddresses.length > 0) {
   console.log(`Turbo vault addresses: ${bankAddresses.length} bank(s)`);
 }

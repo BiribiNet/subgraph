@@ -6,8 +6,10 @@
     "stakedBRB": 284788460,
     "brbReferal": 284788460,
     "sideBet": 284788460,
-    "jackpotFunder": 284788460,
-    "scheduler": 309338845
+    "jackpotFunder": 317422007,
+    "scheduler": 309338845,
+    "tipJar": 317414260,
+    "legacyJackpotFunder": 284788460
   },
   "addresses": {
     "brb": "0xcd97563e22017462f35ba1e266e13f8f756a53c9",
@@ -24,9 +26,15 @@
     "automationReceiver": "0xfda0edcbcf2c6360279cf10ec079d56d43795a86",
     "creExecutionAuthority": "0xb24093fd7cbca76c0a4098cdff5f27d0734a2a68",
     "jackpotTreasury": "0x89658247ab5a1d93830aececc6674170d0d7081c",
-    "jackpotFunder": "0xd990413247611013161a7287d262664df8da7309",
+    "jackpotFunder": "0xfB5075174cb85aDfBf0A4E946840CbFD03bF48a2",
     "sideBet": "0xA0DCb8FCEd50EeD13899Af86DE70FcE42897E8B1",
-    "uniswapRouter": "0xeeda8616872ef6ea2f41a4a40ab240253cd5c4ac"
+    "uniswapRouter": "0xeeda8616872ef6ea2f41a4a40ab240253cd5c4ac",
+    "tipJar": "0xD8B67354374c41E6ED7494D404b0e8D27167031D",
+    "legacyJackpotFunder": "0xd990413247611013161a7287d262664df8da7309",
+    "historicalJackpotFunders": [
+      "0xd990413247611013161a7287d262664df8da7309",
+      "0x6aF569259B87ef2AE4998436047fdFAfaEeDc7d9"
+    ]
   },
   "vrf": {
     "coordinator": "0x5CE8D5A2BC84beb22a398CCA51996F7930313D61",
@@ -52,5 +60,16 @@
   },
   "deployedAt": "2026-07-06T19:30:00Z",
   "previousScheduler": "0xad1f181ad88aee13a6643104941ecea2b963c2d7",
-  "schedulerRedeployedAt": "2026-09-16T01:45:15.543Z"
+  "schedulerRedeployedAt": "2026-09-16T01:45:15.543Z",
+  "previousJackpotFunder": "0x6aF569259B87ef2AE4998436047fdFAfaEeDc7d9",
+  "implementationUpdates": {
+    "RouletteEngine": "0x2bDeaA54d941BCF873C2e89fa74bDB3a1bc10a77",
+    "SideBet": "0xC2efc646F99588fe7C767Adb6f76b0544FC41E62",
+    "BankVault4626": "0xea45De4C6adD20979db76D13dCc56a3724e64CbA"
+  },
+  "upgradeJournal": "../../biribi/deployments/pr-rollout-2026-10-09-live.json",
+  "upgradeHistory": [
+    "../../biribi/deployments/rollout-2026-10-09-live.json",
+    "../../biribi/deployments/pr-rollout-2026-10-09-live.json"
+  ]
 }

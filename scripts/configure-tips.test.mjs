@@ -48,3 +48,12 @@ test("rejects wrong chains, token/engine mismatch, zero addresses and missing re
     assert.notEqual(run({ ...metadata, ...overrides }).result.status, 0);
   }
 });
+
+test("keeps exactly one static TipJar source when regenerating a configured manifest", () => {
+  const first = run(metadata);
+  assert.equal(first.result.status, 0, first.result.stderr);
+  const generated = readFileSync(join(first.cwd, "subgraph.tips.yaml"), "utf8");
+  const second = run(metadata, generated);
+  assert.equal(second.result.status, 0, second.result.stderr);
+  assert.equal(readFileSync(join(second.cwd, "subgraph.tips.yaml"), "utf8"), generated);
+});
