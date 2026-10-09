@@ -17,7 +17,6 @@ import {
 import { bigintToBytes } from "./bigintToBytes"
 import { getOrCreateDailyStats, getOrCreateHourlySnapshot } from "./aggregation"
 import { getOrCreateGlobalState } from "./globalState"
-import { ZERO } from "./number"
 import { findBetInGlobalRound, findBetInMarketRound, isKnownBank, loadMarketByBank } from "./market"
 import { normalizeAmountTo18, updateUserRouletteStats } from "./user"
 import { recordUserMarketWin } from "./user-market-stats"
@@ -59,6 +58,7 @@ export function tryRecordMarketPayoutTransfer(
   transactionHash: Bytes,
   logIndex: BigInt
 ): void {
+  if (from.equals(to) || value.le(BigInt.zero())) return
   if (WithdrawTransaction.load(transactionHash) != null) {
     return
   }
@@ -140,13 +140,7 @@ export function tryRecordMarketPayoutTransfer(
     jackpotPayoutTx.transactionHash = transactionHash
     jackpotPayoutTx.save()
 
-    // Clamp at zero: `currentJackpot` is a counter started at the manifest
-    // startBlock, so it under-states the pool if the treasury already held BRB
-    // then. graph-ts BigInt is signed and would silently go negative.
-    globalState.currentJackpot = value.gt(globalState.currentJackpot)
-      ? ZERO
-      : globalState.currentJackpot.minus(value)
-
+    // brb.ts already accounted for the treasury outflow, independently of attribution.
     globalState.totalJackpotsPaid = globalState.totalJackpotsPaid.plus(value)
     globalState.totalPayouts = globalState.totalPayouts.plus(normalizedPayout)
 
