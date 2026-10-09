@@ -1234,3 +1234,26 @@ type ProtocolFundingAttempt @entity(immutable: false) {
   timestamp: BigInt!
   completed: Boolean!
 }
+
+# Voluntary tips are separate from protocol fees, wagers and points.
+type Tip @entity(immutable: true) {
+  id: Bytes!
+  jar: Bytes!
+  sender: Bytes!
+  token: Bytes!
+  recipient: Bytes!
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type TipTotal @entity(immutable: false) {
+  id: Bytes!
+  jar: Bytes!
+  token: Bytes!
+  recipient: Bytes!
+  amount: BigInt!
+  count: BigInt!
+  updatedAt: BigInt!
+}

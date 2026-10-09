@@ -436,3 +436,22 @@ templates:
         - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
           handler: handleRoleAdminChanged
       file: ./src/mappings/bank-vault.ts
+  - name: TipJar
+    kind: ethereum/contract
+    network: arbitrum-sepolia
+    source:
+      abi: TipJar
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Tip
+        - TipTotal
+      abis:
+        - name: TipJar
+          file: ./abis/TipJar.json
+      eventHandlers:
+        - event: TipSent(indexed address,indexed address,indexed address,uint256)
+          handler: handleTipSent
+      file: ./src/mappings/tips.ts

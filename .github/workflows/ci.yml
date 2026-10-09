@@ -28,6 +28,9 @@ jobs:
       - name: Verify staging safeguards without credentials
         run: node --test scripts/goldsky-stage.test.mjs
 
+      - name: Verify tip manifest activation safeguards
+        run: node --test scripts/configure-tips.test.mjs
+
       - name: Generate types
         run: yarn codegen
 
