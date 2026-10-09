@@ -135,6 +135,9 @@ dataSources:
         - JackpotFundingSkip
         - JackpotFunderConfig
         - JackpotFunderIncident
+        - FundingVaultBalance
+        - FundingLedgerSnapshot
+        - FundingInputImport
         - Market
       abis:
         - name: BRBJackpotFunder
@@ -144,6 +147,14 @@ dataSources:
       eventHandlers:
         - event: FundingAttemptStarted(indexed uint256,indexed uint32,indexed address,uint256,uint256)
           handler: handleFundingAttemptStarted
+        - event: FundingReconciled(indexed uint32,indexed address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleFundingReconciled
+        - event: FundingRetryScheduled(indexed uint32,uint8,uint256,bool)
+          handler: handleFundingRetryScheduled
+        - event: FundingRetryReset(indexed uint32)
+          handler: handleFundingRetryReset
+        - event: FundingImported(indexed uint32,indexed address,uint256,bytes32)
+          handler: handleFundingImported
         - event: FundingAttemptCompleted(indexed uint256,uint256,uint256)
           handler: handleFundingAttemptCompleted
         - event: PendingBrbDistributed(indexed uint32,uint256,uint256)
