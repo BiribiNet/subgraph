@@ -465,6 +465,37 @@ type PayoutTransaction @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+"One observed engine BetRecorded event, preserving every placement in an aggregated ticket."
+type RoulettePlacement @entity(immutable: true) {
+  id: Bytes!
+  bet: RouletteBet!
+  user: User!
+  market: Market!
+  amount: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+}
+
+"Last observed per-vault voluntary limits. Enforcement and time-based activation require an RPC read."
+type PlayerProtection @entity(immutable: false) {
+  id: Bytes!
+  bank: Bytes!
+  player: Bytes!
+  dailyLimit: BigInt!
+  sessionSeconds: BigInt!
+  pendingDailyLimit: BigInt!
+  pendingSessionSeconds: BigInt!
+  changesAt: BigInt!
+  excludedUntil: BigInt!
+  spent: BigInt!
+  spentDay: BigInt!
+  sessionStartedAt: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 "Protocol singleton (id: 0x…01) — live ops, vault rollups, and lifetime analytics. Per-market open wagers on Market.pendingBets."
 type GlobalState @entity(immutable: false) {
   "Singleton ID"

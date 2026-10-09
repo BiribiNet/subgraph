@@ -29,6 +29,7 @@ dataSources:
         - PayoutTransaction
         - RouletteRound
         - RouletteBet
+        - RoulettePlacement
         - DailyStat
         - TokenApproval
       abis:
@@ -387,6 +388,7 @@ templates:
         - GlobalState
         - Market
         - VaultDeposit
+        - PlayerProtection
         - VaultWithdrawal
         - LargeWithdrawalRequest
         - User
@@ -421,6 +423,12 @@ templates:
           handler: handleSideBetStakeLocked
         - event: BetPlaced(address,uint256,bytes,uint256)
           handler: handleBetPlaced
+        - event: PlayerLimitsChanged(indexed address,uint256,uint32,uint256,uint32,uint64)
+          handler: handlePlayerLimitsChanged
+        - event: PlayerExcluded(indexed address,uint64)
+          handler: handlePlayerExcluded
+        - event: PlayerStakeRecorded(indexed address,uint256,uint64,uint64)
+          handler: handlePlayerStakeRecorded
         - event: PayoutBatchProcessed(uint256,uint256)
           handler: handlePayoutBatchProcessed
         - event: FundsTransferred(address,uint256)

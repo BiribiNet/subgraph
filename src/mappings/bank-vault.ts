@@ -1,4 +1,5 @@
 import { recordMarketAccounting } from "../helpers/market-accounting"
+export { handlePlayerLimitsChanged, handlePlayerExcluded, handlePlayerStakeRecorded } from "../helpers/player-protection"
 import { Address, BigInt, Bytes, log, store } from "@graphprotocol/graph-ts"
 import {
   Deposit,
