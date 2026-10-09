@@ -2,6 +2,12 @@
 
 ## Corrected semantics
 
+- Treasury outflows debit `currentJackpot` and the daily pool snapshot directly in
+  the BRB Transfer handler, even when no legacy bet/round can be identified.
+  Attribution failure must not retain money that has left the treasury. A self-transfer
+  changes neither funding nor payouts. Missing baseline balances still clamp at zero;
+  this counter is not a replacement for an authoritative RPC balance.
+
 - `RouletteBet.actualPayout`, `RouletteBet.won`, `UserMarketStats.totalWon`
   and its win count describe regular roulette payments in the market asset.
 - `User.totalWon` and `winCount` also exclude jackpots. These legacy cross-market
@@ -30,6 +36,8 @@ Before moving the production alias:
    transfer orderings. Reconcile jackpot receipts to `totalJackpotsPaid`.
 4. Reconcile daily funding to BRB Transfer events whose destination is the
    treasury, including days with market funding but no treasury receipt.
+   Check an outgoing transfer with no indexed ticket and ensure the pool falls once
+   without manufacturing a JackpotPayout. Check self-transfers leave the pool unchanged.
 5. Run `yarn reconcile:vaults` against staging at a pinned block.
 6. Verify the frontend regular-win and jackpot receipt views, then switch its
    endpoint/alias. Retain the previous deployment for rollback; do not prune it.

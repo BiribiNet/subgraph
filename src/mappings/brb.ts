@@ -90,12 +90,23 @@ export function handleTransfer(event: Transfer): void {
   // Credited before the mint short-circuit below: BRB reaches the treasury both
   // as a BRBJackpotFunder transfer and (potentially) as a direct mint, and both
   // grow the pool.
-  if (event.params.to.equals(JACKPOT_TREASURY_ADDRESS)) {
+  if (event.params.to.equals(JACKPOT_TREASURY_ADDRESS) && !event.params.from.equals(JACKPOT_TREASURY_ADDRESS)) {
     globalState.currentJackpot = globalState.currentJackpot.plus(event.params.value)
     const dailyStatsJackpot = getOrCreateDailyStats(event.block.timestamp)
     dailyStatsJackpot.jackpotFunded = dailyStatsJackpot.jackpotFunded.plus(event.params.value)
     // `jackpotPool` is an end-of-day snapshot, not an accumulator: stamp the
     // post-mutation pool and let the last write of the day win.
+    dailyStatsJackpot.jackpotPool = globalState.currentJackpot
+    dailyStatsJackpot.save()
+  }
+
+  // Pool movement is a token fact even when a legacy payout cannot be associated
+  // with a bet/round. Do not let failed attribution leave an inflated balance.
+  if (event.params.from.equals(JACKPOT_TREASURY_ADDRESS) && !event.params.to.equals(JACKPOT_TREASURY_ADDRESS)) {
+    globalState.currentJackpot = event.params.value.gt(globalState.currentJackpot)
+      ? ZERO
+      : globalState.currentJackpot.minus(event.params.value)
+    const dailyStatsJackpot = getOrCreateDailyStats(event.block.timestamp)
     dailyStatsJackpot.jackpotPool = globalState.currentJackpot
     dailyStatsJackpot.save()
   }

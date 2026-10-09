@@ -67,6 +67,30 @@ describe('jackpot pool accounting', () => {
     clearStore();
   });
 
+  test('an outflow with no attributable round still debits the pool without inventing a payout', () => {
+    emitBrbTransfer(FUNDER, TREASURY, '500', 1_000_000);
+    emitBrbTransfer(TREASURY, DEFAULT_USER, '200', 1_000_500, 5, false);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentJackpot', '300');
+    assert.fieldEquals('DailyStat', dayId(1_000_500), 'jackpotPool', '300');
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalJackpotsPaid', '0');
+    assert.entityCount('JackpotPayout', 0);
+  });
+
+  test('unattributed outflows also clamp an incomplete pool baseline at zero', () => {
+    emitBrbTransfer(FUNDER, TREASURY, '100', 1_000_000);
+    emitBrbTransfer(TREASURY, DEFAULT_USER, '200', 1_000_500, 5, false);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentJackpot', '0');
+    assert.fieldEquals('DailyStat', dayId(1_000_500), 'jackpotPool', '0');
+  });
+
+  test('a treasury self-transfer is neither funding nor a payout', () => {
+    emitBrbTransfer(FUNDER, TREASURY, '500', 1_000_000);
+    emitBrbTransfer(TREASURY, TREASURY, '200', 1_000_500, 5, false);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'currentJackpot', '500');
+    assert.fieldEquals('DailyStat', dayId(1_000_500), 'jackpotFunded', '500');
+    assert.entityCount('JackpotPayout', 0);
+  });
+
   test('BRB transfer to the treasury credits the pool and stamps the daily snapshot', () => {
     emitBrbTransfer(FUNDER, TREASURY, '250000000000000000000', 1_000_000);
 
