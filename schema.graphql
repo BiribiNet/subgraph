@@ -1017,6 +1017,7 @@ type SideBetGlobalConfig @entity(immutable: false) {
 
 type JackpotBuy @entity(immutable: true) {
   id: Bytes!
+  funder: Bytes
   market: Market!
   asset: Bytes!
   assetSwapped: BigInt!
@@ -1030,6 +1031,7 @@ type JackpotBuy @entity(immutable: true) {
 
 type JackpotFundingSkip @entity(immutable: true) {
   id: Bytes!
+  funder: Bytes
   market: Market!
   asset: Bytes!
   reason: Int!
@@ -1043,11 +1045,14 @@ enum JackpotFunderIncidentKind { BURN_FAILED, TREASURY_TRANSFER_FAILED, TOKEN_SW
 
 type JackpotFunderIncident @entity(immutable: true) {
   id: Bytes!
+  funder: Bytes
   kind: JackpotFunderIncidentKind!
   "Market the incident relates to (null for TokenSwept)"
   market: Market
-  "Treasury (TREASURY_TRANSFER_FAILED) or swept asset (TOKEN_SWEPT); null for BURN_FAILED"
+  "Token whose amount is reported"
   asset: Bytes
+  assetSymbol: String
+  assetDecimals: Int
   "Recipient of a swept token (TOKEN_SWEPT only); null otherwise"
   to: Bytes
   "BRB amount (BURN_FAILED / TREASURY_TRANSFER_FAILED) or swept amount (TOKEN_SWEPT)"
@@ -1057,20 +1062,29 @@ type JackpotFunderIncident @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
-# Singleton config for the BRBJackpotFunder. Each setter event updates one or
-# more fields and bumps `lastUpdatedAt`. Lazy-init: all fields default to 0
-# until the first config event fires.
+# Address-scoped funder configuration. First access reads available getters.
+# Reverted getters remain null; setter events subsequently update their fields.
+type JackpotFundingRecovery @entity(immutable: true) {
+  id: Bytes!
+  funder: Bytes!
+  market: Market
+  treasuryAmount: BigInt!
+  burnedAmount: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 type JackpotFunderConfig @entity(immutable: false) {
   id: Bytes!
-  swapAssetTotalBps: BigInt!
-  treasuryBrbNumerator: BigInt!
-  treasuryBrbDenominator: BigInt!
-  slippageBps: BigInt!
+  swapAssetTotalBps: BigInt
+  treasuryBrbNumerator: BigInt
+  treasuryBrbDenominator: BigInt
+  slippageBps: BigInt
   # Uniswap V2 TWAP pricing parameters (funder TWAP rework).
   # coldSlippageBps: slippage used when the TWAP observation is stale/cold.
   # twapWindowSeconds: rolling window length for the BRB/<asset> price oracle.
-  coldSlippageBps: BigInt!
-  twapWindowSeconds: BigInt!
+  coldSlippageBps: BigInt
+  twapWindowSeconds: BigInt
   lastUpdatedAt: BigInt!
 }
 

@@ -3,6 +3,7 @@ import {
   assert,
   beforeEach,
   clearStore,
+  createMockedFunction,
   describe,
   newMockEvent,
   test,
@@ -38,6 +39,12 @@ function eventEntityId(event: ethereum.Event): string {
 describe('BRBJackpotFunder TWAP funding', () => {
   beforeEach(() => {
     clearStore();
+    createMockedFunction(FUNDER, "swapAssetTotalBps", "swapAssetTotalBps():(uint256)").reverts();
+    createMockedFunction(FUNDER, "treasuryBrbNumerator", "treasuryBrbNumerator():(uint256)").reverts();
+    createMockedFunction(FUNDER, "treasuryBrbDenominator", "treasuryBrbDenominator():(uint256)").reverts();
+    createMockedFunction(FUNDER, "slippageBps", "slippageBps():(uint256)").reverts();
+    createMockedFunction(FUNDER, "coldSlippageBps", "coldSlippageBps():(uint256)").reverts();
+    createMockedFunction(FUNDER, "twapWindowSeconds", "twapWindowSeconds():(uint32)").reverts();
   });
 
   test('FundedFromMarket records a JackpotBuy with the full swap breakdown', () => {

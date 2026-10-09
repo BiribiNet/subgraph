@@ -72,6 +72,11 @@
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "ReentrancyGuardReentrantCall",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -296,6 +301,31 @@
       }
     ],
     "name": "PairObservationUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "treasuryAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "burnedAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "PendingBrbDistributed",
     "type": "event"
   },
   {
@@ -723,6 +753,43 @@
   {
     "inputs": [
       {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "name": "pendingBrbByMarket",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "treasury",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "burn",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pendingBurnBrb",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "asset",
         "type": "address"
@@ -774,6 +841,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "pendingTreasuryBrb",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -787,6 +867,19 @@
       }
     ],
     "name": "renounceRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      }
+    ],
+    "name": "retryPendingBrb",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

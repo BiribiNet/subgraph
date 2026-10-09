@@ -1,27 +1,25 @@
-import { BigInt, Bytes } from "@graphprotocol/graph-ts"
+import { Address, BigInt } from "@graphprotocol/graph-ts"
 import { JackpotFunderConfig } from "../../generated/schema"
-import { ZERO } from "./number"
+import { BRBJackpotFunder } from "../../generated/BRBJackpotFunder/BRBJackpotFunder"
 
-const CONFIG_KEY = Bytes.fromUTF8("config")
-
-/**
- * Singleton accessor for BRBJackpotFunder configuration. All fields default to
- * ZERO until the corresponding setter event fires (lazy init). The funder
- * contract emits config events on every state-changing setter, so the singleton
- * converges to the on-chain values without a manual bootstrap call.
- */
-export function getOrCreateJackpotFunderConfig(timestamp: BigInt): JackpotFunderConfig {
-  let cfg = JackpotFunderConfig.load(CONFIG_KEY)
-  if (cfg != null) {
-    return cfg
-  }
-  cfg = new JackpotFunderConfig(CONFIG_KEY)
-  cfg.swapAssetTotalBps = ZERO
-  cfg.treasuryBrbNumerator = ZERO
-  cfg.treasuryBrbDenominator = ZERO
-  cfg.slippageBps = ZERO
-  cfg.coldSlippageBps = ZERO
-  cfg.twapWindowSeconds = ZERO
+/** Address-scoped snapshot. A reverted getter remains unknown, never a synthetic zero. */
+export function getOrCreateJackpotFunderConfig(timestamp: BigInt, address: Address): JackpotFunderConfig {
+  let cfg = JackpotFunderConfig.load(address)
+  if (cfg != null) return cfg
+  cfg = new JackpotFunderConfig(address)
+  const funder = BRBJackpotFunder.bind(address)
+  const swapAssetTotalBps = funder.try_swapAssetTotalBps()
+  if (!swapAssetTotalBps.reverted) cfg.swapAssetTotalBps = swapAssetTotalBps.value
+  const treasuryBrbNumerator = funder.try_treasuryBrbNumerator()
+  if (!treasuryBrbNumerator.reverted) cfg.treasuryBrbNumerator = treasuryBrbNumerator.value
+  const treasuryBrbDenominator = funder.try_treasuryBrbDenominator()
+  if (!treasuryBrbDenominator.reverted) cfg.treasuryBrbDenominator = treasuryBrbDenominator.value
+  const slippageBps = funder.try_slippageBps()
+  if (!slippageBps.reverted) cfg.slippageBps = slippageBps.value
+  const coldSlippageBps = funder.try_coldSlippageBps()
+  if (!coldSlippageBps.reverted) cfg.coldSlippageBps = coldSlippageBps.value
+  const twapWindowSeconds = funder.try_twapWindowSeconds()
+  if (!twapWindowSeconds.reverted) cfg.twapWindowSeconds = twapWindowSeconds.value
   cfg.lastUpdatedAt = timestamp
   cfg.save()
   return cfg
