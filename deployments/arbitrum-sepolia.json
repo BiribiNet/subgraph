@@ -63,13 +63,16 @@
   "schedulerRedeployedAt": "2026-09-16T01:45:15.543Z",
   "previousJackpotFunder": "0x6aF569259B87ef2AE4998436047fdFAfaEeDc7d9",
   "implementationUpdates": {
-    "RouletteEngine": "0x2bDeaA54d941BCF873C2e89fa74bDB3a1bc10a77",
+    "RouletteEngine": "0x4ffdd949820b8cb358ab64985b436cc8dd4f68e8",
     "SideBet": "0xC2efc646F99588fe7C767Adb6f76b0544FC41E62",
     "BankVault4626": "0xea45De4C6adD20979db76D13dCc56a3724e64CbA"
   },
-  "upgradeJournal": "../../biribi/deployments/pr-rollout-2026-10-09-live.json",
+  "upgradeJournal": "../../contracts/reports/upgrades/sepolia-engine-live.json",
   "upgradeHistory": [
     "../../biribi/deployments/rollout-2026-10-09-live.json",
-    "../../biribi/deployments/pr-rollout-2026-10-09-live.json"
-  ]
+    "../../biribi/deployments/pr-rollout-2026-10-09-live.json",
+    "../../contracts/reports/upgrades/sepolia-engine-live.json"
+  ],
+  "engineUpgradeTx": "0x1dd86882d7b666c771619e828cc2754e16af4ce8483d0c92bbca4fdc753969c7",
+  "engineUpgradeBlock": 317690058
 }
