@@ -1,180 +1,58 @@
-# Deploying the Biribi subgraph to Goldsky
+# Goldsky release workflow
 
-This subgraph deploys to **Goldsky** via the REST helper
-`scripts/goldsky-deploy.mjs` (used by `yarn deploy:api`). The REST path is the
-one to use in non-interactive environments (CI, Claude Code on the web) because
-it avoids the Goldsky CLI's TTY/login prompts.
+Production Arbitrum One and retained Sepolia share the **brb** project (`project_cmfbfxud380il01v04gey3ym6`) but use different subgraph names:
 
-## 1. Connect Goldsky (one-time, secure)
+| Chain | Subgraph |
+| --- | --- |
+| Arbitrum Sepolia | Existing `biribi/prod` |
+| Arbitrum One | New `biribi-arbitrum-one/prod` |
 
-The deploy needs a **Goldsky API token**. Get it from the Goldsky dashboard
-(Settings → API keys: https://app.goldsky.com).
+Every provided Goldsky administrative release entrypoint verifies the active credential's project ID and name before remote work. Use `GOLDSKY_API_TOKEN` (legacy `GOLDSKY_TOKEN` or saved BRB login is supported where indicated). Never print or commit tokens. Raw Goldsky CLI commands bypass these safeguards.
 
-**Do not paste the token in chat or commit it.** Add it as an **environment
-secret** so it is injected into the sandbox as an env var across sessions:
+## Existing testnet release
 
-- **Claude Code on the web**: open your environment's configuration and add a
-  secret named `GOLDSKY_API_TOKEN`. See
-  https://code.claude.com/docs/en/claude-code-on-the-web for where environments,
-  env vars and the **network policy** are configured.
-- **Local / CI**: export `GOLDSKY_API_TOKEN` in the shell or CI secret store, or
-  run `goldsky login` (writes `~/.goldsky/auth_token`, which the script also
-  reads as a fallback).
+Use Node 22 and immutable dependencies. Choose an unused version explicitly. The manual GitHub release workflow is scoped to `goldsky-testnet`; configure its required reviewers in GitHub settings.
 
-> Network policy: deploying reaches `api.goldsky.com`. The environment's network
-> policy must allow outbound HTTPS to that host, otherwise the deploy will fail.
-
-## 2. Deploy
-
-### From GitHub Actions (recommended)
-
-The repo ships `.github/workflows/deploy-goldsky.yml`: run the **“Deploy
-subgraph to Goldsky”** workflow (Actions → workflow_dispatch). It uses the
-`GOLDSKY_API_TOKEN` repository secret and calls `scripts/goldsky-release.mjs`,
-which codegens + builds, deploys the next patch version (or the `version`
-input), moves the `prod` tag, then deletes superseded versions (uncheck the
-`prune` input to keep them).
-
-### From a shell
-
-```bash
-# codegen + build + deploy the bundle to Goldsky
-yarn deploy:api biribi/<version>
-
-# deploy and move the `prod` tag to this version in one go
-yarn deploy:api biribi/<version> --tag prod --description "referral indexing"
-
-# or the full release (auto version + prod tag + prune), same as CI
-GOLDSKY_API_TOKEN=... node scripts/goldsky-release.mjs
+```sh
+yarn test:release
+yarn check:constants
+yarn codegen
+yarn graph test -v 0.6.0
+yarn build
+VERSION=0.1.56 node scripts/goldsky-release.mjs
 ```
 
-`<version>` is your choice (e.g. `v2-referral`, `1.2.0`). On success the script
-prints the deployment health and GraphQL endpoint.
+The example version is not a claim about current live state. Submission is immutable and **untagged**. No automatic prod movement or pruning remains in release or legacy sync. Wait for healthy, synced indexing with no errors. Check the actual current prod target in BRB; pass it explicitly to accounting comparison:
 
-The Goldsky CLI also works once the token is available
-(`yarn goldsky subgraph list`, `yarn deploy <version>`); for the CLI path you can
-materialise the token file with:
-
-```bash
-mkdir -p ~/.goldsky && printf '%s' "$GOLDSKY_API_TOKEN" > ~/.goldsky/auth_token
+```sh
+node scripts/validate-deploy.mjs <actual-live-version> <candidate-version>
+SUBGRAPH_URL=<candidate-proxy-url> RPC_URL=<same-chain-rpc> node scripts/reconcile-vaults.mjs deployments/arbitrum-sepolia.json
+node scripts/goldsky-promote.mjs biribi/<candidate-version> --validated
 ```
 
-## 3. Verify referral indexing
+Review accounting/governance changes, save same-block reconciliation evidence and confirm rollback target first. `--validated` acknowledges that review; it is not a replacement for it. Promotion also checks indexing health/sync/errors. Verify the prod alias after promotion and retain prior deployments. Candidate private endpoints need appropriate authentication or a secured proxy. Do not remove endpoint protections to run a check.
 
-Once synced, query the new endpoint to confirm the BRBReferral data source is
-populating BRBr / BRBpoints:
+## New mainnet release
 
-```graphql
-{
-  users(first: 5, where: { totalBrbrEarned_gt: "0" }, orderBy: totalBrbrEarned, orderDirection: desc) {
-    id
-    totalBrbrEarned
-    brbpPoints
-    tier
-    brbReferalTransfers(where: { isCredit: true }) { from value isCredit }
-  }
-}
+Follow [the cross-repository mainnet runbook](../contracts/docs/MAINNET_RUNBOOK.md) and [readiness findings](../contracts/docs/MAINNET_REVIEW_2026-10-09.md). Public launch is held on unresolved security/rehearsal gates.
+
+```sh
+node scripts/prepare-environment.mjs ../contracts/deployments/arbitrum-one.json /tmp/biribi-mainnet-release
+cd /tmp/biribi-mainnet-release
+node node_modules/@graphprotocol/graph-cli/bin/run.js codegen
+node node_modules/@graphprotocol/graph-cli/bin/run.js build
 ```
 
-Then point the frontend at the endpoint by setting `NEXT_PUBLIC_SUBGRAPH_URL`
-(see `frontend/.env.example`) to the deployment's GraphQL URL.
+Return to this repository, then use an unused immutable version:
 
----
-
-## 4. Re-indexing from `startBlock` (data-correcting deploys)
-
-Some fixes correct values that were written **wrongly into history**. Those only
-take effect for blocks indexed *after* the fix unless the subgraph is rebuilt
-from `startBlock`. As of the 2026-08 accounting work that applies to: non-BRB
-market payout attribution, cross-market decimal normalization, and the staking
-component of `brbpPoints`.
-
-`brbpPoints` is the one that makes this urgent rather than cosmetic: Snapshot
-reads it **at a proposal's snapshot block** via time-travel queries, so stale
-history means stale voting power.
-
-### ⚠️ Do not use the normal release path for this
-
-`scripts/goldsky-release.mjs` (and the `deploy-goldsky.yml` workflow) deploys
-**and moves the `prod` tag in the same run**, then prunes superseded versions by
-default. Every new Goldsky version indexes from `startBlock`, so moving the tag
-immediately would point the live endpoint at a version at ~0 % sync — empty
-leaderboards, zeroed stats, missing history — and the prune would delete the
-healthy version you would want to roll back to.
-
-### Two-phase procedure
-
-**Pre-flight** (all must pass before deploying):
-
-```bash
-yarn check:constants                # addresses + startBlocks match the deploy JSON
-yarn codegen && yarn build          # zero warnings
-npx graph test -v 0.6.0             # the -v pin is required; see note below
+```sh
+GOLDSKY_BUILD_DIR=/tmp/biribi-mainnet-release/build node scripts/goldsky-deploy.mjs biribi-arbitrum-one/1.0.0
+# After healthy/synced indexing and reviewed mainnet accounting reconciliation:
+node scripts/goldsky-promote.mjs biribi-arbitrum-one/1.0.0 --validated
 ```
 
-> The version pin is not optional: without it the CLI calls the GitHub "latest
-> release" API to fetch its binary, which fails behind a proxy. `yarn test` runs
-> `graph test` unpinned and is **not** a substitute for this step.
+The exporter never patches Sepolia source files. It rewrites every source/template network, address, constant and start block; removes historical Sepolia funders and optional TipJar from the fresh mainnet. Add TipJar explicitly if in scope. First-release reconciliation compares chain events/receipts to the candidate; do not compare mainnet to testnet totals. For subsequent mainnet upgrades, set `GOLDSKY_SUBGRAPH_NAME=biribi-arbitrum-one` and pass explicit live/candidate versions to `validate-deploy.mjs`.
 
-**Phase 1 — deploy untagged.** `prod` keeps serving the old version, so there is
-no interruption:
+Mainnet Turbo pipelines are a separate provisioning step: new names, mainnet source/addresses and isolated worker/webhook/Ably sinks. Validate before apply. Legacy `sync:pipeline` is testnet-only, requires the CLI login to match the verified credential, fails on Turbo validation errors, and retains rollback versions. Do not use it to provision mainnet.
 
-```bash
-yarn deploy:api biribi/<version>    # no --tag: goldsky-deploy defaults to no tags
-```
-
-**Phase 2 — wait for a full sync, then validate against the *new* version's
-endpoint** (not `prod`). `yarn validate:deploy` runs the whole checklist:
-
-```bash
-yarn validate:deploy                      # newest version vs. the one below it
-yarn validate:deploy 0.1.52 0.1.53        # or name both explicitly
-```
-
-It reads both versions at the **same block** via time-travel and exits 1 on a
-non-regression break, 2 when the candidate has not caught up yet (a comparison
-at two different blocks looks like a result and is worse than none). Goldsky
-prunes history to a rolling window of a few thousand blocks, so the script
-raises the pinned block until both versions answer it. It reads only public
-data and never moves a tag. What it covers:
-
-1. Indexing health — `synced: true`, `health: healthy`, `fatalError: null`.
-2. Payout attribution repaired — a winner in a non-BRB market now has
-   `winCount > 0`. Query `users(where: { winCount_gt: 0 })` and confirm it
-   includes addresses active on the USDC/DAI vaults, which was impossible before.
-3. Decimal normalization repaired — `globalState.totalPayouts` and
-   `totalStakerRevenue` are the same order of magnitude as `totalWagered` (all
-   18-decimal). A ~10^12 gap means a regression.
-4. Staking weight repaired — a USDC staker appears in the `totalStaked` ranking.
-5. **Non-regression** — `totalRounds`, `totalBets` and `brbTotalSupply` must
-   match the old version. No fix touches those counters, so any difference is an
-   alarm, not an improvement.
-
-It also prints the schema delta and the row count of every entity the candidate
-adds, so a new data source that indexes nothing is visible before the tag moves.
-An empty one is **not** automatically a bug: the handler may be waiting on an
-event the deployed contracts do not emit yet. Check the chain for the event
-signature before calling it a mapping defect.
-
-Finally it diffs the top `brbpPoints` holders and says whether Snapshot voting
-weight moves. When it does, the governance caveat below applies; when it does
-not, the cutover carries no governance risk and needs no voting-window timing.
-
-**Phase 3 — cut over** only once the above holds:
-
-```bash
-yarn prod:subgraph <version>        # moves the prod tag; atomic for readers
-```
-
-The frontend needs **no** env change: it queries `/api/subgraph` (same-origin
-proxy) → `SUBGRAPH_API_URL` → the `biribi/prod` tagged endpoint.
-
-**Do not prune** the previous version until the new one has served production
-for a while — it is the only rollback.
-
-### Governance caveat
-
-`brbpPoints` changes retroactively (upward) for USDC/DAI players. A Snapshot
-proposal open across the cutover would see voting weight move under it. Cut over
-outside any voting window, and announce it: a voter who sees their weight change
-without explanation will read it as manipulation, not as a correction.
+Deploy requests are not automatically retried after uncertain transport failures. Inspect the BRB dashboard before recovery. Deployment and promotion are deliberately separate operations. Existing `biribi/prod`, Sepolia Turbo pipelines and workers remain test infrastructure.

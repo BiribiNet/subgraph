@@ -25,6 +25,8 @@
  *   SKIP_KEEPER_PAYOUT_TURBO — if 1, skip applying biribi-keeper-payout (CRE-only deploys)
  */
 import { config } from "dotenv";
+import { goldskyToken, verifyBrbProject } from "./goldsky-project.mjs";
+import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -193,7 +195,7 @@ function validateAndApplyTurbo(pipelineFile) {
       env: process.env,
     });
   } catch {
-    console.warn(`turbo validate failed for ${pipelineFile}; continuing to apply.`);
+    throw new Error(`turbo validate failed for ${pipelineFile}; refusing apply.`);
   }
 
   execSync(`./node_modules/.bin/goldsky turbo apply ${JSON.stringify(abs)}`, {
@@ -221,6 +223,17 @@ if (!DEPLOY_JSON) {
 
 const deployPath = resolve(root, DEPLOY_JSON);
 const deploy = JSON.parse(readFileSync(deployPath, "utf8"));
+if (deploy.chainId === 42161 || deploy.network === "arbitrum-one") {
+  throw new Error("Mainnet must use prepare-environment.mjs; this legacy pipeline sync is testnet-only.");
+}
+if (process.env.GOLDSKY_SYNC_FILES_ONLY !== "1") {
+  const token = goldskyToken();
+  const cliTokenPath = join(homedir(), ".goldsky", "auth_token");
+  if (!existsSync(cliTokenPath) || readFileSync(cliTokenPath, "utf8").trim() !== token) {
+    throw new Error("CLI and configured Goldsky credentials differ; log the CLI into BRB before syncing.");
+  }
+  await verifyBrbProject(token);
+}
 
 function blockFor(key) {
   const v = deploy.startBlocks?.[key];
@@ -511,6 +524,7 @@ if (process.env.GOLDSKY_SYNC_FILES_ONLY === "1") {
 }
 
 const baseName = process.env.GOLDSKY_SUBGRAPH_NAME ?? "biribi";
+if (baseName !== "biribi") throw new Error("Legacy sync is testnet-only: expected subgraph biribi");
 
 function stripAnsi(s) {
   return s.replace(/\u001b\[[0-9;]*m/g, "");
@@ -534,17 +548,6 @@ function parseAllDeployedVersions(output, name) {
     if (semver.valid(m[1])) out.push(m[1]);
   }
   return [...new Set(out)];
-}
-
-function parseProdTargetVersion(output, name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(
-    `${escaped}/prod\\s*->\\s*${escaped}/(\\d+\\.\\d+\\.\\d+)`,
-    "m",
-  );
-  const m = output.match(re);
-  if (m && semver.valid(m[1])) return m[1];
-  return null;
 }
 
 function fetchGoldskySubgraphList() {
@@ -572,40 +575,6 @@ function fetchGoldskySubgraphList() {
   return "";
 }
 
-function pruneOldestSubgraphIfNeeded(deployed, maxVer, listOutput) {
-  if (process.env.GOLDSKY_SUBGRAPH_AUTO_PRUNE === "0") {
-    console.log("GOLDSKY_SUBGRAPH_AUTO_PRUNE=0 — skip prune.");
-    return;
-  }
-  if (!deployed.length || !maxVer || deployed.length < 2) return;
-  const sorted = [...deployed].sort(semver.compare);
-  const minV = sorted[0];
-  if (!semver.lt(minV, maxVer)) return;
-
-  const prodTarget = parseProdTargetVersion(listOutput, baseName);
-  if (prodTarget && semver.eq(minV, prodTarget)) {
-    if (process.env.GOLDSKY_SKIP_PROD_REPOINT_FOR_PRUNE === "1") {
-      console.warn(
-        `Oldest ${baseName}/${minV} is prod; move prod before prune or unset GOLDSKY_SKIP_PROD_REPOINT_FOR_PRUNE.`,
-      );
-      return;
-    }
-    const prodFull = `${baseName}/${maxVer}`;
-    console.log(`Moving prod → ${prodFull} before deleting ${minV}…`);
-    execSync(`./node_modules/.bin/goldsky subgraph tag create ${prodFull} --tag prod`, {
-      cwd: root,
-      stdio: "inherit",
-      env: process.env,
-    });
-  }
-
-  execSync(`./node_modules/.bin/goldsky subgraph delete ${baseName}/${minV} --force`, {
-    cwd: root,
-    stdio: "inherit",
-    env: process.env,
-  });
-}
-
 function computeNextSubgraphVersion(output, name, pkgVersion) {
   const deployed = parseAllDeployedVersions(output, name);
   const maxDeployed =
@@ -627,12 +596,6 @@ const pkgJson = JSON.parse(readFileSync(pkgPath, "utf8"));
 const pkgVersionPre = pkgJson.version ?? "0.0.0";
 
 const listOutput = fetchGoldskySubgraphList();
-const deployedVersions = parseAllDeployedVersions(listOutput, baseName);
-const maxDeployedVer = deployedVersions.length
-  ? deployedVersions.reduce((a, b) => (semver.gt(a, b) ? a : b))
-  : null;
-pruneOldestSubgraphIfNeeded(deployedVersions, maxDeployedVer, listOutput);
-
 const nextVersion = computeNextSubgraphVersion(listOutput, baseName, pkgVersionPre);
 console.log("Next subgraph version:", nextVersion);
 
@@ -742,16 +705,7 @@ try {
     },
   );
 
-  if (process.env.GOLDSKY_SKIP_PROD_TAG === "1") {
-    console.log("GOLDSKY_SKIP_PROD_TAG=1 — prod tag unchanged.");
-  } else {
-    execSync(`./node_modules/.bin/goldsky subgraph tag create ${fullName} --tag prod`, {
-      cwd: root,
-      stdio: "inherit",
-      env: process.env,
-    });
-    console.log(`Tagged prod -> ${fullName}`);
-  }
+  console.log("Deployed untagged. Validate indexing and promote separately; previous deployments are retained.");
 } finally {
   writeFileSync(schemaPath, schemaOriginal, "utf8");
   cleanupAppliedTurbo("turbo.applied.yaml");

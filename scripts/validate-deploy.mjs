@@ -1,3 +1,4 @@
+import { verifyBrbProject, API_BASE } from './goldsky-project.mjs';
 /**
  * Phase 2 gate: compare a candidate Goldsky version against the live one before
  * the `prod` tag moves (see DEPLOY.md §4).
@@ -36,7 +37,6 @@
  * Env:
  *   GOLDSKY_API_TOKEN     — Goldsky API token (required; GOLDSKY_TOKEN also read)
  *   GOLDSKY_SUBGRAPH_NAME — subgraph name (default: biribi)
- *   GOLDSKY_API_BASE      — override API base (default: https://api.goldsky.com)
  */
 
 const token = (process.env.GOLDSKY_API_TOKEN ?? process.env.GOLDSKY_TOKEN ?? "").trim();
@@ -48,7 +48,8 @@ if (!token) {
   process.exit(1);
 }
 
-const apiBase = process.env.GOLDSKY_API_BASE ?? "https://api.goldsky.com";
+const apiBase = API_BASE;
+await verifyBrbProject(token);
 const subgraphName = process.env.GOLDSKY_SUBGRAPH_NAME ?? "biribi";
 
 // GlobalState is a singleton keyed by address(1) — see src/helpers/globalState.ts.
@@ -71,17 +72,7 @@ const byVersion = new Map(deployments.data.map((entry) => [entry.version, entry]
 function pickVersions() {
   const [live, candidate] = process.argv.slice(2);
   if (live && candidate) return [live, candidate];
-  // Default: highest version is the candidate, the one `prod` points at is live.
-  const versions = [...byVersion.keys()].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true }),
-  );
-  if (versions.length < 2) {
-    console.error(
-      `validate-deploy: need two deployed versions to compare, found ${versions.length}.`,
-    );
-    process.exit(1);
-  }
-  return [versions[versions.length - 2], versions[versions.length - 1]];
+  throw new Error('Pass explicit <actual-live-version> <candidate-version>; do not infer prod from version sorting.');
 }
 
 const [LIVE, CANDIDATE] = pickVersions();
@@ -348,5 +339,5 @@ if (regressions.length > 0) {
   process.exit(1);
 }
 console.log(`  Non-regression holds on ${NON_REGRESSION.join(", ")}.`);
-console.log(`  Cut over with: yarn prod:subgraph ${CANDIDATE}`);
+console.log(`  Cut over with: yarn prod:subgraph ${subgraphName}/${CANDIDATE} --validated`);
 console.log(`  Keep ${LIVE} deployed — it is the only rollback.`);

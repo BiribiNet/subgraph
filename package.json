@@ -6,15 +6,16 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "test": "node scripts/check-constants.mjs && graph test",
+    "test": "node scripts/check-constants.mjs && graph test -v 0.6.0",
     "sync:pipeline": "node scripts/sync-pipeline.mjs",
-    "deploy:subgraph": "yarn goldsky subgraph deploy biribi/\"$@\"",
-    "prod:subgraph": "yarn goldsky subgraph tag create biribi/\"$@\" --tag prod",
-    "deploy": "yarn codegen && yarn build && yarn deploy:subgraph $@ && yarn prod:subgraph $@",
+    "deploy:subgraph": "node scripts/goldsky-deploy.mjs",
+    "prod:subgraph": "node scripts/goldsky-promote.mjs",
+    "deploy": "yarn codegen && yarn build && yarn deploy:subgraph",
     "deploy:api": "yarn codegen && yarn build && node scripts/goldsky-deploy.mjs",
     "check:constants": "node scripts/check-constants.mjs",
     "validate:deploy": "node scripts/validate-deploy.mjs",
-    "reconcile:vaults": "node scripts/reconcile-vaults.mjs"
+    "reconcile:vaults": "node scripts/reconcile-vaults.mjs",
+    "test:release": "node --test scripts/goldsky-stage.test.mjs scripts/goldsky-project.test.mjs scripts/prepare-environment.test.mjs scripts/goldsky-promote.test.mjs"
   },
   "devDependencies": {
     "@goldskycom/cli": "^13.9.0",

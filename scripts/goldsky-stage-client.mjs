@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { verifyBrbProject } from './goldsky-project.mjs';
 
 export function credential(env = process.env) {
   const token = env.GOLDSKY_API_TOKEN?.trim() || env.GOLDSKY_TOKEN?.trim();
@@ -16,6 +17,7 @@ export async function submitValidation({ name, version, token, bundle }, fetcher
   validateTarget(name, version);
   if (!token?.trim()) throw new Error('Goldsky credential is unavailable.');
   if (!bundle?.byteLength) throw new Error('Validation bundle is empty.');
+  await verifyBrbProject(token, fetcher);
   const form = new FormData();
   form.set('bundle', new Blob([bundle], { type: 'application/octet-stream' }), 'bundle.zip');
   for (const key of ['overwrite', 'remove_graft', 'skip_graft_validation']) form.set(key, '0');

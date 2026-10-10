@@ -162,10 +162,12 @@ yarn test             # Run Matchstick tests
 ## Deployment
 
 ```bash
-yarn deploy:subgraph <version>   # Deploy to Goldsky
-yarn prod:subgraph <version>     # Tag as production
-yarn deploy <version>            # Codegen + build + deploy + tag
+yarn deploy:subgraph biribi/<version>   # Untagged testnet candidate
+yarn prod:subgraph biribi/<version> --validated # Promote only after reconciliation
+yarn deploy biribi/<version>            # Codegen + build + untagged deploy
 ```
+
+See [DEPLOY.md](DEPLOY.md) for BRB project checks, mainnet isolation and rollout gates.
 
 ## Revenue Distribution Per Round
 

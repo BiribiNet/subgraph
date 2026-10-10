@@ -4,12 +4,14 @@ import { readFileSync, rmSync, rmdirSync, existsSync, mkdtempSync, writeFileSync
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { assertBuildNetwork } from './goldsky-project.mjs';
 import { credential, validateTarget, submitValidation } from './goldsky-stage-client.mjs';
 
 const [name, version] = process.argv.slice(2);
 validateTarget(name, version);
 const token = credential();
 if (!existsSync('build/subgraph.yaml')) throw new Error('Build the subgraph first');
+assertBuildNetwork(name, readFileSync('build/subgraph.yaml', 'utf8'));
 const temporary = mkdtempSync(join(tmpdir(), 'biribi-validation-'));
 const bundle = join(temporary, 'bundle.zip');
 try {

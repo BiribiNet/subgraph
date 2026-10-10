@@ -1,40 +1,32 @@
-name: Deploy subgraph to Goldsky
-
+name: Stage testnet subgraph in BRB project
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to deploy (blank = auto: one patch above the latest)"
-        required: false
+        description: "Explicit immutable version; deploys untagged and retains rollback"
+        required: true
         type: string
-      prune:
-        description: "Delete superseded versions after the deploy"
-        required: false
-        type: boolean
-        default: true
-
+permissions:
+  contents: read
 concurrency:
-  group: goldsky-deploy
+  group: goldsky-testnet-release
   cancel-in-progress: false
-
 jobs:
   deploy:
+    environment: goldsky-testnet
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: |
-          corepack enable
-          yarn install --immutable
-
-      - name: Release to Goldsky (deploy + tag prod + prune)
+          node-version: 22
+      - run: corepack enable && yarn install --immutable
+      - run: yarn test:release && yarn test
+      - name: Submit testnet candidate without promotion or deletion
         env:
           GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+          GOLDSKY_SUBGRAPH_NAME: biribi
           VERSION: ${{ inputs.version }}
-          PRUNE: ${{ inputs.prune == false && '0' || '1' }}
+          PRUNE: "0"
         run: node scripts/goldsky-release.mjs

@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { credential, validateTarget, submitValidation } from './goldsky-stage-client.mjs';
 
+import { BRB_PROJECT_ID } from './goldsky-project.mjs';
+const project = { data: [{ projectId: BRB_PROJECT_ID, name: 'brb', currentlyAuthenticated: true }] };
+const withProject = handler => (url, options) => options.method === 'PUT' ? handler(url, options) : { ok: true, json: async () => project };
+const stage = (input, handler) => submitValidation(input, withProject(handler));
+
 const input = { name: 'biribi', version: 'validation-123-1', token: 'test-secret', bundle: new Uint8Array([1, 2, 3]) };
 test('missing or blank credentials fail; legacy secret remains supported', () => {
   for (const env of [{}, { GOLDSKY_API_TOKEN: '   ' }]) assert.throws(() => credential(env), /GOLDSKY_API_TOKEN/);
@@ -14,13 +19,13 @@ test('rejects prod, empty validation suffix and URL path injection', () => {
 test('invalid input causes no network call', async () => {
   let calls = 0;
   for (const change of [{ version: 'prod' }, { token: '' }, { bundle: new Uint8Array() }]) {
-    await assert.rejects(submitValidation({ ...input, ...change }, async () => { calls++; }));
+    await assert.rejects(stage({ ...input, ...change }, async () => { calls++; }));
   }
   assert.equal(calls, 0);
 });
 test('one deployment request, overwrite disabled, no tag mutation', async () => {
   const calls = [];
-  const result = await submitValidation(input, async (url, options) => {
+  const result = await stage(input, async (url, options) => {
     calls.push(url);
     assert.equal(options.method, 'PUT');
     assert.equal(options.redirect, 'error');
@@ -36,20 +41,20 @@ test('one deployment request, overwrite disabled, no tag mutation', async () => 
 });
 test('uncertain network failure neither retries nor exposes transport secrets', async () => {
   let calls = 0;
-  await assert.rejects(submitValidation(input, async () => { calls++; throw new Error('Bearer test-secret'); }), error => {
+  await assert.rejects(stage(input, async () => { calls++; throw new Error('Bearer test-secret'); }), error => {
     assert.match(error.message, /status unknown/);
     assert.ok(!error.message.includes(input.token)); return true;
   });
   assert.equal(calls, 1);
 });
 test('HTTP conflict cannot be mistaken for accepted deployment', async () => {
-  await assert.rejects(submitValidation(input, async () => ({ ok: false, status: 409 })), /HTTP 409/);
+  await assert.rejects(stage(input, async () => ({ ok: false, status: 409 })), /HTTP 409/);
 });
 test('unreadable successful response remains uncertain', async () => {
-  await assert.rejects(submitValidation(input, async () => ({ ok: true, json: async () => { throw new Error('test-secret'); } })), /status unknown/);
+  await assert.rejects(stage(input, async () => ({ ok: true, json: async () => { throw new Error('test-secret'); } })), /status unknown/);
 });
 test('unexpected server fields are not copied into a public receipt', async () => {
-  const result = await submitValidation(input, async () => ({ ok: true, json: async () => ({ data: { health: 'test-secret', secret: input.token } }) }));
+  const result = await stage(input, async () => ({ ok: true, json: async () => ({ data: { health: 'test-secret', secret: input.token } }) }));
   assert.equal(result.health, null);
   assert.ok(!JSON.stringify(result).includes(input.token));
 });

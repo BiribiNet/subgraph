@@ -1,4 +1,6 @@
 name: CI
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -18,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
         run: |
@@ -26,7 +28,7 @@ jobs:
           yarn install --immutable
 
       - name: Verify staging safeguards without credentials
-        run: node --test scripts/goldsky-stage.test.mjs
+        run: yarn test:release
 
       - name: Verify tip manifest activation safeguards
         run: node --test scripts/configure-tips.test.mjs

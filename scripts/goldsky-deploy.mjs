@@ -1,192 +1,42 @@
 #!/usr/bin/env node
-/**
- * Deploy subgraph to Goldsky via REST API (bypasses CLI proxy/TTY issues).
- *
- * Usage:
- *   node scripts/goldsky-deploy.mjs <name>/<version> [--description "..."] [--tag prod]
- *
- * Requires:
- *   - A Goldsky API token, via either:
- *       • GOLDSKY_API_TOKEN env var (recommended for CI / Claude Code on the web), or
- *       • ~/.goldsky/auth_token (written by `goldsky login`)
- *   - A successful `graph build` (build/ directory must exist)
- *
- * Environment:
- *   GOLDSKY_API_TOKEN — Goldsky API token (preferred over the auth_token file)
- *   GOLDSKY_API_BASE  — override API base (default: https://api.goldsky.com)
- */
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-import { homedir } from "node:os";
+// Immutable, untagged submission. Promotion is a separate, reviewed operation.
+import { execFileSync } from 'node:child_process';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { API_BASE, goldskyToken, verifyBrbProject, validateReleaseTarget, assertBuildNetwork } from './goldsky-project.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-// ── Parse args ────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-let nameAndVersion = null;
-let description = "";
-let tags = [];
-
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--description" && args[i + 1]) {
-    description = args[++i];
-  } else if (args[i] === "--tag" && args[i + 1]) {
-    tags.push(args[++i]);
-  } else if (!args[i].startsWith("-")) {
-    nameAndVersion = args[i];
-  }
+const [target, ...args] = process.argv.slice(2);
+const [name, version, extra] = (target ?? '').split('/');
+validateReleaseTarget(name, version);
+if (extra || (args.length && (args.length !== 2 || args[0] !== '--description'))) {
+  throw new Error('Usage: goldsky-deploy.mjs <name>/<version> [--description text]. Tags cannot move during deployment.');
 }
-
-if (!nameAndVersion || !nameAndVersion.includes("/")) {
-  console.error("Usage: goldsky-deploy.mjs <name>/<version> [--description '...'] [--tag prod]");
-  process.exit(1);
-}
-
-const [name, version] = nameAndVersion.split("/", 2);
-
-// ── Auth token ────────────────────────────────────────────────────────────────
-// Resolve the Goldsky API token. Prefer an environment variable (set as an
-// environment secret in CI / Claude Code on the web — never committed), and
-// fall back to the file written by `goldsky login` (~/.goldsky/auth_token) for
-// local interactive use.
-const tokenPath = join(homedir(), ".goldsky", "auth_token");
-let token = (process.env.GOLDSKY_API_TOKEN ?? process.env.GOLDSKY_TOKEN ?? "").trim();
-if (!token && existsSync(tokenPath)) {
-  token = readFileSync(tokenPath, "utf8").trim();
-}
-if (!token) {
-  console.error(
-    "Goldsky auth token not found. Set the GOLDSKY_API_TOKEN environment variable " +
-    `(recommended for CI / Claude Code on the web), or run \`goldsky login\` to create ${tokenPath}.`,
-  );
-  process.exit(1);
-}
-const apiBase = process.env.GOLDSKY_API_BASE ?? "https://api.goldsky.com";
-
-// ── Build directory ───────────────────────────────────────────────────────────
-const buildDir = join(root, "build");
-if (!existsSync(join(buildDir, "subgraph.yaml"))) {
-  console.error("build/subgraph.yaml not found. Run `yarn codegen && yarn build` first.");
-  process.exit(1);
-}
-
-// ── Create bundle zip ─────────────────────────────────────────────────────────
-// Goldsky expects a zip containing: subgraph.yaml, schema.graphql, wasm files, abi files
-// We use the system `zip` command to create it from the build/ directory.
-
-const bundlePath = join(root, ".goldsky-bundle.zip");
-
-console.log(`Packaging build/ into bundle...`);
-
-// Collect all files in build/
-function collectFiles(dir, base = dir) {
-  const files = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectFiles(full, base));
-    } else {
-      files.push(relative(base, full));
-    }
-  }
-  return files;
-}
-
-const buildFiles = collectFiles(buildDir);
-console.log(`  ${buildFiles.length} files in bundle`);
-
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const build = resolve(process.env.GOLDSKY_BUILD_DIR || join(root, 'build'));
+assertBuildNetwork(name, readFileSync(join(build, 'subgraph.yaml'), 'utf8'));
+const token = goldskyToken();
+await verifyBrbProject(token);
+const temp = mkdtempSync(join(tmpdir(), 'biribi-goldsky-'));
 try {
-  execSync(`rm -f "${bundlePath}" && cd "${buildDir}" && zip -q -r "${bundlePath}" .`, {
-    stdio: "inherit",
-  });
-} catch {
-  console.error("Failed to create bundle zip. Is `zip` installed?");
-  process.exit(1);
-}
-
-// ── Deploy via API ────────────────────────────────────────────────────────────
-const deployUrl = `${apiBase}/api/admin/subgraph/v1/subgraphs/${name}/deployments/${version}`;
-console.log(`\nDeploying ${name}/${version} to Goldsky...`);
-console.log(`  PUT ${deployUrl}`);
-
-const curlArgs = [
-  "curl", "-s", "-w", "\\n%{http_code}",
-  "-X", "PUT",
-  "-H", `Authorization: Bearer ${token}`,
-  "-F", `bundle=@${bundlePath};filename=bundle.zip;type=application/octet-stream`,
-  "-F", "overwrite=0",
-  "-F", "remove_graft=0",
-  "-F", "skip_graft_validation=0",
-];
-
-if (description) {
-  curlArgs.push("-F", `description=${description}`);
-}
-
-curlArgs.push(deployUrl);
-
-let deployOutput;
-try {
-  deployOutput = execSync(curlArgs.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(" "), {
-    encoding: "utf8",
-    timeout: 120_000,
-  });
-} catch (e) {
-  console.error("Deploy request failed:", e.message);
-  process.exit(1);
-} finally {
-  // Clean up bundle
-  try { execSync(`rm -f "${bundlePath}"`, { stdio: "ignore" }); } catch { /* ignore */ }
-}
-
-const lines = deployOutput.trim().split("\n");
-const httpStatus = lines.pop();
-const body = lines.join("\n");
-
-let parsed;
-try { parsed = JSON.parse(body); } catch { parsed = null; }
-
-if (httpStatus === "200" || httpStatus === "201") {
-  console.log(`\n  Deployed ${name}/${version} successfully!`);
-  if (parsed?.data) {
-    const d = parsed.data;
-    console.log(`  Health: ${d.health ?? "pending"}`);
-    console.log(`  Endpoint: ${apiBase}${d.graphql_endpoint ?? ""}`);
-  }
-} else if (httpStatus === "524") {
-  console.log(`\n  Deployment is taking longer than usual but will continue in the background.`);
-  console.log(`  Check status at: https://app.goldsky.com/dashboard`);
-} else {
-  console.error(`\n  Deploy failed (HTTP ${httpStatus}):`);
-  console.error(`  ${body}`);
-  process.exit(1);
-}
-
-// ── Tag ───────────────────────────────────────────────────────────────────────
-for (const tag of tags) {
-  console.log(`\nTagging ${name}/${version} as "${tag}"...`);
-  const tagUrl = `${apiBase}/api/admin/subgraph/v1/subgraphs/${name}/tags/${tag}`;
-
-  let tagOutput;
+  const bundle = join(temp, 'bundle.zip');
+  execFileSync('zip', ['-q', '-r', bundle, '.'], { cwd: build, stdio: 'inherit' });
+  const form = new FormData();
+  form.set('bundle', new Blob([readFileSync(bundle)], { type: 'application/octet-stream' }), 'bundle.zip');
+  for (const key of ['overwrite', 'remove_graft', 'skip_graft_validation']) form.set(key, '0');
+  if (args[1]) form.set('description', args[1]);
+  let response;
   try {
-    tagOutput = execSync(
-      `curl -s -w '\\n%{http_code}' -X PUT -H 'Authorization: Bearer ${token}' -H 'Content-Type: application/json' -d '{"target_version":"${version}"}' '${tagUrl}'`,
-      { encoding: "utf8", timeout: 30_000 },
-    );
-  } catch (e) {
-    console.error(`  Tag "${tag}" failed:`, e.message);
-    continue;
+    response = await fetch(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${name}/deployments/${version}`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: form,
+      signal: AbortSignal.timeout(120000), redirect: 'error',
+    });
+  } catch {
+    throw new Error(`Submission status unknown for ${target}; inspect BRB project before retrying. No retry or tag change sent.`);
   }
-
-  const tagLines = tagOutput.trim().split("\n");
-  const tagStatus = tagLines.pop();
-  if (tagStatus === "200" || tagStatus === "201") {
-    console.log(`  Tagged ${name}/${tag} → ${version}`);
-  } else {
-    console.error(`  Tag failed (HTTP ${tagStatus}): ${tagLines.join("\n")}`);
-  }
+  if (!response.ok) throw new Error(`Submission not confirmed (HTTP ${response.status}); inspect ${target} before retrying.`);
+  console.log(`Accepted ${target} in BRB project. Indexing is unverified; tags and previous versions are unchanged.`);
+} finally {
+  rmSync(temp, { recursive: true, force: true });
 }
-
-console.log("\nDone.");
