@@ -53,6 +53,10 @@ export function sideBetTypeFromI32(value: i32): string {
   if (value == 18) return "SUM_RANGE"
   if (value == 19) return "COLOR_MAJORITY"
   if (value == 20) return "EXACT_DOZEN"
+  if (value == 21) return "ANY_REPEAT"
+  if (value == 22) return "ZIGZAG"
+  if (value == 23) return "ANY_DOZEN"
+  if (value == 24) return "PHOTO_FINISH"
   log.warning("Unknown SideBetType value {}", [value.toString()])
   return "COLOR_COUNT"
 }
