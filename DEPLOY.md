@@ -55,4 +55,6 @@ The exporter never patches Sepolia source files. It rewrites every source/templa
 
 Mainnet Turbo pipelines are a separate provisioning step: new names, mainnet source/addresses and isolated worker/webhook/Ably sinks. Validate before apply. Legacy `sync:pipeline` is testnet-only, requires the CLI login to match the verified credential, fails on Turbo validation errors, and retains rollback versions. Do not use it to provision mainnet.
 
+For the existing mirror pipeline, set `MIRROR_API_SECRET` in this repository's local `.env` to the frontend's `MIRROR_API_SECRET` for `biribi.net`. The sync script URL-encodes it in the mirror sink. The round-watcher uses a separate Worker `WEBHOOK_SECRET` through Goldsky's `BIRIBI_CRE_SCHEDULE` secret; never substitute that credential into the website mirror. Generated `*.applied.yaml` files contain credentials and must not be committed or reused after a secret change.
+
 Deploy requests are not automatically retried after uncertain transport failures. Inspect the BRB dashboard before recovery. Deployment and promotion are deliberately separate operations. Existing `biribi/prod`, Sepolia Turbo pipelines and workers remain test infrastructure.

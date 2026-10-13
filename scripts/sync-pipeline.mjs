@@ -17,10 +17,10 @@
  *                            — MergedEvents.json is extended with SideBet + BRBJackpotFunder events from abis/*.json
  *   GOLDSKY_SUBGRAPH_NAME    — default biribi
  *   GOLDSKY_SYNC_FILES_ONLY  — if 1, only patch YAML files (no goldsky CLI)
- *   WEBHOOK_SECRET           — required for full sync if turbo.yaml url contains ${WEBHOOK_SECRET}
+ *   MIRROR_API_SECRET        — frontend mirror credential; separate from the Worker's WEBHOOK_SECRET
  *   CRE_WEBHOOK_URL          — required for full sync (turbo-cre.yaml ${CRE_WEBHOOK_URL})
  *                            — CRE turbo uses Goldsky `secret_name: BIRIBI_CRE_SCHEDULE` (httpauth),
- *                              header should be `x-webhook-secret` matching the Worker WEBHOOK_SECRET
+ *                              header should be `Authorization: Bearer <Worker WEBHOOK_SECRET>`
  *   KEEPER_PAYOUT_WEBHOOK_URL — required for full sync (turbo-keeper-payout.yaml); Worker POST /webhook/payout
  *   SKIP_KEEPER_PAYOUT_TURBO — if 1, skip applying biribi-keeper-payout (CRE-only deploys)
  */
@@ -37,7 +37,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 config({ path: join(root, ".env") });
 
 /** Must match turbo.yaml webhook url placeholder (string replace — not a regex). */
-const WEBHOOK_SECRET_PLACEHOLDER = "${WEBHOOK_SECRET}";
+const MIRROR_SECRET_PLACEHOLDER = "${MIRROR_API_SECRET}";
 const CRE_WEBHOOK_URL_PLACEHOLDER = "${CRE_WEBHOOK_URL}";
 const KEEPER_PAYOUT_WEBHOOK_URL_PLACEHOLDER = "${KEEPER_PAYOUT_WEBHOOK_URL}";
 const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
@@ -151,7 +151,7 @@ function writeTurboApplied({
       turbo = injectPlaceholder(
         turbo,
         secretPlaceholder,
-        envSecret,
+        encodeURIComponent(envSecret),
         secretLabel,
       );
       console.log(`Injected ${secretLabel} into ${appliedName}`);
@@ -431,9 +431,9 @@ const mirrorTurbo = writeTurboApplied({
   appliedName: "turbo.applied.yaml",
   abiLiteral: sqlAbiLiteral,
   addressList: turboAddresses,
-  secretPlaceholder: WEBHOOK_SECRET_PLACEHOLDER,
-  secretEnvKey: "WEBHOOK_SECRET",
-  secretLabel: "WEBHOOK_SECRET",
+  secretPlaceholder: MIRROR_SECRET_PLACEHOLDER,
+  secretEnvKey: "MIRROR_API_SECRET",
+  secretLabel: "MIRROR_API_SECRET",
 });
 
 const creTurbo = writeTurboApplied({
@@ -620,9 +620,9 @@ try {
     {
       file: "turbo.applied.yaml",
       content: turbo,
-      placeholder: WEBHOOK_SECRET_PLACEHOLDER,
-      envKey: "WEBHOOK_SECRET",
-      label: "WEBHOOK_SECRET",
+      placeholder: MIRROR_SECRET_PLACEHOLDER,
+      envKey: "MIRROR_API_SECRET",
+      label: "MIRROR_API_SECRET",
       appliedPath: turboAppliedPath,
     },
     {
@@ -664,7 +664,7 @@ try {
       content = injectPlaceholder(
         content,
         pipeline.placeholder,
-        secret,
+        encodeURIComponent(secret),
         pipeline.label,
       );
       writeFileSync(pipeline.appliedPath, content, "utf8");

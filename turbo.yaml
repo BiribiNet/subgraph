@@ -62,4 +62,4 @@ sinks:
     payload_version: null
     type: webhook
     url: >-
-      https://biribi.net/api/mirror?secret=${WEBHOOK_SECRET}
+      https://biribi.net/api/mirror?secret=${MIRROR_API_SECRET}
