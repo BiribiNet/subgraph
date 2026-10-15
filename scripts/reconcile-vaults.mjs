@@ -44,6 +44,8 @@ async function graphql(query) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(process.env.SUBGRAPH_AUTH_TOKEN && new URL(subgraphUrl).origin === 'https://api.goldsky.com'
+        ? { Authorization: `Bearer ${process.env.SUBGRAPH_AUTH_TOKEN}` } : {}),
       // The public proxy rejects requests without a same-origin marker.
       Origin: new URL(subgraphUrl).origin,
     },

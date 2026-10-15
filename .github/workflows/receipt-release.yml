@@ -1,0 +1,42 @@
+name: Verify or promote testnet placement receipts
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [inspect, validate, promote]
+        default: inspect
+        required: true
+      version:
+        description: Explicit immutable biribi candidate version
+        required: true
+      expected_live_deployment:
+        description: Observed public deployment hash; required for validation/promotion
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: goldsky-testnet-release
+  cancel-in-progress: false
+jobs:
+  verify:
+    environment: goldsky-testnet
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Inspect or validate the exact testnet candidate
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+          RELEASE_OPERATION: ${{ inputs.operation }}
+          VERSION: ${{ inputs.version }}
+          EXPECTED_LIVE_DEPLOYMENT: ${{ inputs.expected_live_deployment }}
+        run: node scripts/receipt-release.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: receipt-release-status
+          path: receipt-release-status.json

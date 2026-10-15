@@ -15,7 +15,7 @@
     "check:constants": "node scripts/check-constants.mjs",
     "validate:deploy": "node scripts/validate-deploy.mjs",
     "reconcile:vaults": "node scripts/reconcile-vaults.mjs",
-    "test:release": "node --test scripts/goldsky-stage.test.mjs scripts/goldsky-project.test.mjs scripts/prepare-environment.test.mjs scripts/goldsky-promote.test.mjs"
+    "test:release": "node --test scripts/goldsky-stage.test.mjs scripts/goldsky-project.test.mjs scripts/prepare-environment.test.mjs scripts/goldsky-promote.test.mjs scripts/receipt-release.test.mjs"
   },
   "devDependencies": {
     "@goldskycom/cli": "^13.9.0",

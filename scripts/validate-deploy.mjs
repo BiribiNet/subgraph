@@ -334,6 +334,9 @@ if (addedCollections.length > 0) {
 
 // ── Verdict ───────────────────────────────────────────────────────────────────
 console.log("\nVerdict");
+if (process.env.STRICT_RECEIPT_RELEASE === '1' && (pointsMoved || removed.length > 0 || !liveState || !candidateState)) {
+  throw new Error('Receipt-only release must preserve voting weights, existing query fields and global state.');
+}
 if (regressions.length > 0) {
   console.log(`  REGRESSION on ${regressions.join(", ")} — do NOT move the prod tag.`);
   process.exit(1);
