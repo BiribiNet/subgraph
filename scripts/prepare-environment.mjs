@@ -12,21 +12,25 @@ const sources = { BRBToken: 'brb', RouletteEngine: 'roulette', BRBReferral: 'brb
   UpkeepScheduler: 'scheduler', CreExecutionAuthority: 'creExecutionAuthority' };
 const validAddress = value => /^0x[\da-f]{40}$/i.test(value ?? '') && !/^0x0{40}$/i.test(value);
 
-export function prepareManifest(manifestText, deployment) {
+export function prepareManifest(manifestText, deployment, { candidate = false } = {}) {
   const network = { 42161: 'arbitrum-one', 421614: 'arbitrum-sepolia' }[deployment.chainId];
   if (!network) throw new Error('Deployment requires explicit chainId 42161 or 421614.');
-  if (deployment.chainId === 42161 && deployment.handoffComplete !== true) throw new Error('Mainnet deployment handoff is incomplete.');
+  if (deployment.chainId === 42161 && deployment.handoffComplete !== true && !candidate) throw new Error('Mainnet deployment handoff is incomplete. Use --candidate only for local build/review.');
+  const mode = deployment.automation?.mode ?? 'cre';
+  if (!['cre', 'keeper'].includes(mode)) throw new Error('Unknown automation mode.');
+  if (mode === 'keeper' && deployment.addresses?.automationReceiver != null && deployment.addresses.automationReceiver !== '') throw new Error('Keeper release must not configure a CRE receiver.');
+  const activeSources = Object.fromEntries(Object.entries(sources).filter(([name]) => mode === 'cre' || name !== 'AutomationReceiver'));
   const manifest = YAML.parse(manifestText);
-  for (const key of [...Object.values(sources), 'jackpotTreasury']) {
+  for (const key of [...Object.values(activeSources), 'jackpotTreasury']) {
     if (!validAddress(deployment.addresses?.[key])) throw new Error(`Missing/invalid addresses.${key}`);
   }
-  for (const name of Object.keys(sources)) {
+  for (const name of Object.keys(activeSources)) {
     if (manifest.dataSources.filter(source => source.name === name).length !== 1) throw new Error(`Expected one ${name} source`);
   }
   // Old Sepolia funders and optional TipJar must never leak onto a fresh mainnet.
-  manifest.dataSources = manifest.dataSources.filter(source => sources[source.name]);
+  manifest.dataSources = manifest.dataSources.filter(source => activeSources[source.name]);
   for (const source of manifest.dataSources) {
-    const key = sources[source.name];
+    const key = activeSources[source.name];
     const startBlock = deployment.startBlocks?.[key] ?? deployment.startBlock;
     if (!Number.isSafeInteger(startBlock) || startBlock < 1) throw new Error(`Invalid start block for ${key}`);
     source.network = network;
@@ -34,13 +38,22 @@ export function prepareManifest(manifestText, deployment) {
     source.source.startBlock = startBlock;
   }
   for (const template of manifest.templates) template.network = network;
+  if (deployment.addresses?.tipJar) {
+    if (!validAddress(deployment.addresses.tipJar)) throw new Error('Invalid TipJar address.');
+    const template = manifest.templates.find(source => source.name === 'TipJar');
+    if (!template) throw new Error('TipJar template missing.');
+    const startBlock = deployment.startBlocks?.tipJar ?? deployment.startBlock;
+    if (!Number.isSafeInteger(startBlock) || startBlock < 1) throw new Error('Invalid TipJar start block.');
+    manifest.dataSources.push({ ...structuredClone(template), source: { ...template.source,
+      address: deployment.addresses.tipJar.toLowerCase(), startBlock } });
+  }
   return YAML.stringify(manifest, { lineWidth: 0, defaultStringType: 'QUOTE_DOUBLE' });
 }
 
-export function prepareEnvironment(deploymentPath, output) {
+export function prepareEnvironment(deploymentPath, output, options = {}) {
   const deployment = JSON.parse(readFileSync(resolve(deploymentPath), 'utf8'));
   if (deployment.chainId !== 42161) throw new Error('This release exporter is for a fresh mainnet deployment. Keep existing testnet history sources unchanged.');
-  const manifest = prepareManifest(readFileSync(join(root, 'subgraph.yaml'), 'utf8'), deployment);
+  const manifest = prepareManifest(readFileSync(join(root, 'subgraph.yaml'), 'utf8'), deployment, options);
   const out = resolve(output);
   if (existsSync(out)) throw new Error('Output exists; choose a new release directory.');
   mkdirSync(out, { recursive: true });
@@ -57,12 +70,13 @@ export function prepareEnvironment(deploymentPath, output) {
   }
   writeFileSync(constantsPath, constants);
   writeFileSync(join(out, 'deployment.json'), JSON.stringify(deployment, null, 2) + '\n');
-  symlinkSync(join(root, 'node_modules'), join(out, 'node_modules'), 'dir');
+  symlinkSync(join(root, 'node_modules'), join(out, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   console.log(`Prepared ${out}. Run graph codegen/build there; publish as biribi-arbitrum-one/<version>.`);
   return out;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const [deployment, output] = process.argv.slice(2);
+  const [deployment, output, flag] = process.argv.slice(2);
+  if (flag && flag !== '--candidate') throw new Error('Unknown preparation flag');
   if (!deployment || !output) throw new Error('Usage: prepare-environment.mjs <mainnet-deployment.json> <new-output-dir>');
-  prepareEnvironment(deployment, output);
+  prepareEnvironment(deployment, output, { candidate: flag === '--candidate' });
 }

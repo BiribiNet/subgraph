@@ -34,6 +34,36 @@ Review accounting/governance changes, save same-block reconciliation evidence an
 
 ## New mainnet release
 
+The 2026-10-15 public candidate in `deployments/arbitrum-one.json` uses one BRB
+market and direct keeper automation. It omits AutomationReceiver and includes the
+explicit mainnet TipJar. Start block 515103224 is the successful BRB mint/deploy
+receipt, before the engine, registry registration and bank creation. Sepolia
+source files and `biribi/prod` stay unchanged.
+
+For **local compilation/review only**, incomplete handoff evidence can be kept
+visible while preparing an isolated candidate:
+
+```sh
+node scripts/prepare-environment.mjs deployments/arbitrum-one.json <new-source-directory> --candidate
+node scripts/prepare-mainnet-pipelines.mjs deployments/arbitrum-one.json <new-pipeline-directory>
+```
+
+`--candidate` never changes deployment flags or contacts Goldsky. Its output is
+not launch approval. The generated pipeline templates use separate mainnet names,
+`arbitrum_one.raw_logs`, the supplied worker's `/webhook` and `/webhook/payout`,
+and `BIRIBI_MAINNET_SCHEDULE` (a separately provisioned Bearer credential).
+They preserve the mirror secret placeholder for secure substitution and start
+at `latest` to avoid replaying historical events into live clients/keepers.
+Dataset reference: https://app.goldsky.com/explore/dataset/raw_logs
+
+Verify the `brb` project before any remote operation, validate the templates,
+review current indexing/service costs, configure isolated mainnet secrets and
+record rollback targets. No live pipelines were applied by this preparation.
+After publishing an untagged candidate, reconcile market 1, token balances,
+placements, revenue and payouts against mainnet receipts before promotion.
+Reconcile the actual deployed ABIs/source revisions: bytecode sizes differ from
+the dated repository rehearsal and compilation alone cannot establish identity.
+
 Follow [the cross-repository mainnet runbook](../contracts/docs/MAINNET_RUNBOOK.md) and [readiness findings](../contracts/docs/MAINNET_REVIEW_2026-10-09.md). Public launch is held on unresolved security/rehearsal gates.
 
 ```sh
