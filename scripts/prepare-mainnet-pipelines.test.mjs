@@ -25,6 +25,8 @@ test('mainnet pipelines isolate dataset, addresses, names, secrets and worker pa
     }
   }
   assert.ok(Object.values(files).some(text => text.includes('${MIRROR_API_SECRET}')));
+  const mirror = YAML.parse(files['biribi-arbitrum-one-events.template.yaml']);
+  assert.ok(JSON.stringify(mirror.transforms).includes(deployment.addresses.brbReferal.toLowerCase()));
 });
 test('rejects other chains, automation modes, unsafe worker origins and missing addresses', () => {
   for (const change of [{ chainId: 421614 }, { automation: { mode: 'cre' } }, { automation: { mode: 'keeper', worker: 'https://user:secret@example.com' } }, { addresses: {} }]) {

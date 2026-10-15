@@ -12,7 +12,7 @@ export function preparePipelines(deployment) {
   if (deployment.chainId !== 42161 || deployment.automation?.mode !== 'keeper') throw new Error('Requires an explicit Arbitrum One keeper deployment.');
   const worker = new URL(deployment.automation.worker);
   if (worker.protocol !== 'https:' || worker.username || worker.password || worker.search || worker.hash || worker.pathname !== '/') throw new Error('Worker must be a clean HTTPS origin.');
-  const keys = ['brb', 'roulette', 'sideBet', 'jackpotFunder', 'scheduler', 'creExecutionAuthority', 'tipJar'];
+  const keys = ['brb', 'brbReferal', 'roulette', 'sideBet', 'jackpotFunder', 'scheduler', 'creExecutionAuthority', 'tipJar'];
   const addresses = [...keys.map(key => deployment.addresses?.[key]), ...Object.values(deployment.markets ?? {}).map(market => market.bank)];
   if (!addresses.length || addresses.some(address => !valid(address))) throw new Error('Invalid/missing pipeline contract address.');
   const entries = ['MergedEvents', 'Game', 'SideBet', 'BRBJackpotFunder', 'TipJar'].flatMap(name => {
