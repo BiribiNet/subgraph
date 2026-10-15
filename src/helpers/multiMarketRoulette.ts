@@ -20,6 +20,7 @@ import {
   GlobalState,
   PendingBrbBurn,
   RouletteBet,
+  RoulettePlacement,
   RouletteRound,
 } from "../../generated/schema"
 import {
@@ -155,7 +156,7 @@ export function processBetRecorded(event: BetRecorded): void {
   const existingUserBet = RouletteBet.load(event.params.player.concat(round.id))
   const isNewRoundForUser = existingUserBet == null
 
-  recordRouletteBetFromPayload(
+  const ticket = recordRouletteBetFromPayload(
     event.params.player,
     payload,
     event.params.totalAmount,
@@ -165,6 +166,16 @@ export function processBetRecorded(event: BetRecorded): void {
     event.block.timestamp,
     event.transaction.hash
   )
+
+  const placement = new RoulettePlacement(event.transaction.hash.concatI32(event.logIndex.toI32()))
+  placement.bet = ticket.id
+  placement.user = event.params.player
+  placement.market = market.id
+  placement.amount = event.params.totalAmount
+  placement.transactionHash = event.transaction.hash
+  placement.blockNumber = event.block.number
+  placement.timestamp = event.block.timestamp
+  placement.save()
 
   const legCount = payload.types.length
   if (legCount == 0) {

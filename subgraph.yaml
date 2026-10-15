@@ -29,6 +29,7 @@ dataSources:
         - PayoutTransaction
         - RouletteRound
         - RouletteBet
+        - RoulettePlacement
         - DailyStat
         - TokenApproval
       abis:
