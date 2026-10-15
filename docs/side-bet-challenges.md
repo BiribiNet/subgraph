@@ -1,4 +1,4 @@
-# Six additional BRBGAME types
+# Six additional Side bets types
 
 Append-only contract indices: 9 DOZEN_PASSPORT, 10 BOOMERANG, 11 MIRROR_PAIR,
 12 WHEEL_NEIGHBORS, 13 DISTINCT_COLLECTION, 14 COLOR_DUEL. Indices 0..8 remain stable.
