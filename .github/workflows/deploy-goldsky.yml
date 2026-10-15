@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Verify deployment credential before installing or building
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+        run: node --input-type=module -e "import { goldskyToken, verifyBrbProject } from './scripts/goldsky-project.mjs'; await verifyBrbProject(goldskyToken());"
       - run: corepack enable && yarn install --immutable
       - run: yarn test:release && yarn codegen && yarn test
       - name: Submit testnet candidate without promotion or deletion
