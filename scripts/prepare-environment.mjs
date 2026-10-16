@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { deploymentAbi, executorApprovalIndexed } from './deployment-abis.mjs';
 const require = createRequire(import.meta.url);
 // Use the parser pinned by graph-cli, the compiler of this manifest.
 const YAML = createRequire(require.resolve('@graphprotocol/graph-cli/package.json'))('yaml');
@@ -21,6 +22,7 @@ export function prepareManifest(manifestText, deployment, { candidate = false } 
   if (mode === 'keeper' && deployment.addresses?.automationReceiver != null && deployment.addresses.automationReceiver !== '') throw new Error('Keeper release must not configure a CRE receiver.');
   const activeSources = Object.fromEntries(Object.entries(sources).filter(([name]) => mode === 'cre' || name !== 'AutomationReceiver'));
   const manifest = YAML.parse(manifestText);
+  const approvalIndexed = executorApprovalIndexed(deployment);
   for (const key of [...Object.values(activeSources), 'jackpotTreasury']) {
     if (!validAddress(deployment.addresses?.[key])) throw new Error(`Missing/invalid addresses.${key}`);
   }
@@ -36,6 +38,11 @@ export function prepareManifest(manifestText, deployment, { candidate = false } 
     source.network = network;
     source.source.address = deployment.addresses[key].toLowerCase();
     source.source.startBlock = startBlock;
+    if (source.name === 'CreExecutionAuthority' && !approvalIndexed) {
+      const handler = source.mapping.eventHandlers.find(item => item.event === 'ExecutorApprovalUpdated(indexed address,bool)');
+      if (!handler) throw new Error('Executor approval handler missing.');
+      handler.event = 'ExecutorApprovalUpdated(address,bool)';
+    }
   }
   for (const template of manifest.templates) template.network = network;
   if (deployment.addresses?.tipJar) {
@@ -61,6 +68,10 @@ export function prepareEnvironment(deploymentPath, output, options = {}) {
     cpSync(join(root, path), join(out, path), { recursive: true });
   }
   writeFileSync(join(out, 'subgraph.yaml'), manifest);
+  for (const name of ['CreExecutionAuthority', 'MergedEvents']) {
+    const path = join(out, 'abis', name + '.json');
+    writeFileSync(path, JSON.stringify(deploymentAbi(JSON.parse(readFileSync(path, 'utf8')), deployment), null, 2) + '\n');
+  }
   const constantsPath = join(out, 'src/helpers/constant.ts');
   let constants = readFileSync(constantsPath, 'utf8');
   for (const [name, key] of [['BRB_TOKEN_ADDRESS', 'brb'], ['JACKPOT_TREASURY_ADDRESS', 'jackpotTreasury']]) {

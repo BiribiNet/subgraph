@@ -48,3 +48,12 @@ test('explicit local candidate preparation preserves incomplete release evidence
   assert.ok(prepareManifest(text, incomplete, { candidate: true }));
   assert.equal(incomplete.handoffComplete, false);
 });
+
+test('mainnet keeper handler matches its recorded non-indexed event; Sepolia is unchanged', () => {
+  const deployed = JSON.parse(readFileSync(new URL('../deployments/arbitrum-one.json', import.meta.url)));
+  const approval = manifest => YAML.parse(manifest).dataSources.find(source => source.name === 'CreExecutionAuthority')
+    .mapping.eventHandlers.find(handler => handler.handler === 'handleExecutorApprovalUpdated').event;
+  assert.equal(approval(prepareManifest(text, deployed, { candidate: true })), 'ExecutorApprovalUpdated(address,bool)');
+  assert.equal(approval(prepareManifest(text, { ...deployment, chainId: 421614 })), 'ExecutorApprovalUpdated(indexed address,bool)');
+  assert.equal(approval(text), 'ExecutorApprovalUpdated(indexed address,bool)');
+});

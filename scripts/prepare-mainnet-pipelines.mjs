@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { deploymentAbi } from './deployment-abis.mjs';
 const require = createRequire(import.meta.url);
 const YAML = createRequire(require.resolve('@graphprotocol/graph-cli/package.json'))('yaml');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,7 +17,7 @@ export function preparePipelines(deployment) {
   const addresses = [...keys.map(key => deployment.addresses?.[key]), ...Object.values(deployment.markets ?? {}).map(market => market.bank)];
   if (!addresses.length || addresses.some(address => !valid(address))) throw new Error('Invalid/missing pipeline contract address.');
   const entries = ['MergedEvents', 'Game', 'SideBet', 'BRBJackpotFunder', 'TipJar'].flatMap(name => {
-    const artifact = JSON.parse(readFileSync(join(root, 'abis', name + '.json'), 'utf8'));
+    const artifact = deploymentAbi(JSON.parse(readFileSync(join(root, 'abis', name + '.json'), 'utf8')), deployment);
     return (Array.isArray(artifact) ? artifact : artifact.abi).filter(item => item.type === 'event');
   });
   const abi = [...new Map(entries.map(entry => [JSON.stringify(entry), entry])).values()];
