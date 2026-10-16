@@ -88,3 +88,19 @@ Mainnet Turbo pipelines are a separate provisioning step: new names, mainnet sou
 For the existing mirror pipeline, set `MIRROR_API_SECRET` in this repository's local `.env` to the frontend's `MIRROR_API_SECRET` for `biribi.net`. The sync script URL-encodes it in the mirror sink. The round-watcher uses a separate Worker `WEBHOOK_SECRET` through Goldsky's `BIRIBI_CRE_SCHEDULE` secret; never substitute that credential into the website mirror. Generated `*.applied.yaml` files contain credentials and must not be committed or reused after a secret change.
 
 Deploy requests are not automatically retried after uncertain transport failures. Inspect the BRB dashboard before recovery. Deployment and promotion are deliberately separate operations. Existing `biribi/prod`, Sepolia Turbo pipelines and workers remain test infrastructure.
+
+## Deployed keeper event layout — 2026-10-16
+
+The Arbitrum One candidate records `automation.executorApprovalIndexed: false`
+and the raw receipt evidence in its public deployment manifest. Its deployed
+authority emits `ExecutorApprovalUpdated(address,bool)` with a non-indexed
+executor, unlike the checked-in Sepolia/source ABI. `prepare-environment.mjs`
+applies this layout to the isolated authority and MergedEvents ABIs and its
+handler signature. `prepare-mainnet-pipelines.mjs` applies the same layout to
+the mirror decoder. Source Sepolia ABIs/manifests stay unchanged. Omitting
+the override preserves the legacy indexed layout; invalid override scopes fail.
+
+The regression test decodes the actual receipt and proves the indexed layout
+cannot decode it. This correction is one observed compatibility fix; it does
+not attest all deployed artifacts. Keep candidate flags incomplete until the
+remaining release evidence is reconciled.
