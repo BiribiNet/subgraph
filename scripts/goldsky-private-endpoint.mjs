@@ -14,7 +14,8 @@ export async function securePrivateEndpoint(name, version, token, fetcher = fetc
       redirect: 'error', signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) throw new Error();
-    const readback = await fetcher(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${name}/deployments`, {
+    // The name listing includes tags; /deployments intentionally excludes prod.
+    const readback = await fetcher(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${name}`, {
       headers: { Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(15000),
     });
     if (!readback.ok) throw new Error();

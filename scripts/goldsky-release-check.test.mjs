@@ -35,10 +35,13 @@ function fixture({ changedProd = false, drift = false, wrongMarket = false, netw
   const fetcher=async(url, options={}) => {
     let data;
     if (url.endsWith('/projects')) data={ data:[{ projectId:BRB_PROJECT_ID,name:'brb',currentlyAuthenticated:true }] };
-    else if (url.endsWith('/deployments')) {
+    else if (url.endsWith('/subgraphs/'+name)) {
       lists++;
       data={data:[entry('1.0.0'),entry('1.1.0'),...(prodMissing&&!promoted?[]:[{...entry('prod'),tag:{target_version: changedProd && lists>1 ? '1.0.1' : promoted ? '1.1.0':'1.0.0'}}])]};
       if (missingFreshMetadata && lists > 1) data = {};
+    } else if (url.endsWith('/deployments')) {
+      // The real deployments filter does not contain aliases.
+      data={data:[entry('1.0.0'),entry('1.1.0')]};
     } else if (url.endsWith('/rpc')) data={result:'0x'+(network==='mainnet'?42161:421614).toString(16)};
     else if (options.method==='PUT') { writes.push(url); if(url.endsWith('/tags/prod')) promoted=true; data={}; }
     else {

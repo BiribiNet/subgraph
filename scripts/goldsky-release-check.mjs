@@ -58,7 +58,8 @@ export async function runReleaseCheck(env = process.env, {
       return body;
     } catch { throw Error('Release request failed; credential-bearing request details omitted'); }
   }
-  const entries = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}/deployments`, { headers: auth })).data;
+  // The scoped name listing includes deployment versions AND aliases.
+  const entries = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}`, { headers: auth })).data;
   if (!Array.isArray(entries)) throw Error('Missing deployment metadata');
   const candidate = entries.find(item => item.version === version);
   const prod = entries.find(item => item.version === 'prod');
@@ -103,7 +104,7 @@ export async function runReleaseCheck(env = process.env, {
       env: { ...env, RPC_URL: target.rpc, SUBGRAPH_URL: privateEndpoint(target.name, candidate), SUBGRAPH_AUTH_TOKEN: token, TOLERANCE: '0' } });
     if (operation === 'promote' || operation === 'restore-testnet') {
       // Recheck alias identity immediately before the only tag mutation.
-      const fresh = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}/deployments`, { headers: auth })).data;
+      const fresh = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}`, { headers: auth })).data;
       if (!Array.isArray(fresh)) throw Error('Missing fresh deployment metadata; prod state is unknown');
       const live = fresh.find(item => item.version === 'prod');
       if (operation === 'restore-testnet' ? live : live?.tag?.target_version !== previous) throw Error('Prod changed during validation');

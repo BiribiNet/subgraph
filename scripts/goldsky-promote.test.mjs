@@ -8,7 +8,8 @@ function mock(candidate, writes, projectPayload = project, failWrite = false) {
   return async (url, options) => {
     assert.equal(options.redirect, 'error');
     if (url.endsWith('/projects')) return { ok: true, json: async () => projectPayload };
-    if (url.endsWith('/deployments')) return { ok: true, json: async () => ({ data: [candidate, ...(writes.some(write => write.url.endsWith('/tags/prod')) ? [{ ...candidate, version: 'prod' }] : [])] }) };
+    if (url.endsWith('/deployments')) return { ok: true, json: async () => ({ data: [candidate] }) };
+    if (/\/subgraphs\/(biribi|biribi-arbitrum-one)$/.test(url)) return { ok: true, json: async () => ({ data: [candidate, ...(writes.some(write => write.url.endsWith('/tags/prod')) ? [{ ...candidate, version: 'prod' }] : [])] }) };
     writes.push({ url, options });
     if (failWrite) throw new Error('secret transport data');
     return { ok: true };
