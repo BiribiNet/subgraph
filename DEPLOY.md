@@ -104,3 +104,23 @@ The regression test decodes the actual receipt and proves the indexed layout
 cannot decode it. This correction is one observed compatibility fix; it does
 not attest all deployed artifacts. Keep candidate flags incomplete until the
 remaining release evidence is reconciled.
+
+## Verified deployment ABI profile — 2026-10-17
+
+The canonical three-market manifest now selects abiProfile arbitrum-one-2026-10-15
+and cloudflare-keeper mode. Its handoff/source flags preserve the completed
+contracts deployment audit; activationApproved remains false. The ten-contract
+ABI snapshot is source-checked against solc 0.8.27 artifacts and pinned to the
+contracts revision in deployments/arbitrum-one-abi.json.
+
+Mainnet preparation selects complete event layouts, including non-indexed
+payments/funder/TipJar logs and the six-parameter WithdrawalProcessed. Its bank
+mapping records queue entry on WithdrawalIdentified, payment on Processed and
+closure without a payment hash on Skipped. Legacy type-only ABI entries support
+shared source compilation, but are never registered as mainnet handlers or
+included in the mainnet mirror. Default Sepolia files and handlers are unchanged.
+
+The templates use the existing BIRIBI_MAINNET_KEEPER_WAKE HTTP auth secret when
+wake-ups are recorded in the manifest. Generating templates neither applies
+pipelines nor changes existing Goldsky deployments. Verify mainnet indexing,
+Ably/mirror credentials and the complete live canary before public activation.

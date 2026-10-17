@@ -19,7 +19,7 @@ test('mainnet pipelines isolate dataset, addresses, names, secrets and worker pa
     assert.ok(text.includes(deployment.addresses.roulette));
     for (const sink of Object.values(pipeline.sinks)) {
       if (sink.secret_name) {
-        assert.equal(sink.secret_name, 'BIRIBI_MAINNET_SCHEDULE');
+        assert.equal(sink.secret_name, deployment.automation.goldskyWakeupsEnabled ? 'BIRIBI_MAINNET_KEEPER_WAKE' : 'BIRIBI_MAINNET_SCHEDULE');
         assert.ok(sink.url.startsWith(deployment.automation.worker + '/webhook'));
       }
     }

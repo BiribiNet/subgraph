@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { mainnetAbi, mainnetProfile } from './mainnet-abis.mjs';
+import { prepareManifest } from './prepare-environment.mjs';
+import { preparePipelines } from './prepare-mainnet-pipelines.mjs';
+const require=createRequire(import.meta.url);
+const YAML=createRequire(require.resolve('@graphprotocol/graph-cli/package.json'))('yaml');
+const deployment=JSON.parse(readFileSync(new URL('../deployments/arbitrum-one.json',import.meta.url)));
+const source=readFileSync(new URL('../subgraph.yaml',import.meta.url),'utf8');
+test('canonical three-market Cloudflare deployment selects only its deployed withdrawal handlers',()=>{
+ const result=YAML.parse(prepareManifest(source,deployment));
+ const bank=result.templates.find(item=>item.name==='BankVault');
+ assert.match(bank.mapping.file,/mainnet-bank-vault/);
+ const events=bank.mapping.eventHandlers.map(item=>item.event);
+ assert.ok(events.includes('WithdrawalIdentified(uint256,address,address,uint16)'));
+ assert.ok(events.includes('WithdrawalProcessed(uint256,address,address,uint16,uint256,uint256)'));
+ assert.ok(events.includes('WithdrawalSkipped(uint256,address,address,uint16)'));
+ assert.ok(!events.some(event=>event.startsWith('WithdrawalRequested(')||event.startsWith('WithdrawalPaid(')));
+ assert.equal(result.dataSources.find(item=>item.name==='RouletteEngine').mapping.eventHandlers.find(item=>item.handler==='handleRoulettePayment').event,'RoulettePayment(uint64,uint32,address,address,uint256)');
+ assert.equal(Object.keys(deployment.markets).length,3);
+});
+test('mirror uses actual event shapes and both newly registered banks',()=>{
+ const pipeline=YAML.parse(preparePipelines(deployment)['biribi-arbitrum-one-events.template.yaml']);
+ const sql=pipeline.transforms.decoded_events.sql;
+ const abi=JSON.parse(sql.match(/_gs_log_decode\(\s*'([^']+)'/)[1]);
+ assert.equal(abi.find(event=>event.name==='WithdrawalProcessed').inputs.length,6);
+ assert.ok(!abi.some(event=>event.name==='WithdrawalPaid'||event.name==='WithdrawalRequested'));
+ for(const market of Object.values(deployment.markets))assert.ok(JSON.stringify(pipeline.transforms).includes(market.bank.toLowerCase()));
+});
+test('legacy ABI input stays unchanged and unknown profiles fail closed',()=>{
+ const original=[{type:'event',name:'Original',inputs:[]}];
+ assert.deepEqual(mainnetAbi('Game',original,{chainId:421614}),original);
+ assert.throws(()=>mainnetProfile({...deployment,abiProfile:'unknown'}));
+ assert.throws(()=>mainnetProfile({...deployment,chainId:421614}));
+ const abi=mainnetAbi('Game',original,deployment);
+ assert.ok(abi.some(item=>item.name==='RoulettePayment'));
+ assert.deepEqual(original,[{type:'event',name:'Original',inputs:[]}]);
+});

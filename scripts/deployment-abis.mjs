@@ -2,7 +2,7 @@
 export function executorApprovalIndexed(deployment) {
   const indexed = deployment.automation?.executorApprovalIndexed;
   if (indexed === undefined) return true; // Existing Sepolia/source ABI.
-  if (deployment.chainId !== 42161 || deployment.automation?.mode !== 'keeper' || typeof indexed !== 'boolean') {
+  if (deployment.chainId !== 42161 || !['keeper', 'cloudflare-keeper'].includes(deployment.automation?.mode) || typeof indexed !== 'boolean') {
     throw new Error('Executor approval layout requires an explicit mainnet keeper boolean.');
   }
   return indexed;
