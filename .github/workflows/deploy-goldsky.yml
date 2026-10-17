@@ -1,7 +1,14 @@
-name: Stage testnet subgraph in BRB project
+name: Stage isolated Goldsky release in BRB project
+run-name: Stage ${{ inputs.network || 'testnet' }} Goldsky candidate ${{ inputs.version }}
 on:
   workflow_dispatch:
     inputs:
+      network:
+        description: "Explicit chain: mainnet uses the verified isolated ABI profile"
+        required: true
+        type: choice
+        options: [testnet, mainnet]
+        default: testnet
       version:
         description: "Explicit immutable version; deploys untagged and retains rollback"
         required: true
@@ -9,11 +16,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: goldsky-testnet-release
+  group: goldsky-${{ inputs.network || 'testnet' }}-release
   cancel-in-progress: false
 jobs:
   deploy:
-    environment: goldsky-testnet
+    environment: goldsky-${{ inputs.network || 'testnet' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -25,12 +32,30 @@ jobs:
         env:
           GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
         run: node --input-type=module -e "import { goldskyToken, verifyBrbProject } from './scripts/goldsky-project.mjs'; await verifyBrbProject(goldskyToken());"
+      - name: Validate explicit network and immutable version
+        env:
+          RELEASE_NETWORK: ${{ inputs.network || 'testnet' }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          node --input-type=module -e "import { validateReleaseTarget } from './scripts/goldsky-project.mjs'; const n=process.env.RELEASE_NETWORK; if (!['mainnet','testnet'].includes(n)) throw Error('Invalid network'); validateReleaseTarget(n==='mainnet'?'biribi-arbitrum-one':'biribi',process.env.VERSION);"
       - run: corepack enable && yarn install --immutable
       - run: yarn test:release && yarn codegen && yarn test
-      - name: Submit testnet candidate without promotion or deletion
+      - name: Prepare and compile isolated mainnet candidate
+        if: inputs.network == 'mainnet'
+        run: |
+          node scripts/prepare-environment.mjs deployments/arbitrum-one.json release-mainnet
+          cd release-mainnet
+          ../node_modules/.bin/graph codegen
+          ../node_modules/.bin/graph build
+      - name: Submit candidate without promotion or deletion
         env:
           GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
-          GOLDSKY_SUBGRAPH_NAME: biribi
+          RELEASE_NETWORK: ${{ inputs.network || 'testnet' }}
           VERSION: ${{ inputs.version }}
           PRUNE: "0"
-        run: node scripts/goldsky-release.mjs
+        run: |
+          if [ "$RELEASE_NETWORK" = mainnet ]; then
+            GOLDSKY_BUILD_DIR=release-mainnet/build node scripts/goldsky-deploy.mjs "biribi-arbitrum-one/$VERSION"
+          else
+            node scripts/goldsky-release.mjs
+          fi
