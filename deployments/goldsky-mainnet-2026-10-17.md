@@ -9,7 +9,7 @@ isolated mainnet codegen/WASM compilation and private-only endpoint readback.
 This is a deployed indexing candidate; it does not prove synchronized history
 or approve the website's public activation. The existing `prod` alias is retained.
 
-The manual `goldsky-release-check.yml` workflow provides credential-contained
+The manual `deploy-goldsky.yml` workflow provides credential-contained
 inspection, validation and promotion. Select the explicit network/version and
 the observed existing `prod` version for comparison. It checks private endpoint
 identity, full synchronization, errors, exact canonical markets and RPC chain;

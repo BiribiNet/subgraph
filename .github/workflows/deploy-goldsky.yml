@@ -1,8 +1,14 @@
 name: Stage isolated Goldsky release in BRB project
-run-name: Stage ${{ inputs.network || 'testnet' }} Goldsky candidate ${{ inputs.version }}
+run-name: Goldsky ${{ inputs.operation || 'deploy' }} ${{ inputs.network || 'testnet' }} ${{ inputs.version }}
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Deploy a candidate, inspect, validate, promote, or restore a missing Sepolia alias
+        required: true
+        type: choice
+        options: [deploy, inspect, validate, promote, restore-testnet]
+        default: deploy
       network:
         description: "Explicit chain: mainnet uses the verified isolated ABI profile"
         required: true
@@ -19,6 +25,9 @@ on:
         description: "Explicit immutable version; deploys untagged and retains rollback"
         required: true
         type: string
+      expected_live_version:
+        description: Observed current prod version; required for validate/promote
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -47,16 +56,21 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           node --input-type=module -e "import { validateReleaseTarget } from './scripts/goldsky-project.mjs'; const n=process.env.RELEASE_NETWORK; if (!['mainnet','testnet'].includes(n)) throw Error('Invalid network'); validateReleaseTarget(n==='mainnet'?'biribi-arbitrum-one':'biribi',process.env.VERSION);"
+      - name: Check release safeguards
+        run: node --test scripts/goldsky-release-check.test.mjs scripts/goldsky-private-endpoint.test.mjs scripts/goldsky-promote.test.mjs
       - run: corepack enable && yarn install --immutable
+        if: inputs.operation == 'deploy' || inputs.operation == ''
       - run: yarn test:release && yarn codegen && yarn test
+        if: inputs.operation == 'deploy' || inputs.operation == ''
       - name: Prepare and compile isolated mainnet candidate
-        if: inputs.network == 'mainnet'
+        if: inputs.network == 'mainnet' && (inputs.operation == 'deploy' || inputs.operation == '')
         run: |
           node scripts/prepare-environment.mjs deployments/arbitrum-one.json release-mainnet
           cd release-mainnet
           ../node_modules/.bin/graph codegen
           ../node_modules/.bin/graph build
       - name: Submit candidate without promotion or deletion
+        if: inputs.operation == 'deploy' || inputs.operation == ''
         env:
           GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
           RELEASE_NETWORK: ${{ inputs.network || 'testnet' }}
@@ -68,3 +82,18 @@ jobs:
           else
             node scripts/goldsky-release.mjs
           fi
+      - name: Inspect or validate the selected release
+        if: inputs.operation != 'deploy' && inputs.operation != ''
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+          RELEASE_NETWORK: ${{ inputs.network || 'testnet' }}
+          RELEASE_OPERATION: ${{ inputs.operation }}
+          VERSION: ${{ inputs.version }}
+          EXPECTED_LIVE_VERSION: ${{ inputs.expected_live_version }}
+        run: node scripts/goldsky-release-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.operation != 'deploy' && inputs.operation != ''
+        with:
+          name: goldsky-release-status
+          path: goldsky-release-status.json
+          if-no-files-found: warn
