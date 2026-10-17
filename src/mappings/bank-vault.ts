@@ -1,5 +1,5 @@
 import { recordMarketAccounting } from "../helpers/market-accounting"
-import { Address, BigInt, Bytes, log, store } from "@graphprotocol/graph-ts"
+import { Address, BigInt, Bytes, ethereum, log, store } from "@graphprotocol/graph-ts"
 import {
   Deposit,
   Withdraw,
@@ -172,19 +172,23 @@ export function handleDeposit(event: Deposit): void {
 export function handleWithdraw(_event: Withdraw): void {}
 
 export function handleWithdrawalRequested(event: WithdrawalRequested): void {
+  recordWithdrawalRequested(event, event.params.owner, event.params.bps)
+}
+
+export function recordWithdrawalRequested(event: ethereum.Event, owner: Address, bpsValue: i32): void {
   const market = loadMarketByBank(event.address)
   const globalState = getOrCreateGlobalState()
-  const user = getOrCreateUser(event.params.owner)
+  const user = getOrCreateUser(owner)
 
   let estimatedAssets = ZERO
-  const bps = BigInt.fromI32(event.params.bps)
+  const bps = BigInt.fromI32(bpsValue)
   // Per-market shares, not `user.sbrbBalance`: that sums share balances across vaults whose share
   // decimals differ (asset decimals + 6), so a USDC position mixed with a BRB one skewed the estimate
   // by up to 10^12. The schema flags the same hazard on the field itself. The old
   // `cumulativeDepositShares` fallback was dropped because it is cross-vault in exactly the same way.
   let sharesHeld = ZERO
   if (market != null) {
-    const stats = UserMarketStats.load(userMarketStatsId(event.params.owner, market.id))
+    const stats = UserMarketStats.load(userMarketStatsId(owner, market.id))
     if (stats != null) {
       sharesHeld = stats.sbrbShares
     }
@@ -203,7 +207,7 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
 
   const requestId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const request = new LargeWithdrawalRequest(requestId)
-  request.user = event.params.owner
+  request.user = owner
   request.amount = estimatedAssets
   if (market != null) {
     request.market = market.id
@@ -220,7 +224,7 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
   // Track the open request per (user, bank): a user may hold a concurrent request in each vault.
   // The legacy single `User.openWithdrawalRequestId` pointer is kept for backward compatibility but
   // is no longer authoritative for the pending-amount decrement (it was overwritten across vaults).
-  const openKey = event.params.owner.concat(event.address)
+  const openKey = owner.concat(event.address)
   let open = OpenWithdrawalRequest.load(openKey)
   if (open == null) {
     open = new OpenWithdrawalRequest(openKey)
@@ -236,15 +240,17 @@ export function handleWithdrawalRequested(event: WithdrawalRequested): void {
 }
 
 export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
+  recordWithdrawalProcessed(event, event.params.owner, event.params.assetsPaid, event.params.sharesBurned)
+}
+
+export function recordWithdrawalProcessed(event: ethereum.Event, owner: Address, assetsPaid: BigInt, sharesBurned: BigInt): void {
   const market = loadMarketByBank(event.address)
   if (market == null) {
     return
   }
 
   const globalState = getOrCreateGlobalState()
-  const user = getOrCreateUser(event.params.owner)
-  const assetsPaid = event.params.assetsPaid
-  const sharesBurned = event.params.sharesBurned
+  const user = getOrCreateUser(owner)
 
   // Fallback decrement when the request row is missing (e.g. pre-migration
   // rows): keep the clamped assetsPaid subtraction.
@@ -252,7 +258,7 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
 
   // Resolve the open request per (user, bank) so a concurrent withdrawal in another vault cannot
   // point us at the wrong request. `event.address` is the bank (BankVault4626 proxy).
-  const openKey = event.params.owner.concat(event.address)
+  const openKey = owner.concat(event.address)
   const open = OpenWithdrawalRequest.load(openKey)
   const openReqId = open ? open.request : null
   if (openReqId) {
@@ -288,7 +294,7 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     const withdrawalId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
     const withdrawal = new VaultWithdrawal(withdrawalId)
     withdrawal.market = market.id
-    withdrawal.user = event.params.owner
+    withdrawal.user = owner
     withdrawal.assets = assetsPaid
     withdrawal.shares = sharesBurned
     withdrawal.blockNumber = event.block.number
@@ -296,16 +302,16 @@ export function handleWithdrawalProcessed(event: WithdrawalProcessed): void {
     withdrawal.transactionHash = event.transaction.hash
     withdrawal.save()
 
-    updateUserStakingStats(event.params.owner, assetsPaid, market.assetDecimals, false, event.block.timestamp)
+    updateUserStakingStats(owner, assetsPaid, market.assetDecimals, false, event.block.timestamp)
     recordMarketAccounting(market, event.transaction.hash.toHexString() + "-" + event.logIndex.toString() + "-withdraw", event.block.timestamp, event.block.number, ["withdrawalVolume"], [assetsPaid])
-    recordUserMarketStake(event.params.owner, market, assetsPaid, false, event.block.timestamp)
-    updateUserLastActive(event.params.owner, event.block.timestamp)
-    updateUserWithdrawalCostBasis(event.params.owner, sharesBurned)
+    recordUserMarketStake(owner, market, assetsPaid, false, event.block.timestamp)
+    updateUserLastActive(owner, event.block.timestamp)
+    updateUserWithdrawalCostBasis(owner, sharesBurned)
 
     let wt = WithdrawTransaction.load(event.transaction.hash)
     if (wt == null) {
       wt = new WithdrawTransaction(event.transaction.hash)
-      wt.user = event.params.owner
+      wt.user = owner
       wt.blockNumber = event.block.number
       wt.timestamp = event.block.timestamp
       wt.save()
@@ -494,17 +500,21 @@ export function handleWithdrawalIdentified(event: WithdrawalIdentified): void {
   row.save()
 }
 export function handleWithdrawalPaid(event: WithdrawalPaid): void {
-  const id = event.address.toHexString() + "-" + event.params.requestId.toString()
+  recordWithdrawalPayment(event, event.params.requestId, event.params.owner, event.params.assetsPaid, event.params.sharesBurned)
+}
+
+export function recordWithdrawalPayment(event: ethereum.Event, requestId: BigInt, owner: Address, assetsPaid: BigInt, sharesBurned: BigInt): void {
+  const id = event.address.toHexString() + "-" + requestId.toString()
   let row = ProtocolWithdrawalReceipt.load(id)
   if (row == null) {
     row = new ProtocolWithdrawalReceipt(id)
     row.bank = event.address
-    row.requestId = event.params.requestId
-    row.owner = event.params.owner
+    row.requestId = requestId
+    row.owner = owner
   }
   row.processedAt = event.block.timestamp
-  row.assetsPaid = event.params.assetsPaid
-  row.sharesBurned = event.params.sharesBurned
+  row.assetsPaid = assetsPaid
+  row.sharesBurned = sharesBurned
   row.paymentTransaction = event.transaction.hash
   row.save()
 }

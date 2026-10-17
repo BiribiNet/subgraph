@@ -1,3 +1,4 @@
+import { mainnetAbi } from './mainnet-abis.mjs';
 // Local templates only. No Goldsky calls, credential reads or remote apply.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -10,14 +11,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const valid = value => /^0x[\da-f]{40}$/i.test(value ?? '') && !/^0x0{40}$/i.test(value);
 
 export function preparePipelines(deployment) {
-  if (deployment.chainId !== 42161 || deployment.automation?.mode !== 'keeper') throw new Error('Requires an explicit Arbitrum One keeper deployment.');
+  if (deployment.chainId !== 42161 || !['keeper', 'cloudflare-keeper'].includes(deployment.automation?.mode)) throw new Error('Requires an explicit Arbitrum One keeper deployment.');
   const worker = new URL(deployment.automation.worker);
   if (worker.protocol !== 'https:' || worker.username || worker.password || worker.search || worker.hash || worker.pathname !== '/') throw new Error('Worker must be a clean HTTPS origin.');
   const keys = ['brb', 'brbReferal', 'roulette', 'sideBet', 'jackpotFunder', 'scheduler', 'creExecutionAuthority', 'tipJar'];
   const addresses = [...keys.map(key => deployment.addresses?.[key]), ...Object.values(deployment.markets ?? {}).map(market => market.bank)];
   if (!addresses.length || addresses.some(address => !valid(address))) throw new Error('Invalid/missing pipeline contract address.');
   const entries = ['MergedEvents', 'Game', 'SideBet', 'BRBJackpotFunder', 'TipJar'].flatMap(name => {
-    const artifact = deploymentAbi(JSON.parse(readFileSync(join(root, 'abis', name + '.json'), 'utf8')), deployment);
+    const artifact = mainnetAbi(name, deploymentAbi(JSON.parse(readFileSync(join(root, 'abis', name + '.json'), 'utf8')), deployment), deployment);
     return (Array.isArray(artifact) ? artifact : artifact.abi).filter(item => item.type === 'event');
   });
   const abi = [...new Map(entries.map(entry => [JSON.stringify(entry), entry])).values()];
@@ -40,7 +41,7 @@ export function preparePipelines(deployment) {
     // Realtime only: historical accounting comes from the isolated subgraph.
     pipeline.sources.raw_logs.start_at = 'latest';
     for (const sink of Object.values(pipeline.sinks)) {
-      if (sink.secret_name) sink.secret_name = 'BIRIBI_MAINNET_SCHEDULE';
+      if (sink.secret_name) sink.secret_name = deployment.automation.goldskyWakeupsEnabled ? 'BIRIBI_MAINNET_KEEPER_WAKE' : 'BIRIBI_MAINNET_SCHEDULE';
     }
     return [name + '.template.yaml', YAML.stringify(pipeline, { lineWidth: 0 })];
   }));
