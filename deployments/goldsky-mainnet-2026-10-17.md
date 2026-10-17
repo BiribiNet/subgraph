@@ -2,6 +2,28 @@
 
 ## Operational follow-up
 
+Mainnet candidate `biribi-arbitrum-one/1.1.0` was accepted in workflow
+`39042927933` at source commit `56c07d7ce345b8dbbce9b1b25f79bd9b538882eb`.
+The workflow passed its project preflight, release tests, codegen/Matchstick,
+isolated mainnet codegen/WASM compilation and private-only endpoint readback.
+This is a deployed indexing candidate; it does not prove synchronized history
+or approve the website's public activation. The existing `prod` alias is retained.
+
+The manual `goldsky-release-check.yml` workflow provides credential-contained
+inspection, validation and promotion. Select the explicit network/version and
+the observed existing `prod` version for comparison. It checks private endpoint
+identity, full synchronization, errors, exact canonical markets and RPC chain;
+then compares both versions at one block and reconciles every vault with zero
+tolerance before promotion. A fresh alias check prevents overwriting a changed
+release, and the promoted content hash/privacy are read back. Deployment and
+release verification share a per-network concurrency group. The status artifact
+contains public index observations and no token.
+
+`restore-testnet` is limited to Sepolia and an absent `prod` alias. It requires
+indexed placement receipts, exact canonical markets and zero-drift vault
+reconciliation, without inventing a deleted rollback baseline or skipping
+history. It cannot overwrite an existing alias or restore over mainnet.
+
 The existing GitHub `goldsky-testnet` credential successfully authenticated
 project **brb** and submitted a separate Sepolia restoration at master commit
 `b72a7057029081119c84c596ed53ba0a623715d3` (run `39041906593`). This is a
