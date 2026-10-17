@@ -24,7 +24,7 @@ test('missing, duplicate, wrong and cross-market assets or banks fail reconcilia
   for (const data of [[],[markets[0],markets[0]],[markets[1],{...markets[0],bank:'0xbbbb'}],[markets[1],{...markets[0],asset:'0x2222'}]]) assert.throws(()=>assertMarkets(data,manifest));
 });
 
-function fixture({ changedProd = false, drift = false, wrongMarket = false, network = 'mainnet', prodMissing = false, placementMissing = false } = {}) {
+function fixture({ changedProd = false, drift = false, wrongMarket = false, network = 'mainnet', prodMissing = false, placementMissing = false, missingFreshMetadata = false } = {}) {
   const market = { marketId:1,asset:'0x1111',bank:'0xaaaa' };
   const manifest = { markets: { brb: market } };
   const name=network==='mainnet'?'biribi-arbitrum-one':'biribi';
@@ -38,6 +38,7 @@ function fixture({ changedProd = false, drift = false, wrongMarket = false, netw
     else if (url.endsWith('/deployments')) {
       lists++;
       data={data:[entry('1.0.0'),entry('1.1.0'),...(prodMissing&&!promoted?[]:[{...entry('prod'),tag:{target_version: changedProd && lists>1 ? '1.0.1' : promoted ? '1.1.0':'1.0.0'}}])]};
+      if (missingFreshMetadata && lists > 1) data = {};
     } else if (url.endsWith('/rpc')) data={result:'0x'+(network==='mainnet'?42161:421614).toString(16)};
     else if (options.method==='PUT') { writes.push(url); if(url.endsWith('/tags/prod')) promoted=true; data={}; }
     else {
@@ -79,4 +80,10 @@ test('Sepolia recovery cannot overwrite an alias or publish without placement re
     await assert.rejects(runReleaseCheck({...env,RELEASE_NETWORK:'testnet',RELEASE_OPERATION:'restore-testnet'},f.dependencies));
     assert.equal(f.writes.length,0);
   }
+});
+test('missing fresh deployment metadata cannot be mistaken for an absent Sepolia alias',async()=>{
+  const f=fixture({network:'testnet',prodMissing:true,missingFreshMetadata:true});
+  await assert.rejects(runReleaseCheck({...env,RELEASE_NETWORK:'testnet',RELEASE_OPERATION:'restore-testnet'},f.dependencies),/state is unknown/);
+  assert.equal(f.writes.length,0);
+  assert.equal(f.reports.at(-1).promotionAttempted,false);
 });

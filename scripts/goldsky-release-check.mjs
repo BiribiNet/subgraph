@@ -104,7 +104,8 @@ export async function runReleaseCheck(env = process.env, {
     if (operation === 'promote' || operation === 'restore-testnet') {
       // Recheck alias identity immediately before the only tag mutation.
       const fresh = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}/deployments`, { headers: auth })).data;
-      const live = fresh?.find(item => item.version === 'prod');
+      if (!Array.isArray(fresh)) throw Error('Missing fresh deployment metadata; prod state is unknown');
+      const live = fresh.find(item => item.version === 'prod');
       if (operation === 'restore-testnet' ? live : live?.tag?.target_version !== previous) throw Error('Prod changed during validation');
       report.promotionAttempted = true;
       await promoteRelease(target.name, version, token, fetcher);
