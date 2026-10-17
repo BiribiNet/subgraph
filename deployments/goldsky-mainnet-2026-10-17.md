@@ -38,3 +38,14 @@ errors and validate the mainnet withdrawal/payment layouts. Promotion remains
 separate using the guarded promotion script or the authenticated dashboard in
 the confirmed BRB project. Public website cutover additionally requires its
 mainnet services and lifecycle validation.
+
+## Attempted submission
+
+The workflow was manually dispatched on the reviewed branch at commit
+`b025c3cd9abca24332535a41a792f660a45ba022`, explicitly selecting `mainnet`
+and version `1.1.0` (run `39041191608`). It stopped at the credential preflight:
+`GOLDSKY_API_TOKEN` is absent from `goldsky-mainnet`. No build or Goldsky
+submission occurred. The environment exists but has no secrets. Add the BRB
+project credential through GitHub's encrypted environment secret form and
+rerun; do not paste it in an issue, PR, chat or workflow input. The independent
+CI test/codegen/Matchstick/build run `39041095505` passed.
