@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE, goldskyToken, verifyBrbProject, validateReleaseTarget, assertBuildNetwork } from './goldsky-project.mjs';
+import { securePrivateEndpoint } from './goldsky-private-endpoint.mjs';
 
 const [target, ...args] = process.argv.slice(2);
 const [name, version, extra] = (target ?? '').split('/');
@@ -36,6 +37,7 @@ try {
     throw new Error(`Submission status unknown for ${target}; inspect BRB project before retrying. No retry or tag change sent.`);
   }
   if (!response.ok) throw new Error(`Submission not confirmed (HTTP ${response.status}); inspect ${target} before retrying.`);
+  await securePrivateEndpoint(name, version, token);
   console.log(`Accepted ${target} in BRB project. Indexing is unverified; tags and previous versions are unchanged.`);
 } finally {
   rmSync(temp, { recursive: true, force: true });
