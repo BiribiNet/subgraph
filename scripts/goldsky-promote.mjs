@@ -1,5 +1,6 @@
 // Phase 2 only: operator must first review reconciliation and governance impact.
 import { API_BASE, goldskyToken, verifyBrbProject, validateReleaseTarget } from './goldsky-project.mjs';
+import { securePrivateEndpoint } from './goldsky-private-endpoint.mjs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -15,7 +16,8 @@ export async function promoteRelease(name, version, token, fetcher = fetch) {
     if (!response.ok) throw new Error();
     const payload = await response.json();
     const entry = payload.data?.find(item => item.version === version);
-    if (!entry || entry.health !== 'healthy' || entry.synced !== true || !entry.deployments?.length
+    if (!entry || entry.public_endpoint_enabled !== false || entry.private_endpoint_enabled !== true
+        || entry.health !== 'healthy' || entry.synced !== true || !entry.deployments?.length
         || entry.deployments.some(deployment => deployment.fatal_error || deployment.non_fatal_errors?.length)) {
       throw new Error();
     }
@@ -31,6 +33,7 @@ export async function promoteRelease(name, version, token, fetcher = fetch) {
     throw new Error(`Promotion status unknown for ${target}; inspect the BRB dashboard before retrying.`);
 }
 if (!response.ok) throw new Error(`Promotion unconfirmed (HTTP ${response.status}); inspect BRB project before retrying.`);
+await securePrivateEndpoint(name, 'prod', token, fetcher);
 console.log(`Promoted ${target} to ${name}/prod. All older deployments retained. Verify the alias and application before cutover.`);
 
 }

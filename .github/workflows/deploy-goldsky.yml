@@ -9,6 +9,12 @@ on:
         type: choice
         options: [testnet, mainnet]
         default: testnet
+      credential_environment:
+        description: "Location of the BRB project admin key; does not select the chain"
+        required: true
+        type: choice
+        options: [goldsky-testnet, goldsky-mainnet]
+        default: goldsky-testnet
       version:
         description: "Explicit immutable version; deploys untagged and retains rollback"
         required: true
@@ -20,7 +26,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    environment: goldsky-${{ inputs.network || 'testnet' }}
+    # The existing BRB-project admin credential lives under this legacy name.
+    # Network selection and build guards independently bind the deployment chain.
+    # Runtime query/mirror/Ably credentials remain environment-specific.
+    environment: ${{ inputs.credential_environment == 'goldsky-mainnet' && 'goldsky-mainnet' || 'goldsky-testnet' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

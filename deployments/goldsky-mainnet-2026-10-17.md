@@ -1,5 +1,35 @@
 # Goldsky mainnet index inspection, October 17
 
+## Operational follow-up
+
+The existing GitHub `goldsky-testnet` credential successfully authenticated
+project **brb** and submitted a separate Sepolia restoration at master commit
+`b72a7057029081119c84c596ed53ba0a623715d3` (run `39041906593`). This is a
+BRB-project administration key, independent of the deployed network. The release
+workflow now lets the operator explicitly select its credential location;
+the default retains this existing location. A `goldsky-mainnet` key can be used
+instead when configured. This does not copy a secret, expand its Goldsky scope,
+or change chain selection. The generated build/name/network guards still bind
+mainnet to `biribi-arbitrum-one` and Sepolia to `biribi`. Runtime query, Ably,
+mirror and cron credentials still require separate environment configuration.
+The earlier missing-key failure below does not require creating another admin
+credential merely to deploy the corrected mainnet candidate.
+
+`biribi/validation-restore-20261017` was accepted and is reindexing from the
+original block 284788460. No history was skipped and `prod` has not moved.
+Goldsky initially created a public endpoint; dashboard controls enabled its
+private endpoint and disabled its public endpoint. Both flags were read back.
+The scripts now perform this restriction and verify the readback immediately
+after accepting a deployment, before reporting success. Goldsky's creation API
+defaults mean a newly submitted version can briefly be public before the
+update; this workflow does not claim atomic private creation. No service
+credentials are indexed by the mappings.
+
+Promotion requires a healthy, synchronized, private-only candidate. It verifies
+and restricts the `prod` alias after moving it, because a newly created tag can
+also default to public. An uncertain privacy update fails closed and requires
+inspection; it never redeploys, retries a tag change or deletes a version.
+
 Authenticated dashboard inspection confirmed project **brb**,
 `project_cmfbfxud380il01v04gey3ym6`. Its All subgraphs list contains only
 `biribi-arbitrum-one/1.0.0`, deployed October 16 at 14:42 UTC. It is Live on
