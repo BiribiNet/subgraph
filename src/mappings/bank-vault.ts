@@ -278,10 +278,15 @@ export function recordWithdrawalProcessed(event: ethereum.Event, owner: Address,
       }
       req.save()
     }
-    // The request left the queue: drop the per-(user, bank) pointer and clear the legacy field.
+    // Close this vault only; another vault may own the legacy latest-request pointer.
     store.remove("OpenWithdrawalRequest", openKey.toHexString())
-    user.openWithdrawalRequestId = null
-    user.save()
+    const latestRequest = user.openWithdrawalRequestId
+    if (latestRequest) {
+      if (latestRequest.equals(openReqId)) {
+        user.openWithdrawalRequestId = null
+        user.save()
+      }
+    }
   }
 
   if (globalState.totalPendingLargeWithdrawals.lt(pendingDecrement)) {

@@ -39,6 +39,24 @@ describe('Withdrawal Queue Lifecycle', () => {
     clearStore();
   });
 
+  test('an unpaid close preserves a concurrent request in another vault without paying or burning shares', () => {
+    emitDeposit(DEFAULT_USER, HUNDRED_ASSETS, HUNDRED_ASSETS, 1_000_000);
+    setupSecondTestMarket();
+    emitDeposit(DEFAULT_USER, HUNDRED_ASSETS, HUNDRED_ASSETS, 1_000_000, 3, TEST_BANK_2);
+    emitWithdrawalRequested(DEFAULT_USER, 5000, DEFAULT_USER, 1_000_050, 1);
+    emitWithdrawalRequested(DEFAULT_USER, 5000, DEFAULT_USER, 1_000_051, 2, TEST_BANK_2);
+    // Mainnet WithdrawalSkipped delegates to this shared close with both amounts zero.
+    emitWithdrawalProcessed(DEFAULT_USER, 5000, DEFAULT_USER, '0', '0', 1_000_100, 4, TEST_BANK);
+    assert.entityCount('OpenWithdrawalRequest', 1);
+    assert.fieldEquals('GlobalState', GLOBAL_STATE_ID, 'totalPendingLargeWithdrawals', FIFTY_ASSETS);
+    assert.fieldEquals('LargeWithdrawalRequest', requestIdForLogIndex(1), 'isCancelled', 'true');
+    assert.fieldEquals('User', DEFAULT_USER, 'openWithdrawalRequestId', requestIdForLogIndex(2));
+    assert.fieldEquals('Market', '1', 'totalAssets', HUNDRED_ASSETS);
+    assert.fieldEquals('Market', '1', 'totalShares', HUNDRED_ASSETS);
+    assert.entityCount('VaultWithdrawal', 0);
+    assert.entityCount('WithdrawTransaction', 0);
+  });
+
   test('WithdrawalRequested creates LargeWithdrawalRequest and increments queue counter', () => {
     emitWithdrawalRequested(DEFAULT_USER, 5000, DEFAULT_USER, 1_000_000);
 
