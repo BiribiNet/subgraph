@@ -1,0 +1,123 @@
+{
+  "checkedAt": "2026-10-16T19:26:26.809Z",
+  "threeDistinctCredentials": true,
+  "mirrorCredentialRotated": false,
+  "strictFrontendHeaderAuthDeployed": false,
+  "frontendDeploymentLimitation": "Saved Vercel login cannot access the production frontend project",
+  "pipelines": [
+    {
+      "name": "biribi-cre-countdown",
+      "status": "ACTIVE",
+      "readyReplicas": 1,
+      "secretName": "BIRIBI_MAINNET_COUNTDOWN",
+      "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev/webhook",
+      "sourceAndTransformsPreserved": true
+    },
+    {
+      "name": "biribi-keeper-payout",
+      "status": "ACTIVE",
+      "readyReplicas": 1,
+      "secretName": "BIRIBI_MAINNET_PAYOUT",
+      "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev/webhook/payout",
+      "sourceAndTransformsPreserved": true
+    },
+    {
+      "name": "biribi-roulette-events",
+      "status": "ACTIVE",
+      "readyReplicas": 1,
+      "secretName": "BIRIBI_MAINNET_MIRROR",
+      "url": "https://biribi.net/api/mirror",
+      "sourceAndTransformsPreserved": true
+    }
+  ],
+  "receiverTests": [
+    {
+      "pipeline": "biribi-cre-countdown",
+      "credential": "own",
+      "status": 202,
+      "expected": 202
+    },
+    {
+      "pipeline": "biribi-cre-countdown",
+      "credential": "retired-shared",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-cre-countdown",
+      "credential": "other-pipeline",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-cre-countdown",
+      "credential": "other-pipeline",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-keeper-payout",
+      "credential": "own",
+      "status": 202,
+      "expected": 202
+    },
+    {
+      "pipeline": "biribi-keeper-payout",
+      "credential": "retired-shared",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-keeper-payout",
+      "credential": "other-pipeline",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-keeper-payout",
+      "credential": "other-pipeline",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-roulette-events",
+      "credential": "own",
+      "status": 200,
+      "expected": 200
+    },
+    {
+      "pipeline": "biribi-roulette-events",
+      "credential": "retired-shared",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-roulette-events",
+      "credential": "other-pipeline",
+      "status": 401,
+      "expected": 401
+    },
+    {
+      "pipeline": "biribi-roulette-events",
+      "credential": "other-pipeline",
+      "status": 401,
+      "expected": 401
+    }
+  ],
+  "retiredSharedGoldskySecretRemoved": true,
+  "retiredSharedWorkerSecretRemoved": true,
+  "workerHealth": {
+    "ok": true,
+    "chainId": 42161,
+    "webhooksEnabled": true,
+    "httpStatus": 200
+  },
+  "localChecks": {
+    "frontendAuthTests": 26,
+    "workerTests": 127,
+    "pipelineTests": 6,
+    "workerTypecheck": "passed",
+    "frontendFocusedLint": "passed",
+    "frontendTypecheck": "blocked by stale .next/dev/types brbgame path and existing ImportMeta.glob type error"
+  }
+}

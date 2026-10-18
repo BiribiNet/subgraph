@@ -1,3 +1,4 @@
+import { WEBHOOK_AUTH } from './webhook-auth.mjs';
 import { mainnetAbi } from './mainnet-abis.mjs';
 // Local templates only. No Goldsky calls, credential reads or remote apply.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -40,8 +41,14 @@ export function preparePipelines(deployment) {
     pipeline.sources.raw_logs.dataset_name = 'arbitrum_one.raw_logs';
     // Realtime only: historical accounting comes from the isolated subgraph.
     pipeline.sources.raw_logs.start_at = 'latest';
+    const auth = WEBHOOK_AUTH[{
+      'turbo.yaml': 'biribi-roulette-events',
+      'turbo-cre.yaml': 'biribi-cre-countdown',
+      'turbo-keeper-payout.yaml': 'biribi-keeper-payout',
+    }[file]];
     for (const sink of Object.values(pipeline.sinks)) {
-      if (sink.secret_name) sink.secret_name = deployment.automation.goldskyWakeupsEnabled ? 'BIRIBI_MAINNET_KEEPER_WAKE' : 'BIRIBI_MAINNET_SCHEDULE';
+      sink.url = file === 'turbo.yaml' ? auth.url : worker.origin + (file === 'turbo-cre.yaml' ? '/webhook' : '/webhook/payout');
+      sink.secret_name = auth.secret;
     }
     return [name + '.template.yaml', YAML.stringify(pipeline, { lineWidth: 0 })];
   }));

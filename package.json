@@ -15,7 +15,7 @@
     "check:constants": "node scripts/check-constants.mjs",
     "validate:deploy": "node scripts/validate-deploy.mjs",
     "reconcile:vaults": "node scripts/reconcile-vaults.mjs",
-    "test:release": "node --test scripts/goldsky-release-check.test.mjs scripts/goldsky-private-endpoint.test.mjs scripts/mainnet-abis.test.mjs scripts/goldsky-stage.test.mjs scripts/goldsky-project.test.mjs scripts/deployment-abis.test.mjs scripts/prepare-environment.test.mjs scripts/prepare-mainnet-pipelines.test.mjs scripts/goldsky-promote.test.mjs scripts/receipt-release.test.mjs"
+    "test:release": "node --test scripts/goldsky-release-check.test.mjs scripts/goldsky-private-endpoint.test.mjs scripts/mainnet-abis.test.mjs scripts/goldsky-stage.test.mjs scripts/goldsky-project.test.mjs scripts/deployment-abis.test.mjs scripts/prepare-environment.test.mjs scripts/prepare-mainnet-pipelines.test.mjs scripts/goldsky-promote.test.mjs scripts/receipt-release.test.mjs scripts/mainnet-keeper-pipelines.test.mjs scripts/webhook-auth.test.mjs"
   },
   "devDependencies": {
     "@goldskycom/cli": "^13.9.0",

@@ -17,7 +17,7 @@
  *                            — MergedEvents.json is extended with SideBet + BRBJackpotFunder events from abis/*.json
  *   GOLDSKY_SUBGRAPH_NAME    — default biribi
  *   GOLDSKY_SYNC_FILES_ONLY  — if 1, only patch YAML files (no goldsky CLI)
- *   MIRROR_API_SECRET        — frontend mirror credential; separate from the Worker's WEBHOOK_SECRET
+ *   Mirror authentication    — Goldsky httpauth secret_name BIRIBI_MIRROR (Authorization: Bearer)
  *   CRE_WEBHOOK_URL          — required for full sync (turbo-cre.yaml ${CRE_WEBHOOK_URL})
  *                            — CRE turbo uses Goldsky `secret_name: BIRIBI_CRE_SCHEDULE` (httpauth),
  *                              header should be `Authorization: Bearer <Worker WEBHOOK_SECRET>`
@@ -36,8 +36,6 @@ import semver from "semver";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 config({ path: join(root, ".env") });
 
-/** Must match turbo.yaml webhook url placeholder (string replace — not a regex). */
-const MIRROR_SECRET_PLACEHOLDER = "${MIRROR_API_SECRET}";
 const CRE_WEBHOOK_URL_PLACEHOLDER = "${CRE_WEBHOOK_URL}";
 const KEEPER_PAYOUT_WEBHOOK_URL_PLACEHOLDER = "${KEEPER_PAYOUT_WEBHOOK_URL}";
 const addressPlaceholder = "__SYNC_PIPELINE_ADDRESSES__";
@@ -55,11 +53,6 @@ function injectPlaceholder(turbo, placeholder, value, label) {
   return out;
 }
 
-/** @deprecated use injectPlaceholder */
-function injectSecretPlaceholder(turbo, placeholder, secret, label) {
-  return injectPlaceholder(turbo, placeholder, secret, label);
-}
-
 function requireEnvValue(turbo, placeholder, envKey) {
   if (!turbo.includes(placeholder)) return null;
   const value = process.env[envKey]?.trim();
@@ -71,20 +64,14 @@ function requireEnvValue(turbo, placeholder, envKey) {
   return value;
 }
 
-/** @deprecated use requireEnvValue */
-function requireEnvSecret(turbo, placeholder, envKey) {
-  return requireEnvValue(turbo, placeholder, envKey);
-}
-
 /**
- * Resolve ABI + address placeholders (and optional webhook secret) into an applied turbo YAML.
+ * Resolve ABI + address and endpoint placeholders into an applied turbo YAML.
  * @param {'list' | 'single'} [addressMode='list'] — `list` fills `__SYNC_PIPELINE_ADDRESSES__`
  *   (IN (...)); `single` fills `__SYNC_PIPELINE_ROULETTE_ADDRESS__` (equality).
  * @param {string | null} [abiLiteral] — if set, replaces `__SYNC_PIPELINE_ABI__`; if null,
  *   the template must already contain its ABI (CRE countdown uses an inline single-event ABI).
- * @param {string | null} [secretPlaceholder] — if set, substitutes from `secretEnvKey` when present.
  * @param {string | null} [urlPlaceholder] — if set, substitutes from `urlEnvKey` when present.
- * @returns {{ content: string, appliedPath: string, missingSecret: boolean, missingUrl: boolean }}
+ * @returns {{ content: string, appliedPath: string, missingUrl: boolean }}
  */
 function writeTurboApplied({
   templateName,
@@ -92,9 +79,6 @@ function writeTurboApplied({
   abiLiteral = null,
   addressList,
   addressMode = "list",
-  secretPlaceholder = null,
-  secretEnvKey = null,
-  secretLabel = null,
   urlPlaceholder = null,
   urlEnvKey = null,
   urlLabel = null,
@@ -144,25 +128,6 @@ function writeTurboApplied({
     );
   }
 
-  let missingSecret = false;
-  if (secretPlaceholder && secretEnvKey && secretLabel) {
-    const envSecret = process.env[secretEnvKey]?.trim();
-    if (turbo.includes(secretPlaceholder) && envSecret) {
-      turbo = injectPlaceholder(
-        turbo,
-        secretPlaceholder,
-        encodeURIComponent(envSecret),
-        secretLabel,
-      );
-      console.log(`Injected ${secretLabel} into ${appliedName}`);
-    } else if (turbo.includes(secretPlaceholder)) {
-      missingSecret = true;
-      console.warn(
-        `sync:pipeline: ${appliedName} still contains ${secretPlaceholder}; set ${secretEnvKey} in .env before goldsky turbo apply.`,
-      );
-    }
-  }
-
   let missingUrl = false;
   if (urlPlaceholder && urlEnvKey && urlLabel) {
     const envUrl = process.env[urlEnvKey]?.trim();
@@ -181,7 +146,7 @@ function writeTurboApplied({
   console.log(
     `Wrote ${appliedName} (resolved ABI + addresses; ${templateName} unchanged)`,
   );
-  return { content: turbo, appliedPath, missingSecret, missingUrl };
+  return { content: turbo, appliedPath, missingUrl };
 }
 
 function validateAndApplyTurbo(pipelineFile) {
@@ -431,9 +396,6 @@ const mirrorTurbo = writeTurboApplied({
   appliedName: "turbo.applied.yaml",
   abiLiteral: sqlAbiLiteral,
   addressList: turboAddresses,
-  secretPlaceholder: MIRROR_SECRET_PLACEHOLDER,
-  secretEnvKey: "MIRROR_API_SECRET",
-  secretLabel: "MIRROR_API_SECRET",
 });
 
 const creTurbo = writeTurboApplied({
@@ -620,16 +582,12 @@ try {
     {
       file: "turbo.applied.yaml",
       content: turbo,
-      placeholder: MIRROR_SECRET_PLACEHOLDER,
-      envKey: "MIRROR_API_SECRET",
-      label: "MIRROR_API_SECRET",
       appliedPath: turboAppliedPath,
     },
     {
       file: "turbo-cre.applied.yaml",
       content: creTurbo.content,
       // Auth via Goldsky secret_name (BIRIBI_CRE_SCHEDULE); URL from CRE_WEBHOOK_URL.
-      placeholder: null,
       urlPlaceholder: CRE_WEBHOOK_URL_PLACEHOLDER,
       urlEnvKey: "CRE_WEBHOOK_URL",
       urlLabel: "CRE_WEBHOOK_URL",
@@ -640,7 +598,6 @@ try {
           {
             file: "turbo-keeper-payout.applied.yaml",
             content: keeperPayoutTurbo.content,
-            placeholder: null,
             urlPlaceholder: KEEPER_PAYOUT_WEBHOOK_URL_PLACEHOLDER,
             urlEnvKey: "KEEPER_PAYOUT_WEBHOOK_URL",
             urlLabel: "KEEPER_PAYOUT_WEBHOOK_URL",
@@ -652,26 +609,6 @@ try {
 
   for (const pipeline of turboPipelines) {
     let content = pipeline.content;
-    if (
-      pipeline.placeholder &&
-      content.includes(pipeline.placeholder)
-    ) {
-      const secret = requireEnvValue(
-        content,
-        pipeline.placeholder,
-        pipeline.envKey,
-      );
-      content = injectPlaceholder(
-        content,
-        pipeline.placeholder,
-        encodeURIComponent(secret),
-        pipeline.label,
-      );
-      writeFileSync(pipeline.appliedPath, content, "utf8");
-      console.log(
-        `Wrote ${pipeline.file} with ${pipeline.label} for Goldsky.`,
-      );
-    }
     if (
       pipeline.urlPlaceholder &&
       content.includes(pipeline.urlPlaceholder)

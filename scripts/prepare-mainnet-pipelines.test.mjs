@@ -19,12 +19,18 @@ test('mainnet pipelines isolate dataset, addresses, names, secrets and worker pa
     assert.ok(text.includes(deployment.addresses.roulette));
     for (const sink of Object.values(pipeline.sinks)) {
       if (sink.secret_name) {
-        assert.equal(sink.secret_name, deployment.automation.goldskyWakeupsEnabled ? 'BIRIBI_MAINNET_KEEPER_WAKE' : 'BIRIBI_MAINNET_SCHEDULE');
-        assert.ok(sink.url.startsWith(deployment.automation.worker + '/webhook'));
+        assert.equal(sink.secret_name, {
+          'biribi-arbitrum-one-events': 'BIRIBI_MAINNET_MIRROR',
+          'biribi-arbitrum-one-countdown': 'BIRIBI_MAINNET_COUNTDOWN',
+          'biribi-arbitrum-one-payout': 'BIRIBI_MAINNET_PAYOUT',
+        }[pipeline.name]);
+        assert.equal(new URL(sink.url).search, '');
+        assert.ok(sink.url === 'https://biribi.net/api/mirror' || sink.url.startsWith(deployment.automation.worker + '/webhook'));
       }
     }
   }
-  assert.ok(Object.values(files).some(text => text.includes('${MIRROR_API_SECRET}')));
+  assert.ok(Object.values(files).every(text => !text.includes('${MIRROR_API_SECRET}')));
+  assert.equal(new Set(Object.values(files).map(text => Object.values(YAML.parse(text).sinks)[0].secret_name)).size, 3);
   const mirror = YAML.parse(files['biribi-arbitrum-one-events.template.yaml']);
   assert.ok(JSON.stringify(mirror.transforms).includes(deployment.addresses.brbReferal.toLowerCase()));
   const sql = mirror.transforms.decoded_events.sql;

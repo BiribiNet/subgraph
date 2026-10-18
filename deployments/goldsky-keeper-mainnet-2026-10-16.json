@@ -1,0 +1,180 @@
+{
+  "checkedAt": "2026-10-16T15:15:57.408Z",
+  "project": {
+    "name": "brb",
+    "id": "project_cmfbfxud380il01v04gey3ym6"
+  },
+  "chainId": 42161,
+  "pipelines": [
+    {
+      "name": "biribi-cre-countdown",
+      "status": "Running",
+      "readyReplicas": 1,
+      "sources": {
+        "raw_logs_arbitrum_one": {
+          "type": "dataset",
+          "dataset_name": "arbitrum_one.raw_logs",
+          "version": "1.0.0",
+          "start_at": "latest"
+        }
+      },
+      "sinks": [
+        {
+          "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev/webhook",
+          "secretName": "BIRIBI_MAINNET_KEEPER_WAKE"
+        }
+      ]
+    },
+    {
+      "name": "biribi-keeper-payout",
+      "status": "Running",
+      "readyReplicas": 1,
+      "sources": {
+        "raw_logs_arbitrum_one": {
+          "type": "dataset",
+          "dataset_name": "arbitrum_one.raw_logs",
+          "version": "1.0.0",
+          "start_at": "latest"
+        }
+      },
+      "sinks": [
+        {
+          "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev/webhook/payout",
+          "secretName": "BIRIBI_MAINNET_KEEPER_WAKE"
+        }
+      ]
+    },
+    {
+      "name": "biribi-roulette-events",
+      "status": "Running",
+      "readyReplicas": 1,
+      "sources": {
+        "raw_logs_arbitrum_one": {
+          "type": "dataset",
+          "dataset_name": "arbitrum_one.raw_logs",
+          "version": "1.0.0",
+          "start_at": "latest"
+        }
+      },
+      "sinks": [
+        {
+          "url": "https://biribi.net/api/mirror",
+          "secretName": null
+        }
+      ]
+    }
+  ],
+  "worker": {
+    "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev",
+    "activeVersion": "a660e565-ed42-433d-a15a-3606a456617c",
+    "sameDurableSignerPreserved": true,
+    "independentPollingMs": 5000,
+    "health": {
+      "ok": true,
+      "configured": true,
+      "mode": "keeper",
+      "chainId": 42161,
+      "engine": "0xfc6474d1594952ef5beb779b97ba69198b4e7625",
+      "scheduler": "0xcf0c459014ffba7dcc9026f15d5ade1351092ef2",
+      "keeper": "0x29984d0C50DdAA5be680b750025dC88D16c57aB8",
+      "marketIds": [
+        1,
+        2,
+        3
+      ],
+      "laneCount": 2,
+      "pollIntervalMs": 5000,
+      "webhooksEnabled": true,
+      "lastWebhook": {
+        "kind": "payout",
+        "receivedAt": 1792163484594
+      },
+      "lastTransaction": null,
+      "pendingTransactionHash": null,
+      "status": {
+        "ok": true,
+        "checkedAt": 1792163881018,
+        "chainId": 42161
+      }
+    },
+    "authenticationChecks": [
+      {
+        "path": "/webhook",
+        "authentication": "missing",
+        "status": 401
+      },
+      {
+        "path": "/webhook",
+        "authentication": "wrong",
+        "status": 401
+      },
+      {
+        "path": "/webhook",
+        "authentication": "goldsky",
+        "status": 202
+      },
+      {
+        "path": "/webhook/payout",
+        "authentication": "missing",
+        "status": 401
+      },
+      {
+        "path": "/webhook/payout",
+        "authentication": "wrong",
+        "status": 401
+      },
+      {
+        "path": "/webhook/payout",
+        "authentication": "goldsky",
+        "status": 202
+      }
+    ]
+  },
+  "rpcWorker": {
+    "authenticatedHealthStatus": 200,
+    "chainIdResult": "0xa4b1",
+    "chainId": 42161,
+    "upstreams": 6,
+    "unauthenticatedStatus": 401
+  },
+  "validation": {
+    "workerTestsPassed": 126,
+    "liveTestSkipped": 1,
+    "pipelineAndGoldskyGuardTestsPassed": 9,
+    "contractWiringTestsPassed": 2,
+    "workerAndDeploymentTypesPassed": true,
+    "bothPipelineServerValidations": true,
+    "runtimeMainnetIngestion": true,
+    "fullMainnetBettingVrfPayoutTested": false
+  },
+  "notes": [
+    "Countdown pipeline retains its historical cre name; no CRE execution is used.",
+    "Webhook payloads are wake-up hints; contract state controls transactions.",
+    "The existing frontend public subgraph still returns Sepolia markets and was not changed."
+  ],
+  "finalCheckedAt": "2026-10-16T15:18:03.860Z",
+  "finalPipelineReadiness": [
+    {
+      "name": "biribi-cre-countdown",
+      "status": "Running",
+      "ready": 1,
+      "mainnet": true
+    },
+    {
+      "name": "biribi-keeper-payout",
+      "status": "Running",
+      "ready": 1,
+      "mainnet": true
+    },
+    {
+      "name": "biribi-roulette-events",
+      "status": "Running",
+      "ready": 1,
+      "mainnet": true
+    }
+  ],
+  "sourceCommits": {
+    "contracts": "edc9a49",
+    "worker": "c11fc68"
+  }
+}

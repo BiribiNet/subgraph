@@ -1,0 +1,144 @@
+{
+  "checkedAt": "2026-10-16T14:49:09.966Z",
+  "project": {
+    "name": "brb",
+    "id": "project_cmfbfxud380il01v04gey3ym6"
+  },
+  "chainId": 42161,
+  "contractsMerge": {
+    "commit": "366cae5",
+    "remoteBranch": "master",
+    "solidityChangesFromVerifiedDeployment": false
+  },
+  "subgraph": {
+    "name": "biribi-arbitrum-one",
+    "version": "1.0.0",
+    "tag": "prod",
+    "network": "arbitrum-one",
+    "healthy": true,
+    "synced": true,
+    "deploymentId": "QmUEoSFnxnTEjpACyBvjd5YFeRPC6EMMjBAtKgvjKoenGV",
+    "endpoint": "https://api.goldsky.com/api/public/project_cmfbfxud380il01v04gey3ym6/subgraphs/biribi-arbitrum-one/prod/gn",
+    "query": {
+      "markets": [
+        {
+          "marketId": 1,
+          "assetSymbol": "BRB",
+          "bank": "0x5f9332b04b2590850c7681850ca445ddf7f64aa9",
+          "totalAssets": "300000000000000000000000",
+          "totalShares": "300000000000000000000000000000"
+        },
+        {
+          "marketId": 2,
+          "assetSymbol": "USDC",
+          "bank": "0x46206b1c1fc631fd6fcf2aa2503f9cb022da96ba",
+          "totalAssets": "0",
+          "totalShares": "0"
+        },
+        {
+          "marketId": 3,
+          "assetSymbol": "DAI",
+          "bank": "0x137dd55e422b1881ad1566ce21e2e4f393bb37b2",
+          "totalAssets": "0",
+          "totalShares": "0"
+        }
+      ],
+      "creExecutorApprovals": [
+        {
+          "executor": "0x29984d0c50ddaa5be680b750025dc88d16c57ab8",
+          "approved": true
+        }
+      ],
+      "_meta": {
+        "block": {
+          "number": 515405033
+        },
+        "hasIndexingErrors": false
+      }
+    }
+  },
+  "pipeline": {
+    "name": "biribi-roulette-events",
+    "status": "ACTIVE",
+    "readyReplicas": 1,
+    "source": {
+      "raw_logs_arbitrum_one": {
+        "type": "dataset",
+        "dataset_name": "arbitrum_one.raw_logs",
+        "version": "1.0.0",
+        "start_at": "latest"
+      }
+    },
+    "destination": "https://biribi.net/api/mirror",
+    "destinationAndAuthenticationPreserved": true,
+    "sourceCheckpointResetByNewKey": true,
+    "keeperWebhookPipeline": false,
+    "runtimeObservedLagSeconds": [
+      1,
+      3
+    ]
+  },
+  "validation": {
+    "mappingTestsPassed": 247,
+    "goldskyGuardTestsPassed": 7,
+    "contractReleaseTestsPassed": 4,
+    "productionWiringTestsPassed": 2,
+    "sameBlockVaultAudit": {
+      "block": 515402792,
+      "markets": 3,
+      "assetsDrift": "0",
+      "sharesDrift": "0"
+    },
+    "buildWarnings": 0,
+    "pipelineValidation": "valid; Goldsky emitted a plugin-metrics disconnect warning",
+    "endToEndSignedBetAndVrfTest": false
+  },
+  "remaining": {
+    "frontendPublicSubgraphStillSepolia": true,
+    "frontendGitMergePerformed": false,
+    "subgraphGitMergePerformed": false,
+    "legacySepoliaKeeperPipelinesUnchanged": false,
+    "activeSepoliaPipelines": 0
+  },
+  "keeperWakeupPipelines": [
+    {
+      "name": "biribi-cre-countdown",
+      "status": "Running",
+      "readyReplicas": 1,
+      "sources": {
+        "raw_logs_arbitrum_one": {
+          "type": "dataset",
+          "dataset_name": "arbitrum_one.raw_logs",
+          "version": "1.0.0",
+          "start_at": "latest"
+        }
+      },
+      "sinks": [
+        {
+          "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev/webhook",
+          "secretName": "BIRIBI_MAINNET_KEEPER_WAKE"
+        }
+      ]
+    },
+    {
+      "name": "biribi-keeper-payout",
+      "status": "Running",
+      "readyReplicas": 1,
+      "sources": {
+        "raw_logs_arbitrum_one": {
+          "type": "dataset",
+          "dataset_name": "arbitrum_one.raw_logs",
+          "version": "1.0.0",
+          "start_at": "latest"
+        }
+      },
+      "sinks": [
+        {
+          "url": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev/webhook/payout",
+          "secretName": "BIRIBI_MAINNET_KEEPER_WAKE"
+        }
+      ]
+    }
+  ],
+  "workerUpdateReport": "goldsky-keeper-mainnet-2026-10-16.json"
+}
