@@ -124,3 +124,46 @@ The templates use the existing BIRIBI_MAINNET_KEEPER_WAKE HTTP auth secret when
 wake-ups are recorded in the manifest. Generating templates neither applies
 pipelines nor changes existing Goldsky deployments. Verify mainnet indexing,
 Ably/mirror credentials and the complete live canary before public activation.
+
+## Sepolia restoration and mainnet resubmission — 2026-10-18
+
+Before this release the BRB project listed only `biribi-arbitrum-one/1.1.0`
+and its `prod` alias. No `biribi` subgraph remained (the earlier
+`biribi/validation-restore-20261017` was gone too), so the website's
+`/api/subgraph` proxy returned Goldsky 404.
+
+**Sepolia `biribi/0.2.0`** was released from master commit `5ee1ade` with
+`VERSION=0.2.0 node scripts/goldsky-release.mjs`, after `yarn test:release`
+(43 tests), `yarn check:constants`, `yarn codegen` and Matchstick 0.6.0
+(247 tests). Goldsky accepted deployment
+`QmWo4aTAH5bGqMa4w4cs5rZzpV4fWkDRtYGkojhxS5tcuc` (start block 284788459,
+private endpoint on, public off). It reported healthy and synced at once.
+The likely cause is that Goldsky reused an existing index for the same
+content hash, but this was not verified. The vaults were reconciled against
+the private version endpoint with zero tolerance:
+
+```sh
+SUBGRAPH_URL=https://api.goldsky.com/api/private/project_cmfbfxud380il01v04gey3ym6/subgraphs/biribi/0.2.0/gn \
+SUBGRAPH_AUTH_TOKEN=<BRB credential> node scripts/reconcile-vaults.mjs deployments/arbitrum-sepolia.json
+```
+
+At block 320482360 all three markets matched the chain: USDC 10.95,
+DAI 6042214.753100490941204629, BRB 1056165.290799055035350443.
+`validate-deploy.mjs` had no live baseline to compare against because no
+`prod` alias existed. The version was then promoted with
+`node scripts/goldsky-promote.mjs biribi/0.2.0 --validated`. Readback showed
+`biribi/prod` on the same deployment ID, healthy, synced and private-only. The
+website proxy (queried with `Origin: https://biribi.net`) answered `_meta` from
+that deployment at block 320482470 with `hasIndexingErrors: false`.
+
+**Mainnet `biribi-arbitrum-one/1.1.1`** was built through the isolated
+`prepare-environment.mjs deployments/arbitrum-one.json` path. Goldsky rejected
+it with HTTP 422: the bundle is identical to the one already deployed as
+`1.1.0`, which confirms that no mapping, schema or ABI changed after commit
+`56c07d7`. Nothing changed on mainnet; `biribi-arbitrum-one/prod` still targets
+`1.1.0` (`QmV6Dv8QFeceY59xBQVFxkUzHegC5a7Mop616njxZFu7km`). Only submit a new
+mainnet version when the generated bundle differs.
+
+No deployment was deleted. Rollback for Sepolia: there is no earlier
+`biribi` version to fall back to; recover by submitting a fresh version from
+master and reconciling it before re-tagging.
