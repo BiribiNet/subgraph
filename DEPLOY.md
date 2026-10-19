@@ -136,8 +136,9 @@ and its `prod` alias. No `biribi` subgraph remained (the earlier
 `VERSION=0.2.0 node scripts/goldsky-release.mjs`, after `yarn test:release`
 (43 tests), `yarn check:constants`, `yarn codegen` and Matchstick 0.6.0
 (247 tests). Goldsky accepted deployment
-`QmWo4aTAH5bGqMa4w4cs5rZzpV4fWkDRtYGkojhxS5tcuc` (start block 284788459,
-private endpoint on, public off). It reported healthy and synced at once.
+`QmWo4aTAH5bGqMa4w4cs5rZzpV4fWkDRtYGkojhxS5tcuc` (configured start block
+284788460; Goldsky reports the preceding block, 284788459, as
+`deployment_start_block`; private endpoint on, public off). It reported healthy and synced at once.
 The likely cause is that Goldsky reused an existing index for the same
 content hash, but this was not verified. The vaults were reconciled against
 the private version endpoint with zero tolerance:
@@ -165,5 +166,7 @@ it with HTTP 422: the bundle is identical to the one already deployed as
 mainnet version when the generated bundle differs.
 
 No deployment was deleted. Rollback for Sepolia: there is no earlier
-`biribi` version to fall back to; recover by submitting a fresh version from
-master and reconciling it before re-tagging.
+`biribi` version to fall back to. If `biribi/prod` disappears again while
+`biribi/0.2.0` is still healthy, re-tag that version after reconciling it.
+Submitting a new version only helps when its generated bundle differs from
+0.2.0; an identical bundle is rejected with HTTP 422, as on mainnet above.
