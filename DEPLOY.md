@@ -151,7 +151,7 @@ SUBGRAPH_AUTH_TOKEN=<BRB credential> node scripts/reconcile-vaults.mjs deploymen
 At block 320482360 all three markets matched the chain: USDC 10.95,
 DAI 6042214.753100490941204629, BRB 1056165.290799055035350443.
 `validate-deploy.mjs` had no live baseline to compare against because no
-`prod` alias existed. The version was then promoted with
+`prod` alias existed. The historical release was then promoted with
 `node scripts/goldsky-promote.mjs biribi/0.2.0 --validated`. Readback showed
 `biribi/prod` on the same deployment ID, healthy, synced and private-only. The
 website proxy (queried with `Origin: https://biribi.net`) answered `_meta` from
@@ -167,6 +167,17 @@ mainnet version when the generated bundle differs.
 
 No deployment was deleted. Rollback for Sepolia: there is no earlier
 `biribi` version to fall back to. If `biribi/prod` disappears again while
-`biribi/0.2.0` is still healthy, re-tag that version after reconciling it.
+`biribi/0.2.0` is still healthy, recover that version through the guarded local release check below.
 Submitting a new version only helps when its generated bundle differs from
 0.2.0; an identical bundle is rejected with HTTP 422, as on mainnet above.
+
+For future missing-alias recovery, use `scripts/goldsky-release-check.mjs`
+with `RELEASE_NETWORK=testnet`, `RELEASE_OPERATION=restore-testnet` and
+`VERSION=0.2.0`, rather than repeating the historical direct promotion command.
+The check requires healthy/synced private-only metadata, no indexing errors,
+canonical markets, placement receipts, the Sepolia RPC chain and zero-drift
+vault reconciliation. It rereads alias metadata immediately before mutation
+and refuses to overwrite an existing alias. If `prod` exists, inspect its
+exact CID and rollback version and use the normal same-block validation path;
+never invent a rollback baseline. Preserve all immutable deployments. This
+historical report does not authorize mainnet activation or GitHub Actions.
