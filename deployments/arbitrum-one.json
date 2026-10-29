@@ -3,7 +3,8 @@
   "chainId": 42161,
   "startBlock": 515103224,
   "startBlocks": {
-    "brb": 515103224
+    "brb": 515103224,
+    "jackpotFunder": 519451162
   },
   "deployer": "0x90416a578646be1c3b2e6aa0a2f593445ca3ebce",
   "deploymentMode": "three-markets-brb-funded",
@@ -85,7 +86,7 @@
     "mode": "cloudflare-keeper",
     "keeper": "0x29984d0C50DdAA5be680b750025dC88D16c57aB8",
     "cloudflareWorkerName": "biribi-round-watcher-arbitrum-one",
-    "payoutLaneCount": 2,
+    "payoutLaneCount": 1,
     "scanLimit": 25,
     "maxPayoutsPerCall": 60,
     "keeperMaxDrainIterations": 5,
@@ -96,16 +97,17 @@
       "chainId": 42161,
       "engine": "0xfc6474d1594952ef5beb779b97ba69198b4e7625",
       "scheduler": "0xcf0c459014ffba7dcc9026f15d5ade1351092ef2",
-      "funder": "0xa55e108b9ae4f50b2d63ea94a3d2c48add969e4e",
+      "funder": "0xd0083c4D3056F6D2bb2b98aEB4FEe0DD36C3bDB5",
       "authority": "0xc5c5a4b77652ba88853a1c3ad4c6b04891ddd601",
       "keeper": "0x29984d0C50DdAA5be680b750025dC88D16c57aB8",
-      "laneCount": 2,
+      "laneCount": 1,
       "marketIds": [
         1,
         2,
         3
       ],
-      "maxTransactionsPerWake": 5
+      "maxTransactionsPerWake": 5,
+      "maintenancePaused": false
     },
     "workerDeployedAt": "2026-10-16T15:05:18.194Z",
     "workerUrl": "https://biribi-round-watcher-arbitrum-one.soft-thunder-4aae.workers.dev",
@@ -114,7 +116,11 @@
     "executorApprovalIndexed": false,
     "goldskyWakeupsEnabled": true,
     "webhookMode": "wake-only",
-    "workerDeploymentVersion": "a660e565-ed42-433d-a15a-3606a456617c"
+    "workerDeploymentVersion": "e0f7344b-d0b3-485f-9f15-804e4354dae0",
+    "workerPaused": false,
+    "maintenanceVerifiedAt": "2026-10-29T20:17:51.793Z",
+    "triggerMode": "webhook-only",
+    "workerSourceSha256": "ae93efd100a2eb822a5f6b19c309e9cb16de7a6ee8d638e66cc24e434a08832a"
   },
   "addresses": {
     "brb": "0x58871cf545f8f0df790443492a80edc414df4504",
@@ -129,7 +135,7 @@
     "scheduler": "0xcf0c459014ffba7dcc9026f15d5ade1351092ef2",
     "creExecutionAuthority": "0xc5c5a4b77652ba88853a1c3ad4c6b04891ddd601",
     "jackpotTreasury": "0x2a7c5023581f2a5c75d699cf3a7f0c37d7919eae",
-    "jackpotFunder": "0xa55e108b9ae4f50b2d63ea94a3d2c48add969e4e",
+    "jackpotFunder": "0xd0083c4D3056F6D2bb2b98aEB4FEe0DD36C3bDB5",
     "tipJar": "0xa65ad745721b0f1382653328b837ef75f79b99ce",
     "vaultImpl": "0x8cbe21a2203c5cfb5e6f7ee7e13603e70da9e700",
     "vaultBeacon": "0x7b23ccddb62b982245c50bdaaf1d13b3d12d632b",
@@ -335,9 +341,14 @@
       {
         "address": "0x137dD55e422b1881Ad1566ce21E2E4F393bB37B2",
         "artifact": "BeaconProxy"
+      },
+      {
+        "address": "0xd0083c4D3056F6D2bb2b98aEB4FEe0DD36C3bDB5",
+        "artifact": "RoutedBRBJackpotFunder",
+        "verifiedAt": "2026-10-29T20:17:51.793Z"
       }
     ],
-    "count": 28,
+    "count": 29,
     "proxyLinks": [
       {
         "proxy": "0xfc6474d1594952ef5beb779b97ba69198b4e7625",
@@ -716,5 +727,30 @@
       "data": "0x00000000000000000000000029984d0c50ddaa5be680b750025dc88d16c57ab80000000000000000000000000000000000000000000000000000000000000001"
     }
   },
-  "abiProfile": "arbitrum-one-2026-10-15"
+  "abiProfile": "arbitrum-one-2026-10-15",
+  "previousJackpotFunders": [
+    {
+      "address": "0xA55E108B9AE4F50b2d63Ea94A3d2c48Add969e4E",
+      "startBlock": 515103224,
+      "residual": {
+        "asset": "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+        "amount": "30000000000000000",
+        "marketId": 3,
+        "ownerAccepted": true
+      }
+    }
+  ],
+  "funderReplacement": {
+    "contract": "RoutedBRBJackpotFunder",
+    "transactionHash": "0x32849f48a2a37122fe8b3d78e06f9e50d4362792024f5fd4ad5185f8443132b2",
+    "block": 519458900,
+    "engineImplementationChanged": false,
+    "daiRoute": [
+      "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+      "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "0x58871cf545f8f0df790443492a80edc414df4504"
+    ],
+    "indexerVersion": "1.1.4",
+    "report": "reports/upgrades/dai-usdc-route-mainnet-20261029/README.md"
+  }
 }
