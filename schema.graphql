@@ -227,6 +227,11 @@ type User @entity(immutable: false) {
   tier: PlayerTier!
   "BRBP points"
   brbpPoints: BigInt!
+  "Verified BRB tips from configured TipJar sources only (18 decimals); excludes ordinary transfers"
+  totalTipsSent: BigInt!
+  tipCount: BigInt!
+  "Tip component of BRBpoints, rounded down after summing eligible tips"
+  tipPoints: BigInt!
   "First seen timestamp"
   firstSeenAt: BigInt!
   "Last active timestamp"
@@ -1113,6 +1118,7 @@ type BRBPointsConfig @entity(immutable: false) {
   wageredWeight: BigInt!
   stakedWeight: BigInt!
   referralWeight: BigInt!
+  tipWeight: BigInt!
   divisor: BigInt!
   lastUpdatedAt: BigInt!
 }

@@ -33,6 +33,9 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.totalRouletteBets = BigInt.fromI32(0)
     user.tier = "BRONZE"
     user.brbpPoints = BigInt.fromI32(0)
+    user.totalTipsSent = ZERO
+    user.tipCount = ZERO
+    user.tipPoints = ZERO
     user.firstSeenAt = BigInt.fromI32(0)
     user.lastActiveAt = BigInt.fromI32(0)
     user.totalWon = BigInt.fromI32(0)

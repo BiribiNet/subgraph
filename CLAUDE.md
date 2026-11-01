@@ -561,3 +561,12 @@ history from a live defect.
 - Flag when `eth_call` is being used and suggest event-based alternatives
 - Think about reorgs and how entity updates would behave during chain reorganizations
 - Respect The Graph's pricing model — minimize entities and storage where possible
+
+## Verified tip points
+
+See docs/tips.md. Configured TipJar.TipSent events for the canonical BRB token award
+3 BRBpoints per BRB, using cumulative integer division. Keep totalTipsSent, tipCount,
+tipPoints, total score, tier and daily snapshots consistent. Ordinary transfers, fees,
+approvals, other assets and self payments are not eligible. The source-event dedup
+must run before any user accounting. This intentionally extends the voting oracle;
+no bet odds or on-chain privilege changes. Release needs a fresh index, not grafting.
