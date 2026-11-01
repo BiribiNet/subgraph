@@ -18,7 +18,7 @@ Player/staker profile with balances and analytics.
 - `brbBalance`, `sbrbBalance`, `brbReferalBalance` — live token balances
 - `totalStaked`, `totalUnstaked` — cumulative staking stats
 - `totalRouletteBets`, `totalRouletteWins`, `netProfit`, `winCount` — roulette P&L
-- `brbpPoints`, `tier` — BRBpoints (play + stake + referral) and leaderboard tier; **this is the DAO voting weight** (see below)
+- `brbpPoints`, `tier` — BRBpoints (play + stake + referral + verified tips) and leaderboard tier; **this is the DAO voting weight** (see below)
 - `firstSeenAt`, `lastActiveAt` — activity timestamps
 - `cumulativeDepositValue`, `cumulativeDepositShares` — cost basis tracking
 

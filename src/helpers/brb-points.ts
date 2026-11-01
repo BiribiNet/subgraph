@@ -8,6 +8,7 @@ const SECONDS_PER_DAY = BigInt.fromI32(86400)
 const DEFAULT_WAGERED_WEIGHT = BigInt.fromI32(3)
 const DEFAULT_STAKED_WEIGHT = BigInt.fromI32(1)
 const DEFAULT_REFERRAL_WEIGHT = BigInt.fromI32(2)
+const DEFAULT_TIP_WEIGHT = BigInt.fromI32(3)
 // 1e18 — so 1 BRB wagered with weight 3 contributes 3 raw points.
 const DEFAULT_DIVISOR = BigInt.fromI32(10).pow(18)
 
@@ -29,6 +30,7 @@ export function getOrCreateBrbPointsConfig(timestamp: BigInt): BRBPointsConfig {
   cfg.wageredWeight = DEFAULT_WAGERED_WEIGHT
   cfg.stakedWeight = DEFAULT_STAKED_WEIGHT
   cfg.referralWeight = DEFAULT_REFERRAL_WEIGHT
+  cfg.tipWeight = DEFAULT_TIP_WEIGHT
   cfg.divisor = DEFAULT_DIVISOR
   cfg.lastUpdatedAt = timestamp
   cfg.save()
@@ -47,8 +49,9 @@ export function computeBrbPoints(user: User, cfg: BRBPointsConfig): BigInt {
   const wagered = user.totalRouletteBets.times(cfg.wageredWeight)
   const staked = netStaked.times(cfg.stakedWeight)
   const referral = user.totalBrbrEarned.times(cfg.referralWeight)
+  const tips = user.totalTipsSent.times(cfg.tipWeight).div(cfg.divisor)
   const weighted = wagered.plus(staked).plus(referral)
-  return weighted.div(cfg.divisor)
+  return weighted.div(cfg.divisor).plus(tips)
 }
 
 export function computeTier(points: BigInt): string {
@@ -79,6 +82,8 @@ function recordDailyPointsSnapshot(user: User, points: BigInt, tier: string, tim
 
 export function recomputeAndSaveUserPoints(user: User, timestamp: BigInt): void {
   const cfg = getOrCreateBrbPointsConfig(timestamp)
+  user.tipPoints = cfg.divisor.gt(ZERO)
+    ? user.totalTipsSent.times(cfg.tipWeight).div(cfg.divisor) : ZERO
   const points = computeBrbPoints(user, cfg)
   const tier = computeTier(points)
   user.brbpPoints = points
