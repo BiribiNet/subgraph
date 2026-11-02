@@ -1,5 +1,6 @@
 import { Transfer } from "../../generated/BRBToken/BRB"
 import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
+import { dataSource } from "@graphprotocol/graph-ts"
 
 /**
  * Per-winner payout attribution for a market whose asset is not BRB.
@@ -16,6 +17,9 @@ import { tryRecordMarketPayoutTransfer } from "../helpers/payout-transfer"
  * BRB-specific.
  */
 export function handleMarketAssetTransfer(event: Transfer): void {
+  // A shared asset can have multiple bank listeners. Ignore unrelated senders before store reads.
+  const bank = dataSource.context().get("bank")
+  if (bank !== null && !event.params.from.equals(bank.toBytes())) return
   tryRecordMarketPayoutTransfer(
     event.params.from,
     event.params.to,

@@ -40,6 +40,13 @@ explicit mainnet TipJar. Start block 515103224 is the successful BRB mint/deploy
 receipt, before the engine, registry registration and bank creation. Sepolia
 source files and `biribi/prod` stay unchanged.
 
+Mainnet preparation generates per-bank `MarketAssetBank*` templates with an indexed
+`Transfer.from` topic filter from the canonical market asset/bank pairs. Registration
+selects these only when both addresses match; future pairs keep the generic template.
+Every new listener also carries its bank in context and rejects other senders before
+store access. This avoids processing unrelated USDC/DAI activity during a fresh
+reindex while retaining bank payouts, asset decimal normalization and full history.
+
 For **local compilation/review only**, incomplete handoff evidence can be kept
 visible while preparing an isolated candidate:
 

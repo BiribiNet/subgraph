@@ -15,6 +15,20 @@ const sources = { BRBToken: 'brb', RouletteEngine: 'roulette', BRBReferral: 'brb
 const fsAbiNames = out => readdirSync(join(out, 'abis')).filter(name => name.endsWith('.json')).map(name => name.slice(0, -5));
 const validAddress = value => /^0x[\da-f]{40}$/i.test(value ?? '') && !/^0x0{40}$/i.test(value);
 
+export function marketAssetFilters(deployment) {
+  if (deployment.chainId !== 42161) return [];
+  return Object.values(deployment.markets ?? {}).filter(market => market.asset?.toLowerCase() !== deployment.addresses?.brb?.toLowerCase()).map((market, index) => {
+    if (!validAddress(market.asset) || !validAddress(market.bank)) throw Error('Invalid market payout filter pair');
+    return { name: `MarketAssetBank${index}`, asset: market.asset.toLowerCase(), bank: market.bank.toLowerCase() };
+  });
+}
+
+export function marketAssetSelector(deployment) {
+  const clauses = marketAssetFilters(deployment).map(({ name, asset, bank }) =>
+    `  if (asset.equals(Address.fromString("${asset}")) && bank.equals(Address.fromString("${bank}"))) return "${name}"`).join('\n');
+  return `export function marketAssetTemplate(asset: Address, bank: Address): string {\n${clauses}\n  return "MarketAsset"\n}`;
+}
+
 export function prepareManifest(manifestText, deployment, { candidate = false } = {}) {
   const network = { 42161: 'arbitrum-one', 421614: 'arbitrum-sepolia' }[deployment.chainId];
   if (!network) throw new Error('Deployment requires explicit chainId 42161 or 421614.');
@@ -48,6 +62,17 @@ export function prepareManifest(manifestText, deployment, { candidate = false } 
     }
   }
   for (const template of manifest.templates) template.network = network;
+  const filters = marketAssetFilters(deployment);
+  if (filters.length) {
+    const original = manifest.templates.find(source => source.name === 'MarketAsset');
+    if (!original || original.mapping.eventHandlers.length !== 1 || original.mapping.eventHandlers[0].event !== 'Transfer(indexed address,indexed address,uint256)') throw Error('Unexpected market asset template');
+    for (const filter of filters) {
+      const template = structuredClone(original);
+      template.name = filter.name;
+      template.mapping.eventHandlers[0].topic1 = ['0x' + filter.bank.slice(2).padStart(64, '0')];
+      manifest.templates.push(template);
+    }
+  }
   if (deployment.addresses?.tipJar) {
     if (!validAddress(deployment.addresses.tipJar)) throw new Error('Invalid TipJar address.');
     const template = manifest.templates.find(source => source.name === 'TipJar');
@@ -83,6 +108,11 @@ export function prepareEnvironment(deploymentPath, output, options = {}) {
     cpSync(join(root, path), join(out, path), { recursive: true });
   }
   writeFileSync(join(out, 'subgraph.yaml'), manifest);
+  const assetSourcePath = join(out, 'src/helpers/market-asset-source.ts');
+  const assetSource = readFileSync(assetSourcePath, 'utf8');
+  const selector = /export function marketAssetTemplate\(asset: Address, bank: Address\): string \{[^}]*\}/;
+  if (!selector.test(assetSource)) throw Error('Market asset selector missing');
+  writeFileSync(assetSourcePath, assetSource.replace(selector, marketAssetSelector(deployment)));
   for (const name of fsAbiNames(out)) {
     const path = join(out, 'abis', name + '.json');
     writeFileSync(path, JSON.stringify(mainnetAbi(name, deploymentAbi(JSON.parse(readFileSync(path, 'utf8')), deployment), deployment, { compatibilityTypes: true }), null, 2) + '\n');
