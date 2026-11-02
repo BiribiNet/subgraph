@@ -19,7 +19,7 @@ function fixture() {
 }
 test('reconciles exact tips, token transfers, cumulative points and full score at one block', async () => {
  const { args } = fixture();
- assert.deepEqual(await verifyTipPoints(args), { block: 100, tipCount: 1, usersChecked: 1, receiptsChecked: 1, rate: '3 BRBpoints per BRB', verified: true });
+ assert.deepEqual(await verifyTipPoints(args), { block: 100, blockHash: hash, tipCount: 1, usersChecked: 1, receiptsChecked: 1, rate: '3 BRBpoints per BRB', verified: true });
 });
 test('rejects wrong points, counters, score, recipients, replayed rows and incomplete scans', async () => {
  const cases = [f => f.user.tipPoints = '4', f => f.user.tipCount = '2', f => f.user.brbpPoints = '7', f => f.tip.recipient = sender, f => f.data.tips.push(f.tip), f => f.data.users = Array(1000).fill(f.user), f => f.data.users = []];
@@ -28,4 +28,11 @@ test('rejects wrong points, counters, score, recipients, replayed rows and incom
 test('rejects removed, reverted, forged or missing source evidence and mismatched blocks', async () => {
  const cases = [f => f.receipt.status = '0x0', f => f.receipt.logs[0].removed = true, f => f.receipt.logs[0].data = '0x', f => f.receipt.logs[1].data = '0x01', f => f.data._meta.block.hash = '0xwrong', f => f.tip.id = hash + '02'];
  for (const mutate of cases) { const f = fixture(); mutate(f); await assert.rejects(verifyTipPoints(f.args), /Tip release check:/); }
+});
+test('handles unavailable indexed hashes while rejecting a reorg at the pinned chain block', async () => {
+ const f = fixture(); f.data._meta.block.hash = null;
+ assert.equal((await verifyTipPoints(f.args)).verified, true);
+ const original = f.args.rpc; let reads = 0;
+ f.args.rpc = async (method, params) => method === 'eth_getBlockByNumber' && ++reads > 1 ? { hash: '0x' + 'b'.repeat(64) } : original(method, params);
+ await assert.rejects(verifyTipPoints(f.args), /pinned block changed/);
 });

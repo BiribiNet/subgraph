@@ -23,14 +23,24 @@ export async function verifyTipPoints({ graphql, rpc, manifest, block }) {
   requireCheck(data._meta?.block?.number === pin && data._meta.hasIndexingErrors === false, 'index is not healthy at pinned block');
   requireCheck(Array.isArray(data.tips) && Array.isArray(data.users) && data.tips.length < 1000 && data.users.length < 1000, 'scan incomplete; extend pagination before release');
   const chainBlock = await rpc('eth_getBlockByNumber', [blockTag, false]);
-  requireCheck(lower(chainBlock?.hash) === lower(data._meta.block.hash), 'indexed block hash differs from chain');
+  requireCheck(/^0x[\da-f]{64}$/i.test(chainBlock?.hash ?? ''), 'pinned chain block unavailable');
+  // Goldsky may return null for a number-pinned _meta hash. Still reject any
+  // provided mismatch, verify receipt blocks, and reread the chain pin at the end.
+  if (data._meta.block.hash != null) requireCheck(lower(chainBlock.hash) === lower(data._meta.block.hash), 'indexed block hash differs from chain');
   const totals = new Map(), receipts = new Map(), transfers = new Map(), seen = new Set();
   for (const tip of data.tips) {
     requireCheck(!seen.has(tip.id), 'duplicate tip record'); seen.add(tip.id);
     requireCheck(lower(tip.jar) === jar && lower(tip.token) === token && lower(tip.recipient) === recipient, 'unexpected tip deployment, token or recipient');
     const sender = lower(tip.sender), amount = BigInt(tip.amount), hash = lower(tip.transactionHash);
     requireCheck(amount > 0n && sender !== recipient && !/^0x0{40}$/.test(sender), 'ineligible contribution');
-    if (!receipts.has(hash)) receipts.set(hash, await rpc('eth_getTransactionReceipt', [hash]));
+    if (!receipts.has(hash)) {
+      const receipt = await rpc('eth_getTransactionReceipt', [hash]);
+      if (receipt?.blockHash) {
+        const sourceBlock = await rpc('eth_getBlockByNumber', [receipt.blockNumber, false]);
+        requireCheck(lower(sourceBlock?.hash) === lower(receipt.blockHash), 'receipt block differs from canonical chain');
+      }
+      receipts.set(hash, receipt);
+    }
     const receipt = receipts.get(hash);
     requireCheck(receipt?.status === '0x1' && lower(receipt.transactionHash) === hash && Number(BigInt(receipt.blockNumber)) === Number(tip.blockNumber) && Number(tip.blockNumber) <= pin, 'invalid tip receipt');
     const matches = receipt.logs.filter(log => {
@@ -62,5 +72,7 @@ export async function verifyTipPoints({ graphql, rpc, manifest, block }) {
     totals.delete(lower(user.id));
   }
   requireCheck(totals.size === 0, 'tip sender missing from users');
-  return { block: pin, tipCount: data.tips.length, usersChecked: data.users.length, receiptsChecked: receipts.size, rate: '3 BRBpoints per BRB', verified: true };
+  const finalBlock = await rpc('eth_getBlockByNumber', [blockTag, false]);
+  requireCheck(lower(finalBlock?.hash) === lower(chainBlock.hash), 'pinned block changed during verification');
+  return { block: pin, blockHash: chainBlock.hash, tipCount: data.tips.length, usersChecked: data.users.length, receiptsChecked: receipts.size, rate: '3 BRBpoints per BRB', verified: true };
 }
