@@ -1,5 +1,5 @@
-import { Address, BigInt, ethereum } from '@graphprotocol/graph-ts';
-import { assert, beforeEach, clearStore, describe, newMockEvent, test } from 'matchstick-as';
+import { Address, BigInt, DataSourceContext, ethereum } from '@graphprotocol/graph-ts';
+import { assert, beforeEach, clearStore, dataSourceMock, describe, newMockEvent, test } from 'matchstick-as';
 
 import { Transfer } from '../generated/BRBToken/BRB';
 import { PayoutProgress } from '../generated/RouletteEngine/Game';
@@ -87,6 +87,36 @@ function arrangeSixDecimalRoundInPayout(): void {
 describe('Non-BRB market payouts are attributed to the winner', () => {
   beforeEach(() => {
     clearStore();
+    dataSourceMock.resetValues();
+  });
+
+  test('a matching bank context retains the complete normalized payout', () => {
+    arrangeSixDecimalRoundInPayout();
+    const context = new DataSourceContext();
+    context.setBytes('bank', TEST_BANK);
+    dataSourceMock.setContext(context);
+    emitMarketAssetPayout(DEFAULT_USER, '5000000', TIMESTAMP + 400, 7);
+    assert.entityCount('PayoutTransaction', 1);
+    assert.fieldEquals('User', DEFAULT_USER, 'totalWon', '5000000000000000000');
+  });
+
+  test('another bank listener for the same asset cannot credit this payout', () => {
+    arrangeSixDecimalRoundInPayout();
+    const context = new DataSourceContext();
+    context.setBytes('bank', Address.fromString('0x1111000000000000000000000000000000000001'));
+    dataSourceMock.setContext(context);
+    emitMarketAssetPayout(DEFAULT_USER, '5000000', TIMESTAMP + 400, 7);
+    assert.entityCount('PayoutTransaction', 0);
+    assert.fieldEquals('User', DEFAULT_USER, 'winCount', '0');
+  });
+
+  test('unrelated transfers return before creating any protocol state', () => {
+    const context = new DataSourceContext();
+    context.setBytes('bank', Address.fromString('0x1111000000000000000000000000000000000001'));
+    dataSourceMock.setContext(context);
+    emitMarketAssetPayout(DEFAULT_USER, '5000000', TIMESTAMP + 400, 7);
+    assert.entityCount('GlobalState', 0);
+    assert.entityCount('PayoutTransaction', 0);
   });
 
   test('a USDC payout marks the bet won and credits the user', () => {

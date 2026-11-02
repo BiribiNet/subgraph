@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { prepareManifest } from './prepare-environment.mjs';
+import { prepareManifest, marketAssetFilters, marketAssetSelector } from './prepare-environment.mjs';
 const require = createRequire(import.meta.url);
 const YAML = createRequire(require.resolve('@graphprotocol/graph-cli/package.json'))('yaml');
 const text = readFileSync(new URL('../subgraph.yaml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
@@ -56,4 +56,23 @@ test('mainnet keeper handler matches its recorded non-indexed event; Sepolia is 
   assert.equal(approval(prepareManifest(text, deployed, { candidate: true })), 'ExecutorApprovalUpdated(address,bool)');
   assert.equal(approval(prepareManifest(text, { ...deployment, chainId: 421614 })), 'ExecutorApprovalUpdated(indexed address,bool)');
   assert.equal(approval(text), 'ExecutorApprovalUpdated(indexed address,bool)');
+});
+
+test('mainnet payout listeners filter only canonical bank outflows and preserve future pairs', () => {
+  const deployed = JSON.parse(readFileSync(new URL('../deployments/arbitrum-one.json', import.meta.url)));
+  const generated = YAML.parse(prepareManifest(text, deployed));
+  const filters = marketAssetFilters(deployed);
+  assert.equal(filters.length, 2);
+  const selector = marketAssetSelector(deployed);
+  for (const filter of filters) {
+    const template = generated.templates.find(item => item.name === filter.name);
+    assert.deepEqual(template.mapping.eventHandlers[0].topic1, ['0x' + filter.bank.slice(2).padStart(64, '0')]);
+    assert.match(selector, new RegExp(`asset.equals\\(Address.fromString\\("${filter.asset}"\\)\\) && bank.equals\\(Address.fromString\\("${filter.bank}"\\)\\)`));
+  }
+  assert.ok(selector.endsWith('return "MarketAsset"\n}'));
+  assert.equal(generated.templates.find(item => item.name === 'MarketAsset').mapping.eventHandlers[0].topic1, undefined);
+  const sepolia = { ...deployment, chainId: 421614 };
+  assert.deepEqual(marketAssetFilters(sepolia), []);
+  assert.ok(!YAML.parse(prepareManifest(text, sepolia)).templates.some(item => item.name.startsWith('MarketAssetBank')));
+  assert.throws(() => marketAssetFilters({ ...deployed, markets: { invalid: { bank: '0x0', asset: deployed.markets.usdc.asset } } }), /Invalid market/);
 });

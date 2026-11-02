@@ -56,7 +56,8 @@ import { recordUserMarketWager } from "./user-market-stats"
 import { getOrCreateGlobalRound, globalRoundIdBytes } from "./globalRound"
 import { marketRoundId, requireMarket, getOrCreateMarket } from "./market"
 import { ZERO } from "./number"
-import { BankVault as BankVaultTemplate, MarketAsset as MarketAssetTemplate } from "../../generated/templates"
+import { BankVault as BankVaultTemplate } from "../../generated/templates"
+import { createMarketAssetSource } from "./market-asset-source"
 import { recordTxBetForReferral, recordTxBetToBank } from "./tx-activity"
 import {
   finalizeMarketRoundsOnResolve,
@@ -482,7 +483,7 @@ export function processMarketRegistered(event: MarketRegistered): void {
   // event carries (winner, amount). BRB already has a static data source, so spawning one here too
   // would double-count it.
   if (!event.params.asset.equals(BRB_TOKEN_ADDRESS)) {
-    MarketAssetTemplate.create(event.params.asset)
+    createMarketAssetSource(event.params.asset, event.params.bank)
   }
 }
 
