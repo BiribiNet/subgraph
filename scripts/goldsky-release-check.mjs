@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { API_BASE, BRB_PROJECT_ID, goldskyToken, verifyBrbProject, validateReleaseTarget } from './goldsky-project.mjs';
 import { promoteRelease } from './goldsky-promote.mjs';
+import { verifyTipPoints } from './verify-tip-points.mjs';
 
 export function releaseTarget(network, operation, version, previous) {
   if (!['mainnet', 'testnet'].includes(network) || !['inspect', 'validate', 'promote', 'restore-testnet'].includes(operation)) throw Error('Invalid release operation/network');
@@ -89,6 +90,12 @@ export async function runReleaseCheck(env = process.env, {
     const chain = await json(target.rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }) });
     if (Number(BigInt(chain.result)) !== target.chainId) throw Error('RPC chain mismatch');
+    if (env.VERIFY_TIP_POINTS === '1' && network === 'mainnet') {
+      report.tipVerification = await verifyTipPoints({ manifest, block: data._meta.block.number,
+        graphql: async query => (await json(privateEndpoint(target.name, candidate), { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })).data,
+        rpc: async (method, params) => (await json(target.rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).result,
+      });
+    }
     if (operation === 'restore-testnet') {
       if (prod) throw Error('Cannot recover over an existing prod alias');
       if (!data.roulettePlacements?.some(item => /^0x[\da-f]{64}$/i.test(item.transactionHash ?? ''))) throw Error('Restoration requires indexed placement receipts');

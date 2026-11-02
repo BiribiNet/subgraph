@@ -181,3 +181,15 @@ and refuses to overwrite an existing alias. If `prod` exists, inspect its
 exact CID and rollback version and use the normal same-block validation path;
 never invent a rollback baseline. Preserve all immutable deployments. This
 historical report does not authorize mainnet activation or GitHub Actions.
+## Tip statistics and points release gate
+
+The release workflow uses Ubuntu 22.04 because Matchstick 0.6.0 cannot select a
+binary on Ubuntu 26. Mainnet validate/promote additionally verifies tip statistics
+before any alias mutation. scripts/verify-tip-points.mjs pins an indexed block,
+checks the canonical TipJar getters, reconciles each TipSent and BRB Transfer with
+its successful receipt, and verifies per-user totals, counts, cumulative 3x points
+and authoritative score. It checks the pinned block hash against the same-chain RPC.
+The bounded release scan fails closed at 1000 users or tips; extend pagination
+before releasing a larger dataset. Existing accounting comparison, zero-tolerance
+vault reconciliation and rollback checks remain mandatory. The report records
+tipVerification alongside the release status; no credential is included.
