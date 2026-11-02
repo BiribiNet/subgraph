@@ -39,7 +39,8 @@ jobs:
     # Network selection and build guards independently bind the deployment chain.
     # Runtime query/mirror/Ably credentials remain environment-specific.
     environment: ${{ inputs.credential_environment == 'goldsky-mainnet' && 'goldsky-mainnet' || 'goldsky-testnet' }}
-    runs-on: ubuntu-latest
+    # Matchstick 0.6.0 / graph-cli 0.97.1 rejects Ubuntu 26.
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +91,7 @@ jobs:
           RELEASE_OPERATION: ${{ inputs.operation }}
           VERSION: ${{ inputs.version }}
           EXPECTED_LIVE_VERSION: ${{ inputs.expected_live_version }}
+          VERIFY_TIP_POINTS: "1"
         run: node scripts/goldsky-release-check.mjs
       - uses: actions/upload-artifact@v4
         if: always() && inputs.operation != 'deploy' && inputs.operation != ''
