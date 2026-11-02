@@ -47,6 +47,13 @@ Every new listener also carries its bank in context and rejects other senders be
 store access. This avoids processing unrelated USDC/DAI activity during a fresh
 reindex while retaining bank payouts, asset decimal normalization and full history.
 
+Mainnet `WithdrawalProcessed` requests transaction receipts. Its net `assetsPaid`
+excludes the withdrawal fee: the mainnet adapter deducts only the fee transfer
+proven immediately before the matching share burn, separately from the user's net
+receipt. Failed fee transfers remain in vault assets. This fixes the historical
+2 BRB drift from the two queued withdrawals in transaction
+`0x149f812cc1d6937c89d8a4664f9efa46ab746e0b6c9f270180406226d05e4d71`.
+
 For **local compilation/review only**, incomplete handoff evidence can be kept
 visible while preparing an isolated candidate:
 

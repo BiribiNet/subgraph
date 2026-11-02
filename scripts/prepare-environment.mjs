@@ -90,6 +90,7 @@ export function prepareManifest(manifestText, deployment, { candidate = false } 
       });
       if (source.name === 'BankVault') {
         source.mapping.file = './src/mappings/mainnet-bank-vault.ts';
+        source.mapping.eventHandlers.find(handler => handler.handler === 'handleWithdrawalProcessed').receipt = true;
         source.mapping.eventHandlers.push({ event: 'WithdrawalSkipped(uint256,address,address,uint16)', handler: 'handleWithdrawalSkipped' });
       }
     }

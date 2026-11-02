@@ -56,6 +56,9 @@ test('mainnet keeper handler matches its recorded non-indexed event; Sepolia is 
   assert.equal(approval(prepareManifest(text, deployed, { candidate: true })), 'ExecutorApprovalUpdated(address,bool)');
   assert.equal(approval(prepareManifest(text, { ...deployment, chainId: 421614 })), 'ExecutorApprovalUpdated(indexed address,bool)');
   assert.equal(approval(text), 'ExecutorApprovalUpdated(indexed address,bool)');
+  const withdrawal = manifest => YAML.parse(manifest).templates.find(source => source.name === 'BankVault').mapping.eventHandlers.find(handler => handler.handler === 'handleWithdrawalProcessed');
+  assert.equal(withdrawal(prepareManifest(text, deployed)).receipt, true);
+  assert.equal(withdrawal(text).receipt, undefined);
 });
 
 test('mainnet payout listeners filter only canonical bank outflows and preserve future pairs', () => {
