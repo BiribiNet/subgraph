@@ -8,6 +8,7 @@ import { globalRoundIdBytes } from "./globalRound"
 import { marketRoundId, requireMarket } from "./market"
 import { clearMarketPendingBets } from "./vault-liquidity"
 import { updateRoundRevenueAggregates } from "./aggregation"
+import { settleMaskLegsOfRound } from "./mask-bet"
 
 const MAX_MARKET_SCAN: i32 = 32
 
@@ -37,6 +38,17 @@ export function finalizeMarketRoundsOnResolve(globalRoundId: BigInt, timestamp: 
     updateRoundRevenueAggregates(round, timestamp, blockNumber)
     market.maxBetAmount = BigInt.fromI32(0)
     market.save()
+  }
+}
+
+/** Applies a VRF winning number to the mask legs of every market slice of the global round. */
+export function settleMaskLegsForGlobalRound(globalRoundId: BigInt, winningNumber: i32): void {
+  for (let marketId = 1; marketId <= MAX_MARKET_SCAN; marketId++) {
+    const round = RouletteRound.load(marketRoundId(globalRoundId, marketId))
+    if (round == null || round.maskBetsPayout.isZero()) {
+      continue
+    }
+    settleMaskLegsOfRound(round, winningNumber)
   }
 }
 

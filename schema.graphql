@@ -22,6 +22,10 @@ enum BetType {
   HIGH
   TRIO_012
   TRIO_023
+  "BET_MASK = 16 — arbitrary set of 2..24 numbers; decoded legs on RouletteMaskLeg"
+  MASK
+  "Bet type id the mapping does not know (never folded onto STRAIGHT); raw leg number kept in RouletteBet.numbers; unknown type id not persisted"
+  UNKNOWN
 }
 
 enum PlayerTier { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, LEGEND }
@@ -384,6 +388,10 @@ type RouletteRound @entity(immutable: false) {
   columnBetsSum: [BigInt!]!
   "Max payout liability from split/corner/line/trio bets: SPLIT*18 + CORNER*9 + LINE*6 + TRIO*12"
   otherBetsPayout: BigInt!
+  "Prudent mask liability (engine option (a), roundMaskWeightedPayout): sum of floor(amount * 36 / size) over every mask leg, as if all masks won at once"
+  maskBetsPayout: BigInt!
+  "Mask payout implied by the winning number: sum of floor(amount * 36 / size) over the mask legs whose bit is set. 0 until VRFResult"
+  maskWinningPayout: BigInt!
   "Number of payouts processed so far (from PayoutProgress.toCursor)"
   currentPayoutsCount: BigInt!
   "Total paid out to winners in this round (from PayoutProgress)"
@@ -410,6 +418,8 @@ type RouletteRound @entity(immutable: false) {
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "round")
   "Array of jackpot payouts in this round"
   jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "round")
+  "Decoded mask legs (BET_MASK) placed in this round"
+  maskLegs: [RouletteMaskLeg!]! @derivedFrom(field: "round")
 }
 
 type RouletteBet @entity(immutable: false) {
@@ -449,6 +459,52 @@ type RouletteBet @entity(immutable: false) {
   payoutTransactions: [PayoutTransaction]! @derivedFrom(field: "bet")
   "Array of jackpot payouts for this bet"
   jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "bet")
+  "Decoded mask legs of this ticket (empty when it holds no BET_MASK leg)"
+  maskLegs: [RouletteMaskLeg!]! @derivedFrom(field: "bet")
+}
+
+"""
+One BET_MASK leg (betType 16) decoded from `numbers[i] = mask | presetId << 37 | guard << 46 |
+expectedPrev << 47`. Only valid legs are stored (value < 2^53, 2 <= |S| <= 24, expectedPrev <= 36,
+expectedPrev = 0 without guard) — the engine rejects anything else. The leg itself also stays in
+`RouletteBet.amounts/betTypes/numbers` like every other leg. A mask is never jackpot-eligible.
+`won`/`payout` are derived from the winning number at VRFResult (deterministic rule); the amount
+actually paid stays authoritative on `RouletteBet.actualPayout` (bank transfers).
+"""
+type RouletteMaskLeg @entity(immutable: false) {
+  "BetRecorded tx hash + log index + leg index"
+  id: Bytes!
+  "Ticket (user, market round) this leg belongs to"
+  bet: RouletteBet!
+  "Per-market round slice"
+  round: RouletteRound!
+  market: Market!
+  user: User!
+  "Position of the leg inside the BetRecorded betData arrays"
+  legIndex: Int!
+  "Leg stake in market asset units"
+  amount: BigInt!
+  "Raw numbers[i] value as emitted (< 2^53)"
+  rawNumber: BigInt!
+  "Bits 0..36: bit n set <=> number n covered"
+  mask: BigInt!
+  "|S| = popcount(mask), 2..24"
+  maskSize: Int!
+  "Bits 37..45: informational preset id (0..511), never used for any computation"
+  presetId: Int!
+  "expectedPrev (bits 47..52) when the previous-draw guard (bit 46) is set; null without guard"
+  previousGuard: Int
+  "floor(amount * 36 / maskSize), stake included"
+  potentialPayout: BigInt!
+  "Winning number of the round once VRFResult is indexed"
+  winningNumber: Int
+  "True iff bit winningNumber of mask is set; null until VRFResult"
+  won: Boolean
+  "potentialPayout when won, 0 when lost; null until VRFResult"
+  payout: BigInt
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
 }
 
 type PayoutTransaction @entity(immutable: true) {

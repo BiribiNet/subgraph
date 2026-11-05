@@ -6,15 +6,28 @@ import { BetPlaced } from "../../generated/templates/BankVault/BankVault4626"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
   BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN,
-  BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023,
+  BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_MASK,
   BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER,
   BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED,
   BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW,
-  BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023
+  BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, BET_TYPE_MASK, BET_TYPE_UNKNOWN
 } from "./constant"
+import { addMaskLiability } from "./mask-bet"
+
+/** Sentinel for a uint256 that does not fit an i32; matches no bet type and no slot. */
+const OUT_OF_I32_RANGE: i32 = -1
+
+/**
+ * `toI32()` asserts — aborting the handler and halting indexing — on any value outside the i32
+ * range, and `betType`/`number` come straight from unvalidated betData (a mask leg number is up to
+ * 2^53). Returns OUT_OF_I32_RANGE instead.
+ */
+function toI32OrSentinel(value: BigInt): i32 {
+  return value.isI32() ? value.toI32() : OUT_OF_I32_RANGE
+}
 
 function getBetTypeFromNumber(betTypeNumber: BigInt): string {
-  const betTypeInt = betTypeNumber.toI32()
+  const betTypeInt = toI32OrSentinel(betTypeNumber)
   switch (betTypeInt) {
     case BET_STRAIGHT:
       return BET_TYPE_STRAIGHT
@@ -46,9 +59,13 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
       return BET_TYPE_TRIO_012
     case BET_TRIO_023:
       return BET_TYPE_TRIO_023
+    case BET_MASK:
+      return BET_TYPE_MASK
     default:
+      // Folding an unknown id onto STRAIGHT used to rewrite history silently (a mask would have read
+      // as a straight bet). UNKNOWN keeps the leg, its amount and raw number visible and queryable.
       log.warning("Unknown bet type: {}", [betTypeNumber.toString()])
-      return BET_TYPE_STRAIGHT
+      return BET_TYPE_UNKNOWN
   }
 }
 
@@ -65,12 +82,12 @@ function max3(a: BigInt, b: BigInt, c: BigInt): BigInt {
 const STRAIGHT_STREET_SLOTS = 37 // valid straight/street numbers 0..36
 const DOZEN_COLUMN_SLOTS = 4 // valid dozen/column groups 1..3 (slot 0 unused)
 
-function isNumberSlotInRange(numI32: i32, slots: i32, betTypeInt: i32): boolean {
+function isNumberSlotInRange(numI32: i32, slots: i32, betTypeInt: i32, rawNumber: BigInt): boolean {
   if (numI32 >= 0 && numI32 < slots) {
     return true
   }
   log.warning("Skipping out-of-range bet number {} for betType {} (max slots {})", [
-    numI32.toString(),
+    rawNumber.toString(),
     betTypeInt.toString(),
     slots.toString(),
   ])
@@ -78,11 +95,16 @@ function isNumberSlotInRange(numI32: i32, slots: i32, betTypeInt: i32): boolean 
 }
 
 export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, betType: BigInt, number: BigInt): void {
-  const betTypeInt = betType.toI32()
-  const numI32 = number.toI32()
+  const betTypeInt = toI32OrSentinel(betType)
+  if (betTypeInt == BET_MASK) {
+    // Decoded as BigInt: the raw value carries the 37-bit mask plus presetId/guard bits.
+    addMaskLiability(round, amount, number)
+    return
+  }
+  const numI32 = toI32OrSentinel(number)
 
   if (betTypeInt == BET_STRAIGHT) {
-    if (!isNumberSlotInRange(numI32, STRAIGHT_STREET_SLOTS, betTypeInt)) return
+    if (!isNumberSlotInRange(numI32, STRAIGHT_STREET_SLOTS, betTypeInt, number)) return
     const totals = round.straightBetsTotals
     const next = totals[numI32].plus(amount)
     totals[numI32] = next
@@ -91,7 +113,7 @@ export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: Big
       round.maxStraightBet = next
     }
   } else if (betTypeInt == BET_STREET) {
-    if (!isNumberSlotInRange(numI32, STRAIGHT_STREET_SLOTS, betTypeInt)) return
+    if (!isNumberSlotInRange(numI32, STRAIGHT_STREET_SLOTS, betTypeInt, number)) return
     const totals = round.streetBetsTotals
     const next = totals[numI32].plus(amount)
     totals[numI32] = next
@@ -112,13 +134,13 @@ export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: Big
   } else if (betTypeInt == BET_HIGH) {
     round.highBetsSum = round.highBetsSum.plus(amount)
   } else if (betTypeInt == BET_DOZEN) {
-    if (!isNumberSlotInRange(numI32, DOZEN_COLUMN_SLOTS, betTypeInt)) return
+    if (!isNumberSlotInRange(numI32, DOZEN_COLUMN_SLOTS, betTypeInt, number)) return
     const sums = round.dozenBetsSum
     const next = sums[numI32].plus(amount)
     sums[numI32] = next
     round.dozenBetsSum = sums
   } else if (betTypeInt == BET_COLUMN) {
-    if (!isNumberSlotInRange(numI32, DOZEN_COLUMN_SLOTS, betTypeInt)) return
+    if (!isNumberSlotInRange(numI32, DOZEN_COLUMN_SLOTS, betTypeInt, number)) return
     const sums = round.columnBetsSum
     const next = sums[numI32].plus(amount)
     sums[numI32] = next
@@ -151,8 +173,14 @@ export function calculateMaxPayoutFromRoundComponents(round: RouletteRound): Big
   const columnComponent = columnMax.times(BigInt.fromI32(3))
 
   const otherComponent = round.otherBetsPayout
+  const maskComponent = round.maskBetsPayout
 
-  const raw = straightComponent.plus(pairComponent).plus(dozenComponent).plus(columnComponent).plus(otherComponent)
+  const raw = straightComponent
+    .plus(pairComponent)
+    .plus(dozenComponent)
+    .plus(columnComponent)
+    .plus(otherComponent)
+    .plus(maskComponent)
 
   // SAFETY_BUFFER_BPS = 11000 (110%) with floor division by 10000
   return raw.times(BigInt.fromI32(11000)).div(BigInt.fromI32(10000))
