@@ -77,6 +77,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 ### Game Mechanics Reference
 - 37 numbers (0–36), French roulette
 - Bet types: Straight (36x), Split (18x), Street (12x), Corner (9x), Six Line (6x), Column/Dozen (3x), Red/Black/Odd/Even/Low/High (2x)
+- **Mask bet** (`BET_MASK = 16`, `contracts/docs/spec-mask-bets-v1.md`): `numbers[i] = mask | presetId << 37 | guard << 46 | expectedPrev << 47` (< 2^53), `|S| = popcount(mask)` ∈ [2, 24], payout `floor(amount × 36 / |S|)`, never jackpot-eligible. Decoded in `src/helpers/mask-bet.ts` with BigInt shifts/masks only: **never call `toI32()` on a raw bet number or type** — graph-ts 0.38 *asserts* (handler abort ⇒ indexing halts) outside the i32 range, it does not truncate (locked by `tests/mask-bet.test.ts`). One `RouletteMaskLeg` per valid leg, settled at `VRFResult`; liability mirror `RouletteRound.maskBetsPayout` (engine option (a)). An unknown type id is stored as `UNKNOWN`, never `STRAIGHT`.
 - French announced bets: Voisins du Zéro, Tiers du Cylindre, Orphelins, Jeu Zéro
 - Minimum bet: 5 BRB
 - Round cycle: Betting → No More Bets → VRF Request → Result → Payout → Next Round

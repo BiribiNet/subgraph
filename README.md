@@ -58,7 +58,10 @@ Per-user per-round bet aggregation.
 
 ## Bet Types
 
-STRAIGHT, SPLIT, STREET, CORNER, LINE, COLUMN, DOZEN, RED, BLACK, ODD, EVEN, LOW, HIGH, TRIO_012, TRIO_023
+STRAIGHT, SPLIT, STREET, CORNER, LINE, COLUMN, DOZEN, RED, BLACK, ODD, EVEN, LOW, HIGH, TRIO_012, TRIO_023, MASK (16), UNKNOWN
+
+- `MASK` (betType 16, spec `contracts/docs/spec-mask-bets-v1.md`): `numbers[i] = mask | presetId << 37 | guard << 46 | expectedPrev << 47` (< 2^53). Each valid leg is decoded into a `RouletteMaskLeg` (`mask`, `maskSize`, `presetId`, `previousGuard`, `potentialPayout = floor(amount × 36 / maskSize)`; `won`/`payout` set at `VRFResult`). Prudent liability on `RouletteRound.maskBetsPayout`. Never jackpot-eligible.
+- `UNKNOWN`: a bet type id the mapping does not know. It is never folded onto `STRAIGHT`; the raw value stays in `RouletteBet.numbers`.
 
 ## Usage Examples
 
