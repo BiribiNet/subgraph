@@ -24,7 +24,7 @@ enum BetType {
   TRIO_023
   "BET_MASK = 16 — arbitrary set of 2..24 numbers; decoded legs on RouletteMaskLeg"
   MASK
-  "Bet type id the mapping does not know (never folded onto STRAIGHT); raw value kept in RouletteBet.numbers"
+  "Bet type id the mapping does not know (never folded onto STRAIGHT); raw leg number kept in RouletteBet.numbers; unknown type id not persisted"
   UNKNOWN
 }
 
