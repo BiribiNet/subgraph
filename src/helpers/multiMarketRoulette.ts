@@ -39,6 +39,7 @@ import {
   updateRoundMaxPayoutComponents,
 } from "./betting"
 import { decodeBetDataPayload } from "./bet-data"
+import { recordMaskLegs } from "./mask-bet"
 import {
   getOrCreateDailyStats,
   getOrCreateHourlySnapshot,
@@ -62,6 +63,7 @@ import { recordTxBetForReferral, recordTxBetToBank } from "./tx-activity"
 import {
   finalizeMarketRoundsOnResolve,
   lockAllParticipatingMarketRounds,
+  settleMaskLegsForGlobalRound,
 } from "./round-sync"
 import { observeSideBetSpinsForRound } from "./side-bet-vrf"
 
@@ -177,6 +179,17 @@ export function processBetRecorded(event: BetRecorded): void {
   placement.blockNumber = event.block.number
   placement.timestamp = event.block.timestamp
   placement.save()
+
+  recordMaskLegs(
+    payload,
+    ticket,
+    round,
+    market,
+    event.transaction.hash,
+    event.logIndex,
+    event.block.number,
+    event.block.timestamp
+  )
 
   const legCount = payload.types.length
   if (legCount == 0) {
@@ -315,6 +328,7 @@ export function processVRFResult(event: VRFResult): void {
   gr.vrfResultTxHash = event.transaction.hash
   gr.save()
 
+  settleMaskLegsForGlobalRound(roundId, i32(event.params.winningNumber))
   observeSideBetSpinsForRound(roundId, BigInt.fromI32(i32(event.params.winningNumber)))
 }
 
