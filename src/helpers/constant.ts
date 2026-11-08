@@ -25,7 +25,7 @@ export const BET_LOW = 12
 export const BET_HIGH = 13
 export const BET_TRIO_012 = 14
 export const BET_TRIO_023 = 15
-/** Mask bet (spec mask-bets v1, D1): arbitrary set of 2..24 numbers, see helpers/mask-bet.ts. */
+/** Mask bet (spec mask-bets v1, D1): arbitrary set of 2..35 numbers, see helpers/mask-bet.ts. */
 export const BET_MASK = 16
 
 // Constants for round status

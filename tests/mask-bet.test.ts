@@ -45,8 +45,11 @@ function encodeMask(mask: BigInt, presetId: i32, guard: boolean, expectedPrev: i
 // {0, 31, 32, 36}: four numbers, raw value well above 2^31.
 const MASK_A = bitsOf([0, 31, 32, 36]);
 const RAW_A = encodeMask(MASK_A, 7, true, 17);
-// 24 numbers 13..36 (maximum size), presetId 511, guard on 36: largest field values, < 2^53.
-const RAW_MAX = encodeMask(bitsOf([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]), 511, true, 36);
+// 24 numbers 13..36 (the former maximum size), presetId 511, guard on 36, < 2^53.
+const RAW_24 = encodeMask(bitsOf([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]), 511, true, 36);
+
+// 35 numbers 2..36 (maximum size), presetId 511, guard on 36: largest field values, < 2^53.
+const RAW_MAX = encodeMask(bitsOf([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]), 511, true, 36);
 
 function maskLegId(logIndex: i32, legIndex: i32): string {
   return BET_TX_HASH.concatI32(logIndex).concatI32(legIndex).toHexString();
@@ -116,11 +119,11 @@ describe('Mask leg decoding (BigInt only)', () => {
   });
 
   test('should decode the largest field values just below 2^53', () => {
-    assert.stringEquals(RAW_MAX.toString(), '5207287069138944');
+    assert.stringEquals(RAW_MAX.toString(), '5207287069147132');
     assert.assertTrue(RAW_MAX.lt(BigInt.fromString('9007199254740992')));
     const decoded = decodeValidMaskNumber(RAW_MAX);
     assert.assertNotNull(decoded);
-    assert.i32Equals(decoded!.size, 24);
+    assert.i32Equals(decoded!.size, 35);
     assert.i32Equals(decoded!.presetId, 511);
     assert.i32Equals(decoded!.expectedPrev, 36);
   });
@@ -128,9 +131,9 @@ describe('Mask leg decoding (BigInt only)', () => {
   test('should reject legs the engine cannot accept', () => {
     // bit 53 set
     assert.assertNull(decodeValidMaskNumber(bitsOf([1, 2]).bitOr(BigInt.fromI32(1).leftShift(53))));
-    // |S| = 1 and |S| = 25
+    // |S| = 1 and |S| = 36
     assert.assertNull(decodeValidMaskNumber(bitsOf([5])));
-    assert.assertNull(decodeValidMaskNumber(bitsOf([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24])));
+    assert.assertNull(decodeValidMaskNumber(bitsOf([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36])));
     // expectedPrev without guard, expectedPrev > 36 with guard
     assert.assertNull(decodeValidMaskNumber(encodeMask(bitsOf([1, 2]), 0, false, 5)));
     assert.assertNull(decodeValidMaskNumber(encodeMask(bitsOf([1, 2]), 0, true, 37)));
@@ -197,8 +200,23 @@ describe('Mask leg indexing on BetRecorded', () => {
     assert.fieldEquals('RouletteRound', testRoundId(1), 'maskBetsPayout', '120000000000000000000');
   });
 
-  test('should index a 24-number mask near 2^53 without trapping', () => {
+  test('should accept a 25-number mask now that the ceiling is 35', () => {
+    const decoded = decodeValidMaskNumber(bitsOf([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]));
+    assert.assertNotNull(decoded);
+    assert.i32Equals(decoded!.size, 25);
+  });
+
+  test('should index a 35-number mask near 2^53 without trapping', () => {
     emitBetRecordedTx(TEN_TOKENS, singleMaskLeg(RAW_MAX, TEN_TOKENS), 1);
+    assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'maskSize', '35');
+    assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'presetId', '511');
+    assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'previousGuard', '36');
+    assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'potentialPayout', '10285714285714285714');
+    assert.fieldEquals('RouletteRound', testRoundId(1), 'maskBetsPayout', '10285714285714285714');
+  });
+
+  test('should index a 24-number mask near 2^53 without trapping', () => {
+    emitBetRecordedTx(TEN_TOKENS, singleMaskLeg(RAW_24, TEN_TOKENS), 1);
     assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'maskSize', '24');
     assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'presetId', '511');
     assert.fieldEquals('RouletteMaskLeg', maskLegId(0, 0), 'previousGuard', '36');

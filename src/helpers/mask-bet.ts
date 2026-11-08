@@ -18,8 +18,9 @@ const EXPECTED_PREV_SHIFT: u8 = 47
 const EXPECTED_PREV_BITS: u8 = 6
 const ENCODING_BITS: u8 = 53
 
+// Plafond porté de 24 à 35 numéros (décision du 08/11/2026) : doit rester aligné sur le moteur.
 const MIN_MASK_SIZE: i32 = 2
-const MAX_MASK_SIZE: i32 = 24
+const MAX_MASK_SIZE: i32 = 35
 const MAX_ROULETTE_NUMBER: i32 = 36
 /** Mask payout = floor(amount * 36 / |S|), stake included (spec §2.2, D2). */
 const MASK_PAYOUT_NUMERATOR = BigInt.fromI32(36)
