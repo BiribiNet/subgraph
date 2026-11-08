@@ -6,13 +6,14 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "test": "node scripts/check-constants.mjs && graph test -v 0.6.0",
+    "test": "node scripts/check-constants.mjs && node scripts/check-daily-challenges.mjs && graph test -v 0.6.0",
     "sync:pipeline": "node scripts/sync-pipeline.mjs",
     "deploy:subgraph": "node scripts/goldsky-deploy.mjs",
     "prod:subgraph": "node scripts/goldsky-promote.mjs",
     "deploy": "yarn codegen && yarn build && yarn deploy:subgraph",
     "deploy:api": "yarn codegen && yarn build && node scripts/goldsky-deploy.mjs",
     "check:constants": "node scripts/check-constants.mjs",
+    "check:daily-challenges": "node scripts/check-daily-challenges.mjs",
     "validate:deploy": "node scripts/validate-deploy.mjs",
     "reconcile:vaults": "node scripts/reconcile-vaults.mjs",
     "test:release": "node --test scripts/goldsky-release-check.test.mjs scripts/goldsky-private-endpoint.test.mjs scripts/mainnet-abis.test.mjs scripts/goldsky-stage.test.mjs scripts/goldsky-project.test.mjs scripts/deployment-abis.test.mjs scripts/prepare-environment.test.mjs scripts/prepare-mainnet-pipelines.test.mjs scripts/goldsky-promote.test.mjs scripts/receipt-release.test.mjs scripts/verify-tip-points.test.mjs"

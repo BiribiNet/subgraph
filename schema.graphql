@@ -236,8 +236,14 @@ type User @entity(immutable: false) {
   tipCount: BigInt!
   "Tip component of BRBpoints, rounded down after summing eligible tips"
   tipPoints: BigInt!
+  "Points earned from daily challenges (10 per validated challenge, at most 30 per UTC day); weighted by BRBPointsConfig.challengeWeight into brbpPoints"
+  challengePoints: BigInt!
+  "Number of daily challenges validated"
+  challengeCount: BigInt!
   "Per-preset special bet stats (one row per market and canonical presetId)"
   specialBetStats: [UserSpecialBetStats!]! @derivedFrom(field: "user")
+  "Daily challenge progress, one row per UTC day with a settled special bet"
+  dailyChallenges: [UserDailyChallenges!]! @derivedFrom(field: "user")
   "First seen timestamp"
   firstSeenAt: BigInt!
   "Last active timestamp"
@@ -278,6 +284,49 @@ type UserSpecialBetStats @entity(immutable: false) {
   "totalWon - totalWagered (may be negative)"
   netResult: BigInt!
   updatedAt: BigInt!
+}
+
+"""
+Daily challenge state of one user for one UTC day (day = placement timestamp / 86400). The catalogue
+and rotation are defined in docs/daily-challenges.json (shared with the frontend). Only settled legs
+with meetsMinBet count. id = user + day (i32).
+"""
+type UserDailyChallenges @entity(immutable: false) {
+  id: Bytes!
+  user: User!
+  day: Int!
+  "The 3 challenge ids of the day, in slot order"
+  challengeIds: [Int!]!
+  "Progress per slot, capped at each target"
+  progress: [Int!]!
+  "Validated flag per slot"
+  completed: [Boolean!]!
+  "Challenge points earned this day (<= 30)"
+  points: BigInt!
+  "Distinct canonical presetIds won this day"
+  wonPresetIds: [Int!]!
+  "Distinct global rounds played this day (capped at the largest round target)"
+  playedRounds: [BigInt!]!
+  "Eligible settled legs this day"
+  legCount: Int!
+  "Families won this day: THEMATIC, ENDINGS, PREVIOUS_DRAW, NEIGHBOURS"
+  wonFamilies: [String!]!
+  "Winning Sélection libre legs of at most the small-selection size"
+  smallFreeSelectionWins: Int!
+  updatedAt: BigInt!
+}
+
+"One validated daily challenge. id = user + day (i32) + challengeId (i32): the dedup key, written once."
+type DailyChallengeCompletion @entity(immutable: true) {
+  id: Bytes!
+  user: User!
+  day: Int!
+  challengeId: Int!
+  points: BigInt!
+  "Mask leg whose settlement validated the challenge"
+  leg: RouletteMaskLeg!
+  timestamp: BigInt!
+  blockNumber: BigInt!
 }
 
 "Per-user stats in a single market (amounts in that market's asset units)"
@@ -522,8 +571,10 @@ type RouletteMaskLeg @entity(immutable: false) {
   previousGuard: Int
   "floor(amount * 36 / maskSize), stake included"
   potentialPayout: BigInt!
-  "presetId when the mask really is that preset (static mask, or previous-draw preset rebuilt on expectedPrev), else 0 (Sélection libre). Drives the per-preset stats; presetId itself is unvalidated"
+  "presetId when the mask really is that preset (static mask, or previous-draw preset rebuilt on expectedPrev), else 0 (Sélection libre). Drives stats and daily challenges; presetId itself is unvalidated"
   canonicalPresetId: Int!
+  "amount >= Market.minBet when the leg was recorded: only such legs count for daily challenges"
+  meetsMinBet: Boolean!
   "Winning number of the round once VRFResult is indexed"
   winningNumber: Int
   "True iff bit winningNumber of mask is set; null until VRFResult"
@@ -1203,6 +1254,8 @@ type BRBPointsConfig @entity(immutable: false) {
   stakedWeight: BigInt!
   referralWeight: BigInt!
   tipWeight: BigInt!
+  "Multiplier of User.challengePoints in brbpPoints (default 1, no divisor: challenge points are already BRBpoints)"
+  challengeWeight: BigInt!
   divisor: BigInt!
   lastUpdatedAt: BigInt!
 }

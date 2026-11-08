@@ -1,0 +1,663 @@
+{
+  "$comment": "Définition partagée des défis du jour et des presets de paris spéciaux. Source de vérité : subgraph docs/daily-challenges.json ; copie identique dans frontend lib/daily-challenges/definition.json. Toute modification doit être faite dans les deux dépôts (tests : frontend test/unit/daily-challenges.test.ts, subgraph tests/daily-challenges.test.ts + scripts/check-daily-challenges.mjs). Changer le catalogue ou la rotation exige une ré-indexation complète.",
+  "version": 1,
+  "secondsPerDay": 86400,
+  "challengesPerDay": 3,
+  "pointsPerChallenge": 10,
+  "rotation": "challenge(dayIndex, slot) = catalogue[(dayIndex * challengesPerDay + slot) mod catalogue.length], dayIndex = floor(placementTimestamp / secondsPerDay), slot = 0..challengesPerDay-1",
+  "eligibility": "Seules comptent les jambes de paris spéciaux réglées (VRFResult indexé) dont la mise est >= Market.minBet au moment du pari. Le jour d'une jambe est celui de son placement (UTC). Le preset retenu est le preset canonique : presetId seulement si le masque correspond exactement au preset (sinon Sélection libre, id 0).",
+  "families": {
+    "THEMATIC": {
+      "min": 1,
+      "max": 12
+    },
+    "ENDINGS": {
+      "min": 20,
+      "max": 29
+    },
+    "PREVIOUS_DRAW": {
+      "min": 40,
+      "max": 50
+    },
+    "NEIGHBOURS": {
+      "ids": [
+        42,
+        48
+      ]
+    }
+  },
+  "catalogue": [
+    {
+      "id": 1,
+      "key": "WIN_THREE_DIFFERENT",
+      "kind": "WIN_DISTINCT_PRESETS",
+      "target": 3
+    },
+    {
+      "id": 2,
+      "key": "WIN_PREVIOUS_DRAW",
+      "kind": "WIN_PRESET_FAMILY",
+      "family": "PREVIOUS_DRAW",
+      "target": 1
+    },
+    {
+      "id": 3,
+      "key": "WIN_SMALL_FREE_SELECTION",
+      "kind": "WIN_SMALL_FREE_SELECTION",
+      "maxSize": 5,
+      "target": 1
+    },
+    {
+      "id": 4,
+      "key": "PLAY_THREE_ROUNDS",
+      "kind": "PLAY_DISTINCT_ROUNDS",
+      "target": 3
+    },
+    {
+      "id": 5,
+      "key": "WIN_ENDING",
+      "kind": "WIN_PRESET_FAMILY",
+      "family": "ENDINGS",
+      "target": 1
+    },
+    {
+      "id": 6,
+      "key": "WIN_THEMATIC",
+      "kind": "WIN_PRESET_FAMILY",
+      "family": "THEMATIC",
+      "target": 1
+    },
+    {
+      "id": 7,
+      "key": "PLAY_FIVE_BETS",
+      "kind": "PLAY_LEGS",
+      "target": 5
+    },
+    {
+      "id": 8,
+      "key": "WIN_NEIGHBOURS",
+      "kind": "WIN_PRESET_FAMILY",
+      "family": "NEIGHBOURS",
+      "target": 1
+    }
+  ],
+  "staticPresetMasks": {
+    "1": "0xa08a28ac",
+    "2": "0x1fc0802008",
+    "3": "0x1002010212",
+    "4": "0x40020212e",
+    "5": "0x200400800",
+    "6": "0x1008040200",
+    "7": "0x1111111110",
+    "8": "0x810204080",
+    "9": "0x1540055000",
+    "10": "0xaa002a800",
+    "11": "0xaa802aa",
+    "12": "0x15500554",
+    "20": "0x40100400",
+    "21": "0x80200802",
+    "22": "0x100401004",
+    "23": "0x200802008",
+    "24": "0x401004010",
+    "25": "0x802008020",
+    "26": "0x1004010040",
+    "27": "0x8020080",
+    "28": "0x10040100",
+    "29": "0x20080200"
+  },
+  "vectors": {
+    "rotation": [
+      {
+        "dayIndex": 0,
+        "challengeIds": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "dayIndex": 1,
+        "challengeIds": [
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "dayIndex": 2,
+        "challengeIds": [
+          7,
+          8,
+          1
+        ]
+      },
+      {
+        "dayIndex": 7,
+        "challengeIds": [
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "dayIndex": 8,
+        "challengeIds": [
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "dayIndex": 20765,
+        "challengeIds": [
+          8,
+          1,
+          2
+        ]
+      },
+      {
+        "dayIndex": 20766,
+        "challengeIds": [
+          3,
+          4,
+          5
+        ]
+      },
+      {
+        "dayIndex": 20767,
+        "challengeIds": [
+          6,
+          7,
+          8
+        ]
+      }
+    ],
+    "previousDrawPresets": [
+      {
+        "presetId": 45,
+        "previous": 17,
+        "numbers": [
+          7,
+          17,
+          27
+        ]
+      },
+      {
+        "presetId": 45,
+        "previous": 0,
+        "numbers": [
+          10,
+          20,
+          30
+        ]
+      },
+      {
+        "presetId": 45,
+        "previous": 30,
+        "numbers": [
+          10,
+          20,
+          30
+        ]
+      },
+      {
+        "presetId": 46,
+        "previous": 17,
+        "numbers": [
+          6,
+          8,
+          16,
+          18,
+          26,
+          28,
+          36
+        ]
+      },
+      {
+        "presetId": 46,
+        "previous": 0,
+        "numbers": [
+          1,
+          9,
+          11,
+          19,
+          21,
+          29,
+          31
+        ]
+      },
+      {
+        "presetId": 46,
+        "previous": 9,
+        "numbers": [
+          8,
+          10,
+          18,
+          20,
+          28,
+          30
+        ]
+      },
+      {
+        "presetId": 47,
+        "previous": 0,
+        "numbers": [
+          1,
+          5,
+          6,
+          8,
+          9,
+          10,
+          11,
+          13,
+          14,
+          16,
+          20,
+          23,
+          24,
+          27,
+          30,
+          31,
+          33,
+          36
+        ]
+      },
+      {
+        "presetId": 47,
+        "previous": 17,
+        "numbers": [
+          1,
+          3,
+          5,
+          7,
+          9,
+          10,
+          12,
+          14,
+          16,
+          18,
+          20,
+          22,
+          24,
+          28,
+          29,
+          31,
+          33,
+          35
+        ]
+      },
+      {
+        "presetId": 48,
+        "previous": 0,
+        "numbers": [
+          0,
+          26,
+          32
+        ],
+        "wheelDistance": 1
+      },
+      {
+        "presetId": 48,
+        "previous": 17,
+        "numbers": [
+          2,
+          6,
+          17,
+          21,
+          25,
+          27,
+          34
+        ],
+        "wheelDistance": 3
+      },
+      {
+        "presetId": 48,
+        "previous": 26,
+        "numbers": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36
+        ],
+        "wheelDistance": 17
+      },
+      {
+        "presetId": 49,
+        "previous": 17,
+        "numbers": [
+          1,
+          3,
+          5,
+          7,
+          9,
+          12,
+          14,
+          16,
+          18,
+          19,
+          21,
+          23,
+          25,
+          27,
+          30,
+          32,
+          34,
+          36
+        ]
+      },
+      {
+        "presetId": 49,
+        "previous": 18,
+        "numbers": [
+          2,
+          4,
+          6,
+          8,
+          10,
+          11,
+          13,
+          15,
+          17,
+          20,
+          22,
+          24,
+          26,
+          28,
+          29,
+          31,
+          33,
+          35
+        ]
+      },
+      {
+        "presetId": 50,
+        "previous": 17,
+        "numbers": [
+          2,
+          4,
+          6,
+          8,
+          10,
+          12,
+          14,
+          16,
+          18,
+          20,
+          22,
+          24,
+          26,
+          28,
+          30,
+          32,
+          34,
+          36
+        ]
+      },
+      {
+        "presetId": 50,
+        "previous": 18,
+        "numbers": [
+          1,
+          3,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          17,
+          19,
+          21,
+          23,
+          25,
+          27,
+          29,
+          31,
+          33,
+          35
+        ]
+      }
+    ],
+    "evaluation": [
+      {
+        "name": "three different winning presets, free selection counted once",
+        "legs": [
+          {
+            "round": 1,
+            "canonicalPresetId": 1,
+            "size": 11,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 1,
+            "canonicalPresetId": 1,
+            "size": 11,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 2,
+            "canonicalPresetId": 20,
+            "size": 3,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 3,
+            "canonicalPresetId": 0,
+            "size": 10,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 3,
+            "canonicalPresetId": 0,
+            "size": 8,
+            "won": true,
+            "meetsMinBet": true
+          }
+        ],
+        "expected": {
+          "1": 3,
+          "2": 0,
+          "3": 0,
+          "4": 3,
+          "5": 1,
+          "6": 1,
+          "7": 5,
+          "8": 0
+        }
+      },
+      {
+        "name": "bets below the minimum stake never count",
+        "legs": [
+          {
+            "round": 1,
+            "canonicalPresetId": 42,
+            "size": 5,
+            "won": true,
+            "meetsMinBet": false
+          },
+          {
+            "round": 2,
+            "canonicalPresetId": 0,
+            "size": 2,
+            "won": true,
+            "meetsMinBet": false
+          },
+          {
+            "round": 3,
+            "canonicalPresetId": 1,
+            "size": 11,
+            "won": true,
+            "meetsMinBet": false
+          }
+        ],
+        "expected": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0,
+          "7": 0,
+          "8": 0
+        }
+      },
+      {
+        "name": "free selection of five numbers or fewer must win",
+        "legs": [
+          {
+            "round": 1,
+            "canonicalPresetId": 0,
+            "size": 5,
+            "won": false,
+            "meetsMinBet": true
+          },
+          {
+            "round": 1,
+            "canonicalPresetId": 0,
+            "size": 6,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 2,
+            "canonicalPresetId": 0,
+            "size": 5,
+            "won": true,
+            "meetsMinBet": true
+          }
+        ],
+        "expected": {
+          "1": 1,
+          "2": 0,
+          "3": 1,
+          "4": 2,
+          "5": 0,
+          "6": 0,
+          "7": 3,
+          "8": 0
+        }
+      },
+      {
+        "name": "previous-draw wins, neighbours family is 42 and 48 only",
+        "legs": [
+          {
+            "round": 4,
+            "canonicalPresetId": 45,
+            "size": 3,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 5,
+            "canonicalPresetId": 48,
+            "size": 7,
+            "won": false,
+            "meetsMinBet": true
+          },
+          {
+            "round": 6,
+            "canonicalPresetId": 47,
+            "size": 18,
+            "won": true,
+            "meetsMinBet": true
+          }
+        ],
+        "expected": {
+          "1": 2,
+          "2": 1,
+          "3": 0,
+          "4": 3,
+          "5": 0,
+          "6": 0,
+          "7": 3,
+          "8": 0
+        }
+      },
+      {
+        "name": "neighbours win validates two challenges, losses only count as plays",
+        "legs": [
+          {
+            "round": 7,
+            "canonicalPresetId": 42,
+            "size": 5,
+            "won": true,
+            "meetsMinBet": true
+          },
+          {
+            "round": 7,
+            "canonicalPresetId": 12,
+            "size": 9,
+            "won": false,
+            "meetsMinBet": true
+          },
+          {
+            "round": 7,
+            "canonicalPresetId": 25,
+            "size": 4,
+            "won": false,
+            "meetsMinBet": true
+          }
+        ],
+        "expected": {
+          "1": 1,
+          "2": 1,
+          "3": 0,
+          "4": 1,
+          "5": 0,
+          "6": 0,
+          "7": 3,
+          "8": 1
+        }
+      },
+      {
+        "name": "no legs",
+        "legs": [],
+        "expected": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0,
+          "7": 0,
+          "8": 0
+        }
+      }
+    ]
+  }
+}

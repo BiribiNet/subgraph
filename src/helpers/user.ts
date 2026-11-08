@@ -36,6 +36,8 @@ export function getOrCreateUser(userAddress: Bytes): User {
     user.totalTipsSent = ZERO
     user.tipCount = ZERO
     user.tipPoints = ZERO
+    user.challengePoints = ZERO
+    user.challengeCount = ZERO
     user.firstSeenAt = BigInt.fromI32(0)
     user.lastActiveAt = BigInt.fromI32(0)
     user.totalWon = BigInt.fromI32(0)

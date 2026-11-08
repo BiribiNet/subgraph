@@ -5,6 +5,7 @@ import { BET_MASK } from "./constant"
 import { ONE, ZERO } from "./number"
 import { canonicalPresetId } from "./special-bet-presets"
 import { recordSpecialBetStats } from "./special-bet-stats"
+import { recordChallengeLeg } from "./daily-challenges"
 
 // Mask leg encoding (spec mask-bets v1, §1.3 / D7):
 //   numbers[i] = mask | (presetId << 37) | (guard << 46) | (expectedPrev << 47), always < 2^53.
@@ -155,6 +156,8 @@ export function recordMaskLegs(
       decoded.expectedPrev,
       decoded.size
     )
+    // Mise minimale du marché au moment du pari : seule une jambe qui l'atteint compte pour les défis.
+    leg.meetsMinBet = amount.ge(market.minBet)
     leg.blockNumber = blockNumber
     leg.timestamp = timestamp
     leg.transactionHash = transactionHash
@@ -166,7 +169,7 @@ export function recordMaskLegs(
  * Applies the winning number to every mask leg of a market round: a mask wins iff its bit is set,
  * and then pays potentialPayout. Never a jackpot win — jackpot receipts are attributed from the
  * treasury's BRB transfers only, and the engine restricts them to straight bets.
- * A leg settled for the first time also feeds the per-preset stats; a
+ * A leg settled for the first time also feeds the per-preset stats and the daily challenges; a
  * replayed VRFResult (already settled leg) never counts twice.
  */
 export function settleMaskLegsOfRound(
@@ -191,6 +194,7 @@ export function settleMaskLegsOfRound(
     leg.save()
     if (firstSettlement) {
       recordSpecialBetStats(leg, timestamp)
+      recordChallengeLeg(leg, round.roundNumber, timestamp, blockNumber)
     }
   }
   round.maskWinningPayout = winningPayout
