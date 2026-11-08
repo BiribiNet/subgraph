@@ -3,6 +3,8 @@ import { Market, RouletteBet, RouletteMaskLeg, RouletteRound } from "../../gener
 import { DecodedBetData } from "./bet-data"
 import { BET_MASK } from "./constant"
 import { ONE, ZERO } from "./number"
+import { canonicalPresetId } from "./special-bet-presets"
+import { recordSpecialBetStats } from "./special-bet-stats"
 
 // Mask leg encoding (spec mask-bets v1, §1.3 / D7):
 //   numbers[i] = mask | (presetId << 37) | (guard << 46) | (expectedPrev << 47), always < 2^53.
@@ -146,6 +148,13 @@ export function recordMaskLegs(
       leg.previousGuard = decoded.expectedPrev
     }
     leg.potentialPayout = maskPayout(amount, decoded.size)
+    leg.canonicalPresetId = canonicalPresetId(
+      decoded.mask,
+      decoded.presetId,
+      decoded.guard,
+      decoded.expectedPrev,
+      decoded.size
+    )
     leg.blockNumber = blockNumber
     leg.timestamp = timestamp
     leg.transactionHash = transactionHash
@@ -157,13 +166,21 @@ export function recordMaskLegs(
  * Applies the winning number to every mask leg of a market round: a mask wins iff its bit is set,
  * and then pays potentialPayout. Never a jackpot win — jackpot receipts are attributed from the
  * treasury's BRB transfers only, and the engine restricts them to straight bets.
+ * A leg settled for the first time also feeds the per-preset stats; a
+ * replayed VRFResult (already settled leg) never counts twice.
  */
-export function settleMaskLegsOfRound(round: RouletteRound, winningNumber: i32): void {
+export function settleMaskLegsOfRound(
+  round: RouletteRound,
+  winningNumber: i32,
+  timestamp: BigInt,
+  blockNumber: BigInt
+): void {
   const legs = round.maskLegs.load()
   if (legs.length == 0) return
   let winningPayout = ZERO
   for (let index = 0; index < legs.length; index++) {
     const leg = legs[index]
+    const firstSettlement = leg.payout === null
     const won = maskCoversNumber(leg.mask, winningNumber)
     leg.winningNumber = winningNumber
     leg.won = won
@@ -172,6 +189,9 @@ export function settleMaskLegsOfRound(round: RouletteRound, winningNumber: i32):
       winningPayout = winningPayout.plus(leg.potentialPayout)
     }
     leg.save()
+    if (firstSettlement) {
+      recordSpecialBetStats(leg, timestamp)
+    }
   }
   round.maskWinningPayout = winningPayout
   round.save()

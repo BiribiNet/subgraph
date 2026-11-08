@@ -328,7 +328,7 @@ export function processVRFResult(event: VRFResult): void {
   gr.vrfResultTxHash = event.transaction.hash
   gr.save()
 
-  settleMaskLegsForGlobalRound(roundId, i32(event.params.winningNumber))
+  settleMaskLegsForGlobalRound(roundId, i32(event.params.winningNumber), event.block.timestamp, event.block.number)
   observeSideBetSpinsForRound(roundId, BigInt.fromI32(i32(event.params.winningNumber)))
 }
 

@@ -236,6 +236,8 @@ type User @entity(immutable: false) {
   tipCount: BigInt!
   "Tip component of BRBpoints, rounded down after summing eligible tips"
   tipPoints: BigInt!
+  "Per-preset special bet stats (one row per market and canonical presetId)"
+  specialBetStats: [UserSpecialBetStats!]! @derivedFrom(field: "user")
   "First seen timestamp"
   firstSeenAt: BigInt!
   "Last active timestamp"
@@ -252,6 +254,30 @@ type User @entity(immutable: false) {
   totalBrbrEarned: BigInt!
   "Total BRBR spent (debits)"
   totalBrbrSpent: BigInt!
+}
+
+"""
+Special bet stats of one user, per market and canonical presetId (0 = Sélection libre), updated when
+each RouletteMaskLeg is settled (VRFResult). Keyed by market because amounts are in that market's asset
+units, like UserMarketStats. id = user + marketId (i32) + presetId (i32).
+"""
+type UserSpecialBetStats @entity(immutable: false) {
+  id: Bytes!
+  user: User!
+  market: Market!
+  "Canonical presetId (see RouletteMaskLeg.canonicalPresetId)"
+  presetId: Int!
+  "Settled legs"
+  betCount: BigInt!
+  "Winning legs"
+  winCount: BigInt!
+  "Sum of leg stakes, market asset units"
+  totalWagered: BigInt!
+  "Sum of gross payouts (stake included), market asset units"
+  totalWon: BigInt!
+  "totalWon - totalWagered (may be negative)"
+  netResult: BigInt!
+  updatedAt: BigInt!
 }
 
 "Per-user stats in a single market (amounts in that market's asset units)"
@@ -496,6 +522,8 @@ type RouletteMaskLeg @entity(immutable: false) {
   previousGuard: Int
   "floor(amount * 36 / maskSize), stake included"
   potentialPayout: BigInt!
+  "presetId when the mask really is that preset (static mask, or previous-draw preset rebuilt on expectedPrev), else 0 (Sélection libre). Drives the per-preset stats; presetId itself is unvalidated"
+  canonicalPresetId: Int!
   "Winning number of the round once VRFResult is indexed"
   winningNumber: Int
   "True iff bit winningNumber of mask is set; null until VRFResult"

@@ -42,13 +42,18 @@ export function finalizeMarketRoundsOnResolve(globalRoundId: BigInt, timestamp: 
 }
 
 /** Applies a VRF winning number to the mask legs of every market slice of the global round. */
-export function settleMaskLegsForGlobalRound(globalRoundId: BigInt, winningNumber: i32): void {
+export function settleMaskLegsForGlobalRound(
+  globalRoundId: BigInt,
+  winningNumber: i32,
+  timestamp: BigInt,
+  blockNumber: BigInt
+): void {
   for (let marketId = 1; marketId <= MAX_MARKET_SCAN; marketId++) {
     const round = RouletteRound.load(marketRoundId(globalRoundId, marketId))
     if (round == null || round.maskBetsPayout.isZero()) {
       continue
     }
-    settleMaskLegsOfRound(round, winningNumber)
+    settleMaskLegsOfRound(round, winningNumber, timestamp, blockNumber)
   }
 }
 
