@@ -22,7 +22,7 @@ enum BetType {
   HIGH
   TRIO_012
   TRIO_023
-  "BET_MASK = 16 — arbitrary set of 2..24 numbers; decoded legs on RouletteMaskLeg"
+  "BET_MASK = 16 — arbitrary set of 2..35 numbers; decoded legs on RouletteMaskLeg"
   MASK
   "Bet type id the mapping does not know (never folded onto STRAIGHT); raw leg number kept in RouletteBet.numbers; unknown type id not persisted"
   UNKNOWN
@@ -488,7 +488,7 @@ type RouletteMaskLeg @entity(immutable: false) {
   rawNumber: BigInt!
   "Bits 0..36: bit n set <=> number n covered"
   mask: BigInt!
-  "|S| = popcount(mask), 2..24"
+  "|S| = popcount(mask), 2..35"
   maskSize: Int!
   "Bits 37..45: informational preset id (0..511), never used for any computation"
   presetId: Int!
