@@ -2,6 +2,9 @@
 const TIP_TOPIC = '0x7034535d23588442e56e6f7a2c0d6c139dec7d61cfdb7e68f094a7cf6b6e0a5b';
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const UNIT = 10n ** 18n;
+// BRBPointsConfig.challengeWeight default (src/helpers/brb-points.ts): daily-challenge points are
+// already whole BRBpoints, added after the divisor like tips (owner decision 2026-11-08).
+const CHALLENGE_WEIGHT = 1n;
 const lower = value => String(value).toLowerCase();
 const address = word => '0x' + word.slice(-40).toLowerCase();
 function requireCheck(ok, message) { if (!ok) throw Error('Tip release check: ' + message); }
@@ -19,7 +22,7 @@ export async function verifyTipPoints({ graphql, rpc, manifest, block }) {
   const recipient = address(onchainRecipient);
   const data = await graphql(`{ _meta(block:{number:${pin}}) { block { number hash } hasIndexingErrors }
     tips(first:1000,block:{number:${pin}}) { id jar sender token recipient amount transactionHash blockNumber }
-    users(first:1000,block:{number:${pin}}) { id totalTipsSent tipCount tipPoints brbpPoints totalRouletteBets totalStaked totalUnstaked totalBrbrEarned } }`);
+    users(first:1000,block:{number:${pin}}) { id totalTipsSent tipCount tipPoints challengePoints brbpPoints totalRouletteBets totalStaked totalUnstaked totalBrbrEarned } }`);
   requireCheck(data._meta?.block?.number === pin && data._meta.hasIndexingErrors === false, 'index is not healthy at pinned block');
   requireCheck(Array.isArray(data.tips) && Array.isArray(data.users) && data.tips.length < 1000 && data.users.length < 1000, 'scan incomplete; extend pagination before release');
   const chainBlock = await rpc('eth_getBlockByNumber', [blockTag, false]);
@@ -67,7 +70,8 @@ export async function verifyTipPoints({ graphql, rpc, manifest, block }) {
     const points = expected.amount * 3n / UNIT;
     requireCheck(BigInt(user.totalTipsSent) === expected.amount && BigInt(user.tipCount) === expected.count && BigInt(user.tipPoints) === points, 'user tip totals or 3x points differ');
     const netStake = BigInt(user.totalStaked) > BigInt(user.totalUnstaked) ? BigInt(user.totalStaked) - BigInt(user.totalUnstaked) : 0n;
-    const score = (BigInt(user.totalRouletteBets) * 3n + netStake + BigInt(user.totalBrbrEarned) * 2n) / UNIT + points;
+    const challenges = BigInt(user.challengePoints) * CHALLENGE_WEIGHT;
+    const score = (BigInt(user.totalRouletteBets) * 3n + netStake + BigInt(user.totalBrbrEarned) * 2n) / UNIT + points + challenges;
     requireCheck(BigInt(user.brbpPoints) === score, 'authoritative score differs from approved formula');
     totals.delete(lower(user.id));
   }

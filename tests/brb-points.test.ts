@@ -13,7 +13,8 @@ import {
   updateUserBrbrEarnings,
   updateUserRouletteStats,
 } from '../src/helpers/user';
-import { computeTier } from '../src/helpers/brb-points';
+import { computeTier, getOrCreateBrbPointsConfig, recomputeAndSaveUserPoints } from '../src/helpers/brb-points';
+import { getOrCreateUser } from '../src/helpers/user';
 
 const USER_A = '0xaaaa000000000000000000000000000000000001';
 const USER_B = '0xbbbb000000000000000000000000000000000002';
@@ -119,6 +120,32 @@ describe('BRBpoints wagered component', () => {
     // wagered (and thus points) unchanged by a payout
     assert.fieldEquals('User', USER_A, 'totalRouletteBets', ONE_BRB);
     assert.fieldEquals('User', USER_A, 'brbpPoints', '3');
+  });
+});
+
+describe('BRBpoints challenge component (daily challenges, 2026-11-08)', () => {
+  beforeEach(() => {
+    clearStore();
+  });
+
+  test('should seed challengeWeight = 1 and add challenge points after the divisor', () => {
+    assert.bigIntEquals(getOrCreateBrbPointsConfig(TS).challengeWeight, BigInt.fromI32(1));
+    updateUserWageredStats(addr(USER_A), bi(ONE_BRB), 18, true, TS); // 3 points
+    const user = getOrCreateUser(addr(USER_A));
+    user.challengePoints = BigInt.fromI32(30);
+    recomputeAndSaveUserPoints(user, TS);
+    assert.fieldEquals('User', USER_A, 'brbpPoints', '33');
+  });
+
+  test('should apply a changed challengeWeight and move the tier with it', () => {
+    const config = getOrCreateBrbPointsConfig(TS);
+    config.challengeWeight = BigInt.fromI32(20);
+    config.save();
+    const user = getOrCreateUser(addr(USER_B));
+    user.challengePoints = BigInt.fromI32(30);
+    recomputeAndSaveUserPoints(user, TS);
+    assert.fieldEquals('User', USER_B, 'brbpPoints', '600');
+    assert.fieldEquals('User', USER_B, 'tier', 'SILVER');
   });
 });
 

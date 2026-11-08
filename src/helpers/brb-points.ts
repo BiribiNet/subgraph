@@ -9,6 +9,8 @@ const DEFAULT_WAGERED_WEIGHT = BigInt.fromI32(3)
 const DEFAULT_STAKED_WEIGHT = BigInt.fromI32(1)
 const DEFAULT_REFERRAL_WEIGHT = BigInt.fromI32(2)
 const DEFAULT_TIP_WEIGHT = BigInt.fromI32(3)
+// Défis du jour (08/11/2026) : User.challengePoints est déjà en BRBpoints (10 par défi), poids 1.
+const DEFAULT_CHALLENGE_WEIGHT = BigInt.fromI32(1)
 // 1e18 — so 1 BRB wagered with weight 3 contributes 3 raw points.
 const DEFAULT_DIVISOR = BigInt.fromI32(10).pow(18)
 
@@ -31,6 +33,7 @@ export function getOrCreateBrbPointsConfig(timestamp: BigInt): BRBPointsConfig {
   cfg.stakedWeight = DEFAULT_STAKED_WEIGHT
   cfg.referralWeight = DEFAULT_REFERRAL_WEIGHT
   cfg.tipWeight = DEFAULT_TIP_WEIGHT
+  cfg.challengeWeight = DEFAULT_CHALLENGE_WEIGHT
   cfg.divisor = DEFAULT_DIVISOR
   cfg.lastUpdatedAt = timestamp
   cfg.save()
@@ -50,8 +53,10 @@ export function computeBrbPoints(user: User, cfg: BRBPointsConfig): BigInt {
   const staked = netStaked.times(cfg.stakedWeight)
   const referral = user.totalBrbrEarned.times(cfg.referralWeight)
   const tips = user.totalTipsSent.times(cfg.tipWeight).div(cfg.divisor)
+  // Already whole points: added after the divisor, like tips.
+  const challenges = user.challengePoints.times(cfg.challengeWeight)
   const weighted = wagered.plus(staked).plus(referral)
-  return weighted.div(cfg.divisor).plus(tips)
+  return weighted.div(cfg.divisor).plus(tips).plus(challenges)
 }
 
 export function computeTier(points: BigInt): string {

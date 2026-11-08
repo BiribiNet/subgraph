@@ -62,6 +62,7 @@ This subgraph indexes **all on-chain events** from the Biribi protocol (biribi.n
 
 - `BRBPointsConfig` singleton (id = `bytes("config")`) holds the formula parameters: `wageredWeight` (default 3), `stakedWeight` (default 1), `referralWeight` (default 2), `divisor` (default 1e18). Seeded by `getOrCreateBrbPointsConfig()` (`src/helpers/brb-points.ts`) on first access.
 - `computeBrbPoints(user, cfg)` = `(user.totalRouletteBets * 3 + user.totalStaked * 1 + user.totalBrbrEarned * 2) / 1e18` with the default config — points are denominated in BRB-equivalent units.
+- Since 2026-11-08 the score also adds `user.challengePoints × challengeWeight` (daily challenges, default weight 1, no divisor — 10 points per validated challenge, at most 30 per UTC day; see `docs/daily-challenges.md`).
 - `computeTier(points)` maps to `BRONZE / SILVER (≥ 500) / GOLD (≥ 2k) / PLATINUM (≥ 5k) / DIAMOND (≥ 15k) / LEGEND (≥ 50k)`. **These thresholds MUST match the frontend `BRBP_TIERS` array** in `frontend/hooks/use-biribi-points.ts`; the subgraph is the source of truth for `user.tier`.
 - `recomputeAndSaveUserPoints(user, timestamp)` runs after every `updateUserRouletteStats` / `updateUserStakingStats` / `updateUserBrbrEarnings` call — keeps `user.brbpPoints` and `user.tier` always in sync with the components.
 - `User.totalRouletteBets` and `User.totalStaked`/`totalUnstaked` are **decimal-normalized to 18** across markets, so 1 USDC and 1 BRB each count as one unit. What is still absent is **price** normalization: a unit of USDC and a unit of BRB score identically regardless of market value. Document that trade-off when consumers query the leaderboard, and do not confuse it with a decimals bug.
@@ -403,7 +404,11 @@ to index**, and this subgraph deliberately ships **no governance entities**
 
 The subgraph's only governance role is to be the **voting-power source**:
 `User.brbpPoints` already is the canonical voting weight
-(`a·wagered + b·staked + c·referral`, see `src/helpers/brb-points.ts`).
+(`a·wagered + b·staked + c·referral + tips + challengeWeight·challengePoints`, see
+`src/helpers/brb-points.ts`). **Daily challenges count in the vote** (owner decision 2026-11-08):
+`User.challengePoints` (10 per validated « Défi du jour », at most 30 per UTC day) is added with
+`BRBPointsConfig.challengeWeight` (default 1). See `docs/daily-challenges.md`; the catalogue is
+shared with the frontend through `docs/daily-challenges.json`.
 Because `User` is `@entity(immutable: false)`, Snapshot can read it **at a
 proposal's snapshot block** via The Graph time-travel queries. A Snapshot
 custom/`api` strategy should use exactly:
@@ -562,6 +567,16 @@ history from a live defect.
 - Flag when `eth_call` is being used and suggest event-based alternatives
 - Think about reorgs and how entity updates would behave during chain reorganizations
 - Respect The Graph's pricing model — minimize entities and storage where possible
+
+## Special bet stats and daily challenges
+
+See docs/daily-challenges.md. `RouletteMaskLeg.canonicalPresetId` keeps the presetId only when the
+mask really is that preset (else 0 = Sélection libre); `UserSpecialBetStats` aggregates per (user,
+market, canonical preset) on first settlement. Daily challenges (`UserDailyChallenges`,
+`DailyChallengeCompletion` dedup id user + day + challenge) feed `User.challengePoints` and therefore
+`brbpPoints`, tier and daily snapshots. Keep `docs/daily-challenges.json` byte-identical to frontend
+`lib/daily-challenges/definition.json`; `scripts/check-daily-challenges.mjs` guards the AssemblyScript
+copy. Release needs a fresh index, not grafting.
 
 ## Verified tip points
 

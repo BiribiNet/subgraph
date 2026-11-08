@@ -5,7 +5,7 @@ const sender = '0x' + '1'.repeat(40), token = '0x' + '2'.repeat(40), recipient =
 const word = value => value.replace(/^0x/, '').padStart(64, '0'), amount = 10n ** 18n;
 function fixture() {
  const tip = { id: hash + '01', jar, sender, token, recipient, amount: String(amount), transactionHash: hash, blockNumber: '90' };
- const user = { id: sender, totalTipsSent: String(amount), tipCount: '1', tipPoints: '3', brbpPoints: '6', totalRouletteBets: String(amount), totalStaked: '0', totalUnstaked: '0', totalBrbrEarned: '0' };
+ const user = { id: sender, totalTipsSent: String(amount), tipCount: '1', tipPoints: '3', challengePoints: '0', brbpPoints: '6', totalRouletteBets: String(amount), totalStaked: '0', totalUnstaked: '0', totalBrbrEarned: '0' };
  const data = { _meta: { block: { number: 100, hash }, hasIndexingErrors: false }, tips: [tip], users: [user] };
  const receipt = { status: '0x1', transactionHash: hash, blockNumber: '0x5a', logs: [
    { address: jar, topics: ['0x7034535d23588442e56e6f7a2c0d6c139dec7d61cfdb7e68f094a7cf6b6e0a5b'], data: '0x' + word(sender) + word(token) + word(recipient) + word(amount.toString(16)), logIndex: '0x1' },
@@ -35,4 +35,10 @@ test('handles unavailable indexed hashes while rejecting a reorg at the pinned c
  const original = f.args.rpc; let reads = 0;
  f.args.rpc = async (method, params) => method === 'eth_getBlockByNumber' && ++reads > 1 ? { hash: '0x' + 'b'.repeat(64) } : original(method, params);
  await assert.rejects(verifyTipPoints(f.args), /pinned block changed/);
+});
+test('counts daily-challenge points in the authoritative score, like computeBrbPoints', async () => {
+ const f = fixture(); f.user.challengePoints = '20'; f.user.brbpPoints = '26';
+ assert.equal((await verifyTipPoints(f.args)).verified, true);
+ const stale = fixture(); stale.user.challengePoints = '20'; stale.user.brbpPoints = '6';
+ await assert.rejects(verifyTipPoints(stale.args), /authoritative score differs/);
 });
