@@ -121,6 +121,8 @@ export function handleDeposit(event: Deposit): void {
   const depositId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
   const deposit = new VaultDeposit(depositId)
   deposit.market = market.id
+  // Adresse du vault émetteur : le frontend filtre l'historique de staking par `bank`.
+  deposit.bank = event.address
   deposit.user = event.params.owner
   deposit.assets = event.params.assets
   deposit.shares = event.params.shares
@@ -294,6 +296,8 @@ export function recordWithdrawalProcessed(event: ethereum.Event, owner: Address,
     const withdrawalId = event.transaction.hash.concat(bigintToBytes(event.logIndex))
     const withdrawal = new VaultWithdrawal(withdrawalId)
     withdrawal.market = market.id
+    // Adresse du vault émetteur : le frontend filtre l'historique de staking par `bank`.
+    withdrawal.bank = event.address
     withdrawal.user = owner
     withdrawal.assets = assetsPaid
     withdrawal.shares = sharesBurned
