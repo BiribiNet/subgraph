@@ -1,7 +1,7 @@
 name: Validate and activate the Arbitrum One vault recovery
 on:
   push:
-    tags: [ops/vault-recovery-promote-20261116]
+    tags: [ops/vault-recovery-promote-20261116-checkpoint]
 permissions:
   contents: read
 concurrency:

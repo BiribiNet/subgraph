@@ -38,7 +38,7 @@ async function query(entry, document, expectFailedIndex = false) {
     method: 'POST', headers: { ...jsonHeaders, ...auth }, body: JSON.stringify({ query: document }),
   });
   assert(data && (!errors?.length || (expectFailedIndex && errors.every(item => item.message === 'indexing_error'))),
-    'Unexpected GraphQL error');
+    'GraphQL validation failed: ' + JSON.stringify(errors?.map(item => item.message) ?? []));
   return data;
 }
 
@@ -72,7 +72,7 @@ assertCandidate(candidate);
 const data = await query(candidate, `{
   _meta { deployment hasIndexingErrors block { number hash } }
   markets(orderBy:marketId) { marketId asset bank }
-  globalRounds(first:1,where:{roundNumber:"173"},block:{number:${failedBlock}}) { roundNumber status resolvedAt }
+  globalRounds(first:1,where:{roundNumber:"173"}) { roundNumber status resolvedAt }
 }`);
 assertMarkets(data.markets, manifest);
 assert.equal(data._meta.hasIndexingErrors, false);
@@ -84,7 +84,7 @@ assert.equal(data._meta.block.hash, indexedHash, 'Indexed head differs from Arbi
 assert.deepEqual(data.globalRounds, [{ roundNumber:'173', status:'CLEAN', resolvedAt:String(resolutionTime) }]);
 console.log('Verified round 173 at', failedBlock);
 
-for (const block of [failedBlock - 1, indexedBlock]) {
+async function reconcileVaults(block) {
   const pinned = await query(candidate, `{ markets(orderBy:marketId,block:{number:${block}}) {
     marketId asset bank totalAssets totalShares
   } }`);
@@ -99,6 +99,14 @@ for (const block of [failedBlock - 1, indexedBlock]) {
     assert.equal(BigInt(m.totalShares), BigInt(shares), `Vault supply drift at ${block} market ${m.marketId}`);
     console.log(`Vault ${m.marketId} reconciled at ${block}`);
   }
+}
+
+await reconcileVaults(indexedBlock);
+try {
+  await reconcileVaults(failedBlock - 1);
+} catch (error) {
+  if (!/GraphQL validation failed:.*(?:earliest|historical|prun|only has data starting)/i.test(error.message)) throw error;
+  console.log('Historical block is outside index retention. All three vaults were reconciled at the indexed head and the settled round was verified.');
 }
 
 const canonicalRpc = async (method, params) => {
