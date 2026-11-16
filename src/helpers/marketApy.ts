@@ -83,14 +83,14 @@ function calculateAPYInternal(
     return BigDecimal.fromString("0")
   }
 
-  const PRECISION = BigInt.fromI32(10).pow(18)
-  const currentShareValue = currentTotalAssets.times(PRECISION).div(currentTotalShares)
-  const baselineShareValue = baselineTotalAssets.times(PRECISION).div(baselineTotalShares)
-
-  const growthRate = currentShareValue
+  // Compare the ratios directly. Scaling and truncating each share price can
+  // turn a positive baseline into zero when the vault has very many shares.
+  const baseline = baselineTotalAssets.times(currentTotalShares)
+  const growthRate = currentTotalAssets
+    .times(baselineTotalShares)
+    .minus(baseline)
     .toBigDecimal()
-    .div(baselineShareValue.toBigDecimal())
-    .minus(BigDecimal.fromString("1"))
+    .div(baseline.toBigDecimal())
 
   const SECONDS_PER_YEAR = BigDecimal.fromString("31536000")
   const annualizationFactor = SECONDS_PER_YEAR.div(timeElapsed.toBigDecimal())

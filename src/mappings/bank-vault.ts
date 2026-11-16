@@ -322,11 +322,6 @@ export function recordWithdrawalProcessed(event: ethereum.Event, owner: Address,
     }
 
     subtractGrossVaultBalance(market, assetsPaid)
-    if (market.totalShares.ge(sharesBurned)) {
-      market.totalShares = market.totalShares.minus(sharesBurned)
-    } else {
-      market.totalShares = ZERO
-    }
     syncMarketTotalAssets(market)
     market.totalWithdrawVolume = market.totalWithdrawVolume.plus(assetsPaid)
 
@@ -441,6 +436,16 @@ export function handleTransfer(event: VaultShareTransfer): void {
   if (market != null) {
     recordUserMarketSbrbShares(event.params.from, market, event.params.value, false)
     recordUserMarketSbrbShares(event.params.to, market, event.params.value, true)
+
+    // Withdrawals and standalone recovery burns both emit this ERC-20 event.
+    // The withdrawal handler still accounts for the assets paid and receipt.
+    if (event.params.to.equals(Address.zero()) && event.params.value.gt(ZERO)) {
+      market.totalShares = market.totalShares.ge(event.params.value)
+        ? market.totalShares.minus(event.params.value)
+        : ZERO
+      syncMarketTotalAssets(market)
+      market.save()
+    }
   }
   updateUserSBRBBalance(event.params.from, event.params.value, false)
   updateUserSBRBBalance(event.params.to, event.params.value, true)

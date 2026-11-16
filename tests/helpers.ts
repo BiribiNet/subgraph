@@ -363,6 +363,9 @@ export function emitWithdrawalProcessed(
   event.logIndex = BigInt.fromI32(logIndex);
   event.block.timestamp = BigInt.fromI32(timestamp);
   event.block.number = BigInt.fromI32(timestamp / 100);
+  if (BigInt.fromString(sharesBurned).gt(BigInt.zero())) {
+    emitVaultShareTransfer(owner, ZERO_ADDRESS, sharesBurned, timestamp, logIndex - 1, bank);
+  }
   handleWithdrawalProcessed(event);
 }
 

@@ -1,6 +1,7 @@
 import { assert, beforeEach, clearStore, describe, test } from 'matchstick-as';
 
 import { Market } from '../generated/schema';
+import { ZERO_ADDRESS } from '../src/helpers/constant';
 import {
   DEFAULT_USER,
   TEST_BANK,
@@ -12,6 +13,8 @@ import {
   emitFundsTransferred,
   emitPayoutBatchProcessed,
   emitSideBetStakeLocked,
+  emitVaultShareTransfer,
+  emitWithdrawalProcessed,
   setupBrbTestMarket,
 } from './helpers';
 
@@ -35,6 +38,32 @@ describe('Market APY recalculation on vault yield events', () => {
     emitBetsReleased(ONE_BRB, '0', TWO_DAYS_LATER);
 
     // growth 1.0 annualized over 2 days: 1 * (31536000 / 172800) * 100 = 18250
+    assert.fieldEquals('Market', '1', 'apyLifetime', '18250');
+    assert.entityCount('MarketAPYSnapshot', 2);
+  });
+
+  test('A standalone recovery burn corrects supply without creating a withdrawal', () => {
+    emitDeposit(DEFAULT_USER, ONE_BRB, ONE_BRB, DEPOSIT_TS);
+    emitDeposit(DEFAULT_USER, ONE_BRB, ONE_BRB, DEPOSIT_TS + 1, 2);
+    emitVaultShareTransfer(DEFAULT_USER, ZERO_ADDRESS, ONE_BRB, ONE_DAY_LATER);
+
+    assert.fieldEquals('Market', '1', 'totalShares', ONE_BRB);
+    assert.fieldEquals('Market', '1', 'totalAssets', TWO_BRB);
+    assert.entityCount('VaultWithdrawal', 0);
+
+    const half = '500000000000000000';
+    emitWithdrawalProcessed(DEFAULT_USER, 5000, DEFAULT_USER, ONE_BRB, half, TWO_DAYS_LATER, 5);
+
+    assert.fieldEquals('Market', '1', 'totalShares', half);
+    assert.fieldEquals('Market', '1', 'totalAssets', ONE_BRB);
+    assert.entityCount('VaultWithdrawal', 1);
+  });
+
+  test('A positive baseline below the share-price precision still yields APY', () => {
+    emitDeposit(DEFAULT_USER, ONE_BRB, '10000000000000000000000000000000000000000', DEPOSIT_TS);
+    emitBetPlaced(ONE_BRB, DEPOSIT_TS + 100);
+    emitBetsReleased(ONE_BRB, '0', TWO_DAYS_LATER);
+
     assert.fieldEquals('Market', '1', 'apyLifetime', '18250');
     assert.entityCount('MarketAPYSnapshot', 2);
   });
