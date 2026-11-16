@@ -1,0 +1,36 @@
+name: Reindex Arbitrum One vault recovery
+on:
+  push:
+    tags: [ops/vault-recovery-20261116]
+permissions:
+  contents: read
+concurrency:
+  group: goldsky-mainnet-release
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    environment: goldsky-testnet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify the BRB project
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+        run: node --input-type=module -e "import { goldskyToken, verifyBrbProject } from './scripts/goldsky-project.mjs'; await verifyBrbProject(goldskyToken());"
+      - run: corepack enable && yarn install --immutable
+      - run: yarn test:release && yarn codegen && yarn test
+      - name: Prepare and compile the mainnet build
+        run: |
+          node scripts/prepare-environment.mjs deployments/arbitrum-one.json release-mainnet
+          cd release-mainnet
+          ../node_modules/.bin/graph codegen
+          ../node_modules/.bin/graph build
+      - name: Deploy the private candidate without changing prod
+        env:
+          GOLDSKY_API_TOKEN: ${{ secrets.GOLDSKY_API_TOKEN || secrets.GOLDSKY_TOKEN }}
+          GOLDSKY_BUILD_DIR: release-mainnet/build
+        run: node scripts/goldsky-deploy.mjs biribi-arbitrum-one/validation-vault-recovery-20261116
