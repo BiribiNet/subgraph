@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { releaseTarget, privateEndpoint, assertCandidate, assertMarkets, runReleaseCheck } from './goldsky-release-check.mjs';
+import { releaseTarget, privateEndpoint, assertCandidate, assertMarkets, releaseRpc, runReleaseCheck } from './goldsky-release-check.mjs';
 import { BRB_PROJECT_ID } from './goldsky-project.mjs';
 test('release and recovery choices cannot select another chain or arbitrary versions', () => {
   assert.equal(releaseTarget('mainnet', 'promote', '1.1.0', '1.0.0').name, 'biribi-arbitrum-one');
@@ -55,6 +55,43 @@ function fixture({ changedProd = false, drift = false, wrongMarket = false, netw
   }}};
 }
 const env={RELEASE_NETWORK:'mainnet',RELEASE_OPERATION:'promote',VERSION:'1.1.0',EXPECTED_LIVE_VERSION:'1.0.0',GOLDSKY_API_TOKEN:'credential'};
+test('mainnet RPC failover verifies the chain before retrying a receipt and stays on the verified endpoint', async () => {
+  const target = releaseTarget('mainnet', 'promote', '1.1.0', '1.0.0');
+  const calls = [];
+  const rpc = releaseRpc(target, async (url, options) => {
+    const { method } = JSON.parse(options.body);
+    assert.equal(options.headers.Authorization, undefined);
+    calls.push([url, method]);
+    if (method === 'eth_chainId') return { result: '0xa4b1' };
+    if (url === target.rpc) throw Error('RPC unavailable');
+    return { result: 'verified evidence' };
+  });
+  await rpc.read('eth_chainId', []);
+  assert.deepEqual(await Promise.all([
+    rpc.read('eth_getTransactionReceipt', ['hash']),
+    rpc.read('eth_getBlockByNumber', ['block', false]),
+  ]), ['verified evidence', 'verified evidence']);
+  assert.equal(rpc.endpoint(), target.fallbackRpc);
+  assert.deepEqual(calls, [
+    [target.rpc, 'eth_chainId'], [target.rpc, 'eth_getTransactionReceipt'],
+    [target.rpc, 'eth_getBlockByNumber'], [target.fallbackRpc, 'eth_chainId'], [target.fallbackRpc, 'eth_getTransactionReceipt'],
+    [target.fallbackRpc, 'eth_getBlockByNumber'],
+  ]);
+});
+
+test('a wrong-chain fallback prevents promotion before any tag write', async () => {
+  const f = fixture();
+  const target = releaseTarget('mainnet', 'promote', '1.1.0', '1.0.0');
+  const fetcher = f.dependencies.fetcher;
+  f.dependencies.fetcher = async (url, options) => {
+    if (url === target.rpc) throw Error('RPC unavailable');
+    if (url === target.fallbackRpc) return { ok: true, json: async () => ({ result: '0x1' }) };
+    return fetcher(url, options);
+  };
+  await assert.rejects(runReleaseCheck(env, f.dependencies), /RPC chain mismatch/);
+  assert.equal(f.writes.length, 0);
+  assert.equal(f.reports.at(-1).promotionAttempted, false);
+});
 test('mainnet promotion requires comparison and exact vault reconciliation before one private tag move',async()=>{
   const f=fixture(); const report=await runReleaseCheck(env,f.dependencies);
   assert.equal(report.promoted,true);
