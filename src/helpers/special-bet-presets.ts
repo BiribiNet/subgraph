@@ -51,7 +51,7 @@ export const STATIC_PRESET_MASKS: string[] = [
   "68786651200", "134348928", "268697856", "537395712",
 ]
 
-function isRed(pocket: i32): boolean {
+export function isRed(pocket: i32): boolean {
   return RED_POCKETS.includes(pocket)
 }
 
@@ -59,7 +59,7 @@ function bitOf(pocket: i32): BigInt {
   return ONE.leftShift(u8(pocket))
 }
 
-function wheelIndexOf(pocket: i32): i32 {
+export function wheelIndexOf(pocket: i32): i32 {
   return EUROPEAN_WHEEL_ORDER.indexOf(pocket)
 }
 

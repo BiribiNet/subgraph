@@ -41,6 +41,8 @@ export function createNewRouletteRound(
   round.otherBetsPayout = BigInt.fromI32(0)
   round.maskBetsPayout = ZERO
   round.maskWinningPayout = ZERO
+  round.dualBetsPayout = ZERO
+  round.dualDrawPayout = ZERO
   round.currentPayoutsCount = BigInt.fromI32(0)
   round.totalPayouts = BigInt.fromI32(0)
   round.betCount = BigInt.fromI32(0)
