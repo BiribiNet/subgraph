@@ -6,6 +6,9 @@ import { API_BASE, BRB_PROJECT_ID, goldskyToken, verifyBrbProject, validateRelea
 import { promoteRelease } from './goldsky-promote.mjs';
 import { verifyTipPoints } from './verify-tip-points.mjs';
 
+const MAINNET_FALLBACK_RPC = 'https://arbitrum-one-rpc.publicnode.com';
+const TRANSIENT_RPC_STATUS = new Set([429, 500, 502, 503, 504]);
+
 export function releaseTarget(network, operation, version, previous) {
   if (!['mainnet', 'testnet'].includes(network) || !['inspect', 'validate', 'promote', 'restore-testnet'].includes(operation)) throw Error('Invalid release operation/network');
   if (operation === 'restore-testnet' && network !== 'testnet') throw Error('Recovery is limited to the missing Sepolia alias');
@@ -17,6 +20,7 @@ export function releaseTarget(network, operation, version, previous) {
   }
   return { name, chainId: network === 'mainnet' ? 42161 : 421614,
     rpc: network === 'mainnet' ? 'https://arb1.arbitrum.io/rpc' : 'https://sepolia-rollup.arbitrum.io/rpc',
+    fallbackRpc: network === 'mainnet' ? MAINNET_FALLBACK_RPC : null,
     manifestPath: network === 'mainnet' ? 'deployments/arbitrum-one.json' : 'deployments/arbitrum-sepolia.json' };
 }
 export function privateEndpoint(name, entry) {
@@ -40,6 +44,59 @@ export function assertMarkets(markets, manifest) {
   }
 }
 
+export function releaseRpc(target, json, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+  let endpoint = target.rpc;
+  let verified = false;
+  let fallbackVerification;
+  const request = async (url, method, params) => {
+    const options = {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return (await json(url, options)).result;
+      } catch (cause) {
+        const transient = TRANSIENT_RPC_STATUS.has(cause.httpStatus) || cause.rpcCode === -32005;
+        if (!transient || attempt >= 2) {
+          const detail = cause.httpStatus ? ` (HTTP ${cause.httpStatus})`
+            : cause.rpcCode !== undefined ? ` (JSON-RPC ${cause.rpcCode})` : '';
+          throw Error(`Arbitrum RPC ${method} failed${detail}`);
+        }
+        await pause(800 * 2 ** attempt);
+      }
+    }
+  };
+  const verifyChain = value => {
+    if (typeof value !== 'string' || !/^0x[\da-f]+$/i.test(value) || BigInt(value) !== BigInt(target.chainId)) {
+      throw Error('RPC chain mismatch');
+    }
+  };
+  const read = async (method, params) => {
+    const attempted = endpoint;
+    if (method !== 'eth_chainId' && !verified) throw Error('Release RPC chain not verified');
+    let result;
+    try {
+      result = await request(attempted, method, params);
+    } catch (error) {
+      if (!target.fallbackRpc || attempted === target.fallbackRpc) throw error;
+      fallbackVerification ??= request(target.fallbackRpc, 'eth_chainId', []).then(chain => {
+        verifyChain(chain);
+        return chain;
+      });
+      const chain = await fallbackVerification;
+      endpoint = target.fallbackRpc;
+      result = method === 'eth_chainId' ? chain : await request(endpoint, method, params);
+    }
+    if (method === 'eth_chainId') {
+      verifyChain(result);
+      verified = true;
+    }
+    return result;
+  };
+  return { read, endpoint: () => endpoint };
+}
+
 export async function runReleaseCheck(env = process.env, {
   fetcher = fetch, execute = execFileSync,
   readManifest = path => JSON.parse(readFileSync(path, 'utf8')),
@@ -53,11 +110,19 @@ export async function runReleaseCheck(env = process.env, {
   async function json(url, options = {}) {
     try {
       const response = await fetcher(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw Error();
+      if (!response.ok) throw Object.assign(Error(), { httpStatus: response.status });
       const body = await response.json();
-      if (body.errors || body.error) throw Error();
+      if (body.errors || body.error) {
+        const code = body.error?.code;
+        throw Object.assign(Error(), { rpcCode: Number.isInteger(code) ? code : undefined });
+      }
       return body;
-    } catch { throw Error('Release request failed; credential-bearing request details omitted'); }
+    } catch (cause) {
+      throw Object.assign(Error('Release request failed; credential-bearing request details omitted'), {
+        httpStatus: cause?.httpStatus,
+        rpcCode: cause?.rpcCode,
+      });
+    }
   }
   // The scoped name listing includes deployment versions AND aliases.
   const entries = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}`, { headers: auth })).data;
@@ -87,13 +152,12 @@ export async function runReleaseCheck(env = process.env, {
     if (!data?._meta || data._meta.hasIndexingErrors !== false) throw Error('Candidate query is not healthy');
     const manifest = readManifest(target.manifestPath);
     assertMarkets(data.markets, manifest);
-    const chain = await json(target.rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }) });
-    if (Number(BigInt(chain.result)) !== target.chainId) throw Error('RPC chain mismatch');
+    const rpc = releaseRpc(target, json);
+    await rpc.read('eth_chainId', []);
     if (env.VERIFY_TIP_POINTS === '1' && network === 'mainnet') {
       report.tipVerification = await verifyTipPoints({ manifest, block: data._meta.block.number,
         graphql: async query => (await json(privateEndpoint(target.name, candidate), { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })).data,
-        rpc: async (method, params) => (await json(target.rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) })).result,
+        rpc: rpc.read,
       });
     }
     if (operation === 'restore-testnet') {
@@ -108,7 +172,7 @@ export async function runReleaseCheck(env = process.env, {
         env: { ...env, GOLDSKY_API_TOKEN: token, GOLDSKY_SUBGRAPH_NAME: target.name } });
     }
     execute(process.execPath, ['scripts/reconcile-vaults.mjs', target.manifestPath], { stdio: 'inherit',
-      env: { ...env, RPC_URL: target.rpc, SUBGRAPH_URL: privateEndpoint(target.name, candidate), SUBGRAPH_AUTH_TOKEN: token, TOLERANCE: '0' } });
+      env: { ...env, RPC_URL: rpc.endpoint(), SUBGRAPH_URL: privateEndpoint(target.name, candidate), SUBGRAPH_AUTH_TOKEN: token, TOLERANCE: '0' } });
     if (operation === 'promote' || operation === 'restore-testnet') {
       // Recheck alias identity immediately before the only tag mutation.
       const fresh = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}`, { headers: auth })).data;
