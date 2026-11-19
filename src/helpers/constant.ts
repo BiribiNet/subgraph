@@ -27,6 +27,7 @@ export const BET_TRIO_012 = 14
 export const BET_TRIO_023 = 15
 /** Mask bet (spec mask-bets v1, D1): arbitrary set of 2..35 numbers, see helpers/mask-bet.ts. */
 export const BET_MASK = 16
+export const BET_DUAL = 17
 
 // Constants for round status
 export const ROUND_STATUS_BETTING = "BETTING"
@@ -52,5 +53,6 @@ export const BET_TYPE_HIGH = "HIGH"
 export const BET_TYPE_TRIO_012 = "TRIO_012"
 export const BET_TYPE_TRIO_023 = "TRIO_023"
 export const BET_TYPE_MASK = "MASK"
+export const BET_TYPE_DUAL = "DUAL"
 /** Bet type id this mapping does not know. Never folded onto STRAIGHT. */
 export const BET_TYPE_UNKNOWN = "UNKNOWN"

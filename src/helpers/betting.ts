@@ -6,11 +6,11 @@ import { BetPlaced } from "../../generated/templates/BankVault/BankVault4626"
 import {
   BET_STRAIGHT, BET_SPLIT, BET_STREET, BET_CORNER, BET_LINE,
   BET_COLUMN, BET_DOZEN, BET_RED, BET_BLACK, BET_ODD, BET_EVEN,
-  BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_MASK,
+  BET_LOW, BET_HIGH, BET_TRIO_012, BET_TRIO_023, BET_MASK, BET_DUAL,
   BET_TYPE_STRAIGHT, BET_TYPE_SPLIT, BET_TYPE_STREET, BET_TYPE_CORNER,
   BET_TYPE_LINE, BET_TYPE_COLUMN, BET_TYPE_DOZEN, BET_TYPE_RED,
   BET_TYPE_BLACK, BET_TYPE_ODD, BET_TYPE_EVEN, BET_TYPE_LOW,
-  BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, BET_TYPE_MASK, BET_TYPE_UNKNOWN
+  BET_TYPE_HIGH, BET_TYPE_TRIO_012, BET_TYPE_TRIO_023, BET_TYPE_MASK, BET_TYPE_DUAL, BET_TYPE_UNKNOWN
 } from "./constant"
 import { addMaskLiability } from "./mask-bet"
 
@@ -61,6 +61,8 @@ function getBetTypeFromNumber(betTypeNumber: BigInt): string {
       return BET_TYPE_TRIO_023
     case BET_MASK:
       return BET_TYPE_MASK
+    case BET_DUAL:
+      return BET_TYPE_DUAL
     default:
       // Folding an unknown id onto STRAIGHT used to rewrite history silently (a mask would have read
       // as a straight bet). UNKNOWN keeps the leg, its amount and raw number visible and queryable.
@@ -96,6 +98,7 @@ function isNumberSlotInRange(numI32: i32, slots: i32, betTypeInt: i32, rawNumber
 
 export function updateRoundMaxPayoutComponents(round: RouletteRound, amount: BigInt, betType: BigInt, number: BigInt): void {
   const betTypeInt = toI32OrSentinel(betType)
+  if (betTypeInt == BET_DUAL) return // Recorded alongside the decoded leg.
   if (betTypeInt == BET_MASK) {
     // Decoded as BigInt: the raw value carries the 37-bit mask plus presetId/guard bits.
     addMaskLiability(round, amount, number)
@@ -173,7 +176,7 @@ export function calculateMaxPayoutFromRoundComponents(round: RouletteRound): Big
   const columnComponent = columnMax.times(BigInt.fromI32(3))
 
   const otherComponent = round.otherBetsPayout
-  const maskComponent = round.maskBetsPayout
+  const maskComponent = round.maskBetsPayout.plus(round.dualBetsPayout)
 
   const raw = straightComponent
     .plus(pairComponent)

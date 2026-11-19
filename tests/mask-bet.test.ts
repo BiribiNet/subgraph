@@ -306,8 +306,8 @@ describe('Unknown bet types', () => {
     setupTestMarket();
   });
 
-  test('should record type 17 as UNKNOWN, never as STRAIGHT', () => {
-    emitBetRecorded(DEFAULT_USER, TEN_TOKENS, encodeBetLegs([BigInt.fromI32(17)], [BigInt.fromI32(7)], [BigInt.fromString(TEN_TOKENS)]), 1);
+  test('should record type 18 as UNKNOWN, never as STRAIGHT', () => {
+    emitBetRecorded(DEFAULT_USER, TEN_TOKENS, encodeBetLegs([BigInt.fromI32(18)], [BigInt.fromI32(7)], [BigInt.fromString(TEN_TOKENS)]), 1);
     const betId = Bytes.fromHexString(DEFAULT_USER).concat(Bytes.fromHexString(testRoundId(1))).toHexString();
     assert.fieldEquals('RouletteBet', betId, 'betTypes', '[UNKNOWN]');
     assert.fieldEquals('RouletteRound', testRoundId(1), 'maxStraightBet', '0');

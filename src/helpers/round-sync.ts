@@ -9,6 +9,7 @@ import { marketRoundId, requireMarket } from "./market"
 import { clearMarketPendingBets } from "./vault-liquidity"
 import { updateRoundRevenueAggregates } from "./aggregation"
 import { settleMaskLegsOfRound } from "./mask-bet"
+import { settleDualLegsOfRound } from "./dual-bet"
 
 const MAX_MARKET_SCAN: i32 = 32
 
@@ -41,19 +42,19 @@ export function finalizeMarketRoundsOnResolve(globalRoundId: BigInt, timestamp: 
   }
 }
 
-/** Applies a VRF winning number to the mask legs of every market slice of the global round. */
-export function settleMaskLegsForGlobalRound(
-  globalRoundId: BigInt,
+/** Applies the published VRF draw to special legs across the market slices. */
+export function settleSpecialLegsForGlobalRound(
+  globalRound: GlobalRound,
   winningNumber: i32,
+  jackpotNumber: i32,
   timestamp: BigInt,
   blockNumber: BigInt
 ): void {
-  for (let marketId = 1; marketId <= MAX_MARKET_SCAN; marketId++) {
-    const round = RouletteRound.load(marketRoundId(globalRoundId, marketId))
-    if (round == null || round.maskBetsPayout.isZero()) {
-      continue
-    }
-    settleMaskLegsOfRound(round, winningNumber, timestamp, blockNumber)
+  const rounds = globalRound.marketRounds.load()
+  for (let index = 0; index < rounds.length; index++) {
+    const round = rounds[index]
+    if (!round.maskBetsPayout.isZero()) settleMaskLegsOfRound(round, winningNumber, timestamp, blockNumber)
+    settleDualLegsOfRound(round, winningNumber, jackpotNumber)
   }
 }
 

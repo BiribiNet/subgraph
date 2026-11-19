@@ -24,6 +24,7 @@ enum BetType {
   TRIO_023
   "BET_MASK = 16 — arbitrary set of 2..35 numbers; decoded legs on RouletteMaskLeg"
   MASK
+  DUAL
   "Bet type id the mapping does not know (never folded onto STRAIGHT); raw leg number kept in RouletteBet.numbers; unknown type id not persisted"
   UNKNOWN
 }
@@ -467,6 +468,10 @@ type RouletteRound @entity(immutable: false) {
   maskBetsPayout: BigInt!
   "Mask payout implied by the winning number: sum of floor(amount * 36 / size) over the mask legs whose bit is set. 0 until VRFResult"
   maskWinningPayout: BigInt!
+  "Sum of the maximum returns of the round's two-ball legs"
+  dualBetsPayout: BigInt!
+  "Sum of returns implied by both VRF results, including refunded stakes"
+  dualDrawPayout: BigInt!
   "Number of payouts processed so far (from PayoutProgress.toCursor)"
   currentPayoutsCount: BigInt!
   "Total paid out to winners in this round (from PayoutProgress)"
@@ -495,6 +500,7 @@ type RouletteRound @entity(immutable: false) {
   jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "round")
   "Decoded mask legs (BET_MASK) placed in this round"
   maskLegs: [RouletteMaskLeg!]! @derivedFrom(field: "round")
+  dualLegs: [RouletteDualLeg!]! @derivedFrom(field: "round")
 }
 
 type RouletteBet @entity(immutable: false) {
@@ -536,6 +542,42 @@ type RouletteBet @entity(immutable: false) {
   jackpotPayouts: [JackpotPayout]! @derivedFrom(field: "bet")
   "Decoded mask legs of this ticket (empty when it holds no BET_MASK leg)"
   maskLegs: [RouletteMaskLeg!]! @derivedFrom(field: "bet")
+  dualLegs: [RouletteDualLeg!]! @derivedFrom(field: "bet")
+}
+
+enum RouletteDualVariant {
+  OPPOSITE_COLORS
+  SAME_ENDING
+  WHEEL_NEIGHBORS
+  SUM_37
+  DOUBLE_MASK
+  REFUND_MASK
+  EXACT_PAIR
+  DOUBLE_ZERO
+}
+
+enum RouletteDualOutcome {
+  LOST
+  REFUNDED
+  WON
+}
+
+type RouletteDualLeg @entity(immutable: false) {
+  id: Bytes!
+  bet: RouletteBet!
+  round: RouletteRound!
+  market: Market!
+  transactionHash: Bytes!
+  legIndex: Int!
+  rawNumber: BigInt!
+  amount: BigInt!
+  variant: RouletteDualVariant!
+  roulettePockets: [Int!]!
+  jackpotPockets: [Int!]!
+  maximumReturn: BigInt!
+  outcome: RouletteDualOutcome
+  "Gross return implied by the draw, independent of transfer progress"
+  drawReturn: BigInt
 }
 
 """
