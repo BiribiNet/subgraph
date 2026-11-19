@@ -7,6 +7,7 @@ import { promoteRelease } from './goldsky-promote.mjs';
 import { verifyTipPoints } from './verify-tip-points.mjs';
 
 const MAINNET_FALLBACK_RPC = 'https://arbitrum-one-rpc.publicnode.com';
+const TRANSIENT_RPC_STATUS = new Set([429, 500, 502, 503, 504]);
 
 export function releaseTarget(network, operation, version, previous) {
   if (!['mainnet', 'testnet'].includes(network) || !['inspect', 'validate', 'promote', 'restore-testnet'].includes(operation)) throw Error('Invalid release operation/network');
@@ -43,14 +44,29 @@ export function assertMarkets(markets, manifest) {
   }
 }
 
-export function releaseRpc(target, json) {
+export function releaseRpc(target, json, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
   let endpoint = target.rpc;
   let verified = false;
   let fallbackVerification;
-  const request = async (url, method, params) => (await json(url, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  })).result;
+  const request = async (url, method, params) => {
+    const options = {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return (await json(url, options)).result;
+      } catch (cause) {
+        const transient = TRANSIENT_RPC_STATUS.has(cause.httpStatus) || cause.rpcCode === -32005;
+        if (!transient || attempt >= 2) {
+          const detail = cause.httpStatus ? ` (HTTP ${cause.httpStatus})`
+            : cause.rpcCode !== undefined ? ` (JSON-RPC ${cause.rpcCode})` : '';
+          throw Error(`Arbitrum RPC ${method} failed${detail}`);
+        }
+        await pause(800 * 2 ** attempt);
+      }
+    }
+  };
   const verifyChain = value => {
     if (typeof value !== 'string' || !/^0x[\da-f]+$/i.test(value) || BigInt(value) !== BigInt(target.chainId)) {
       throw Error('RPC chain mismatch');
@@ -94,11 +110,19 @@ export async function runReleaseCheck(env = process.env, {
   async function json(url, options = {}) {
     try {
       const response = await fetcher(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw Error();
+      if (!response.ok) throw Object.assign(Error(), { httpStatus: response.status });
       const body = await response.json();
-      if (body.errors || body.error) throw Error();
+      if (body.errors || body.error) {
+        const code = body.error?.code;
+        throw Object.assign(Error(), { rpcCode: Number.isInteger(code) ? code : undefined });
+      }
       return body;
-    } catch { throw Error('Release request failed; credential-bearing request details omitted'); }
+    } catch (cause) {
+      throw Object.assign(Error('Release request failed; credential-bearing request details omitted'), {
+        httpStatus: cause?.httpStatus,
+        rpcCode: cause?.rpcCode,
+      });
+    }
   }
   // The scoped name listing includes deployment versions AND aliases.
   const entries = (await json(`${API_BASE}/api/admin/subgraph/v1/subgraphs/${target.name}`, { headers: auth })).data;

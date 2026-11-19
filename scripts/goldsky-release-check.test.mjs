@@ -92,6 +92,20 @@ test('a wrong-chain fallback prevents promotion before any tag write', async () 
   assert.equal(f.writes.length, 0);
   assert.equal(f.reports.at(-1).promotionAttempted, false);
 });
+test('a throttled receipt is retried with a bounded delay', async () => {
+  const target = releaseTarget('mainnet', 'promote', '1.1.0', '1.0.0');
+  let receipts = 0;
+  const delays = [];
+  const rpc = releaseRpc(target, async (url, options) => {
+    assert.equal(url, target.rpc);
+    if (JSON.parse(options.body).method === 'eth_chainId') return { result: '0xa4b1' };
+    if (++receipts < 3) throw Object.assign(Error(), { httpStatus: 429 });
+    return { result: 'receipt' };
+  }, async ms => delays.push(ms));
+  await rpc.read('eth_chainId', []);
+  assert.equal(await rpc.read('eth_getTransactionReceipt', ['hash']), 'receipt');
+  assert.deepEqual(delays, [800, 1600]);
+});
 test('mainnet promotion requires comparison and exact vault reconciliation before one private tag move',async()=>{
   const f=fixture(); const report=await runReleaseCheck(env,f.dependencies);
   assert.equal(report.promoted,true);
