@@ -55,7 +55,7 @@ function fixture({ changedProd = false, drift = false, wrongMarket = false, netw
   }}};
 }
 const env={RELEASE_NETWORK:'mainnet',RELEASE_OPERATION:'promote',VERSION:'1.1.0',EXPECTED_LIVE_VERSION:'1.0.0',GOLDSKY_API_TOKEN:'credential'};
-test('mainnet RPC failover verifies the chain before retrying a receipt and stays on the verified endpoint', async () => {
+test('receipt and block readers verify their own fallbacks and keep vault calls on the state provider', async () => {
   const target = releaseTarget('mainnet', 'promote', '1.1.0', '1.0.0');
   const calls = [];
   const rpc = releaseRpc(target, async (url, options) => {
@@ -74,8 +74,14 @@ test('mainnet RPC failover verifies the chain before retrying a receipt and stay
   assert.equal(rpc.endpoint(), target.fallbackRpc);
   assert.deepEqual(calls, [
     [target.rpc, 'eth_chainId'], [target.rpc, 'eth_getTransactionReceipt'],
-    [target.rpc, 'eth_getBlockByNumber'], [target.fallbackRpc, 'eth_chainId'], [target.fallbackRpc, 'eth_getTransactionReceipt'],
+    [target.rpc, 'eth_getBlockByNumber'], [target.receiptFallbackRpc, 'eth_chainId'], [target.fallbackRpc, 'eth_chainId'],
+    [target.receiptFallbackRpc, 'eth_getTransactionReceipt'],
     [target.fallbackRpc, 'eth_getBlockByNumber'],
+  ]);
+  await rpc.read('eth_getTransactionReceipt', ['another-hash']);
+  await rpc.read('eth_call', [{}, '0x123']);
+  assert.deepEqual(calls.slice(-2), [
+    [target.receiptFallbackRpc, 'eth_getTransactionReceipt'], [target.fallbackRpc, 'eth_call'],
   ]);
 });
 
