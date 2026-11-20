@@ -7,6 +7,7 @@ import { promoteRelease } from './goldsky-promote.mjs';
 import { verifyTipPoints } from './verify-tip-points.mjs';
 
 const MAINNET_FALLBACK_RPC = 'https://arbitrum-one-rpc.publicnode.com';
+const MAINNET_RECEIPT_RPC = 'https://arbitrum.drpc.org';
 const TRANSIENT_RPC_STATUS = new Set([429, 500, 502, 503, 504]);
 
 export function releaseTarget(network, operation, version, previous) {
@@ -21,6 +22,7 @@ export function releaseTarget(network, operation, version, previous) {
   return { name, chainId: network === 'mainnet' ? 42161 : 421614,
     rpc: network === 'mainnet' ? 'https://arb1.arbitrum.io/rpc' : 'https://sepolia-rollup.arbitrum.io/rpc',
     fallbackRpc: network === 'mainnet' ? MAINNET_FALLBACK_RPC : null,
+    receiptFallbackRpc: network === 'mainnet' ? MAINNET_RECEIPT_RPC : null,
     manifestPath: network === 'mainnet' ? 'deployments/arbitrum-one.json' : 'deployments/arbitrum-sepolia.json' };
 }
 export function privateEndpoint(name, entry) {
@@ -47,7 +49,8 @@ export function assertMarkets(markets, manifest) {
 export function releaseRpc(target, json, pause = ms => new Promise(resolve => setTimeout(resolve, ms))) {
   let endpoint = target.rpc;
   let verified = false;
-  let fallbackVerification;
+  let receiptEndpoint;
+  const fallbackVerifications = new Map();
   const request = async (url, method, params) => {
     const options = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -73,20 +76,25 @@ export function releaseRpc(target, json, pause = ms => new Promise(resolve => se
     }
   };
   const read = async (method, params) => {
-    const attempted = endpoint;
+    const historicalReceipt = method === 'eth_getTransactionReceipt' && target.receiptFallbackRpc;
+    const attempted = (historicalReceipt && receiptEndpoint) || endpoint;
     if (method !== 'eth_chainId' && !verified) throw Error('Release RPC chain not verified');
     let result;
     try {
       result = await request(attempted, method, params);
     } catch (error) {
-      if (!target.fallbackRpc || attempted === target.fallbackRpc) throw error;
-      fallbackVerification ??= request(target.fallbackRpc, 'eth_chainId', []).then(chain => {
-        verifyChain(chain);
-        return chain;
-      });
-      const chain = await fallbackVerification;
-      endpoint = target.fallbackRpc;
-      result = method === 'eth_chainId' ? chain : await request(endpoint, method, params);
+      const fallback = historicalReceipt ? target.receiptFallbackRpc : target.fallbackRpc;
+      if (!fallback || attempted === fallback) throw error;
+      if (!fallbackVerifications.has(fallback)) {
+        fallbackVerifications.set(fallback, request(fallback, 'eth_chainId', []).then(chain => {
+          verifyChain(chain);
+          return chain;
+        }));
+      }
+      const chain = await fallbackVerifications.get(fallback);
+      if (historicalReceipt) receiptEndpoint = fallback;
+      else endpoint = fallback;
+      result = method === 'eth_chainId' ? chain : await request(fallback, method, params);
     }
     if (method === 'eth_chainId') {
       verifyChain(result);
