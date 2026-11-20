@@ -30,6 +30,7 @@ dataSources:
         - RouletteRound
         - RouletteBet
         - RouletteDualLeg
+        - RouletteDualVariantStat
         - RoulettePlacement
         - DailyStat
         - TokenApproval
