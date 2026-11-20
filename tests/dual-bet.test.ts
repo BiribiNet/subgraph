@@ -74,6 +74,14 @@ describe("Two balls", () => {
     round = RouletteRound.load(roundId)!
     legs = round.dualLegs.load()
     assert.bigIntEquals(round.dualDrawPayout, BigInt.fromI32(19_000_000))
+    assert.entityCount("RouletteDualVariantStat", 3)
+    assert.fieldEquals("RouletteDualVariantStat", "1-WHEEL_NEIGHBORS", "won", "1")
+    assert.fieldEquals("RouletteDualVariantStat", "1-WHEEL_NEIGHBORS", "netResult", "17000000")
+    assert.fieldEquals("RouletteDualVariantStat", "1-REFUND_MASK", "refunded", "1")
+    assert.fieldEquals("RouletteDualVariantStat", "1-REFUND_MASK", "grossReturn", "1000000")
+    assert.fieldEquals("RouletteDualVariantStat", "1-REFUND_MASK", "netResult", "0")
+    assert.fieldEquals("RouletteDualVariantStat", "1-DOUBLE_ZERO", "lost", "1")
+    assert.fieldEquals("RouletteDualVariantStat", "1-DOUBLE_ZERO", "netResult", "-1000000")
     for (let i = 0; i < legs.length; i++) {
       const leg = legs[i]
       const outcome = leg.legIndex == 0 ? "WON" : leg.legIndex == 1 ? "REFUNDED" : "LOST"

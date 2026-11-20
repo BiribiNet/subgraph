@@ -1,5 +1,5 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts"
-import { RouletteBet, RouletteDualLeg, RouletteRound } from "../../generated/schema"
+import { RouletteBet, RouletteDualLeg, RouletteDualVariantStat, RouletteRound } from "../../generated/schema"
 import { DecodedBetData } from "./bet-data"
 import { BET_DUAL } from "./constant"
 import { isRed, wheelIndexOf } from "./special-bet-presets"
@@ -10,6 +10,7 @@ const VARIANTS = [
 ]
 const WINS = [648, 96, 74, 36, 0, 0, 2, 1]
 const ZERO = BigInt.zero()
+const ONE = BigInt.fromI32(1)
 
 export class DualSelection {
   variant: i32
@@ -124,6 +125,7 @@ export function settleDualLegsOfRound(round: RouletteRound, roulette: i32, jackp
     if (selection == null) continue
     const result = dualDrawOutcome(selection, roulette, jackpot)
     const payout = result == "WON" ? leg.maximumReturn : result == "REFUNDED" ? leg.amount : ZERO
+    if (leg.outcome === null) addVariantResult(leg, result, payout)
     leg.outcome = result
     leg.drawReturn = payout
     leg.save()
@@ -131,4 +133,26 @@ export function settleDualLegsOfRound(round: RouletteRound, roulette: i32, jackp
   }
   round.dualDrawPayout = total
   round.save()
+}
+
+function addVariantResult(leg: RouletteDualLeg, outcome: string, payout: BigInt): void {
+  const id = leg.market + "-" + leg.variant
+  let stats = RouletteDualVariantStat.load(id)
+  if (stats == null) {
+    stats = new RouletteDualVariantStat(id)
+    stats.market = leg.market
+    stats.variant = leg.variant
+    stats.won = ZERO
+    stats.refunded = ZERO
+    stats.lost = ZERO
+    stats.wagered = ZERO
+    stats.grossReturn = ZERO
+  }
+  if (outcome == "WON") stats.won = stats.won.plus(ONE)
+  else if (outcome == "REFUNDED") stats.refunded = stats.refunded.plus(ONE)
+  else stats.lost = stats.lost.plus(ONE)
+  stats.wagered = stats.wagered.plus(leg.amount)
+  stats.grossReturn = stats.grossReturn.plus(payout)
+  stats.netResult = stats.grossReturn.minus(stats.wagered)
+  stats.save()
 }

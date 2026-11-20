@@ -562,6 +562,19 @@ enum RouletteDualOutcome {
   WON
 }
 
+"Cumulative draw-calculated results for one variant in one market asset"
+type RouletteDualVariantStat @entity(immutable: false) {
+  id: ID!
+  market: Market!
+  variant: RouletteDualVariant!
+  won: BigInt!
+  refunded: BigInt!
+  lost: BigInt!
+  wagered: BigInt!
+  grossReturn: BigInt!
+  netResult: BigInt!
+}
+
 type RouletteDualLeg @entity(immutable: false) {
   id: Bytes!
   bet: RouletteBet!
