@@ -6,7 +6,7 @@ import { API_BASE, BRB_PROJECT_ID, goldskyToken, verifyBrbProject, validateRelea
 import { promoteRelease } from './goldsky-promote.mjs';
 import { verifyTipPoints } from './verify-tip-points.mjs';
 
-const MAINNET_FALLBACK_RPC = 'https://arbitrum-one-rpc.publicnode.com';
+const MAINNET_FALLBACK_RPC = 'https://arbitrum.drpc.org';
 const TRANSIENT_RPC_STATUS = new Set([429, 500, 502, 503, 504]);
 
 export function releaseTarget(network, operation, version, previous) {
